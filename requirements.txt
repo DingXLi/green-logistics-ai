@@ -1,0 +1,59 @@
+# ============================================
+# Green Logistics AI - Python Dependencies
+# ============================================
+
+# --- Agent Development ---
+google-adk>=0.1.0          # Google Agent Development Kit
+google-generativeai>=0.8.0 # Gemini API
+
+# --- Optimization ---
+ortools>=9.10.0            # Google OR-Tools for VRP
+scipy>=1.12.0              # Scientific computing
+numpy>=1.26.0              # Numerical computing
+pandas>=2.2.0              # Data manipulation
+
+# --- Geospatial ---
+osmnx>=1.9.0               # OpenStreetMap data
+networkx>=3.2.0            # Graph algorithms
+geopandas>=0.14.0          # Geospatial dataframes
+shapely>=2.0.0             # Geometry operations
+folium>=0.16.0             # Interactive maps
+
+# --- Synthetic Data ---
+# data-designer>=0.5.0     # NVIDIA DataDesigner (optional)
+faker>=24.0.0              # Fake data generation
+
+# --- Web Backend ---
+fastapi>=0.110.0           # API framework
+uvicorn>=0.29.0            # ASGI server
+python-multipart>=0.0.9    # Form data
+pydantic>=2.6.0            # Data validation
+websockets>=12.0           # Real-time communication
+
+# --- Web Frontend Build ---
+# (handled by npm/package.json in web/frontend/)
+
+# --- Data & Serialization ---
+pyyaml>=6.0.0              # YAML config
+python-dotenv>=1.0.0       # Environment variables
+jsonschema>=4.21.0         # JSON validation
+
+# --- Logging & Monitoring ---
+loguru>=0.7.0              # Better logging
+rich>=13.7.0               # Terminal formatting
+
+# --- Testing ---
+pytest>=8.0.0              # Testing framework
+pytest-asyncio>=0.23.0     # Async testing
+pytest-cov>=4.1.0          # Coverage
+
+# --- Development ---
+black>=24.0.0              # Code formatting
+isort>=5.13.0              # Import sorting
+mypy>=1.8.0                # Type checking
+pre-commit>=3.6.0          # Git hooks
+
+# --- Utilities ---
+aiohttp>=3.9.0             # Async HTTP
+tenacity>=8.2.0            # Retry logic
+tqdm>=4.66.0               # Progress bars

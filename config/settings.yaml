@@ -1,0 +1,132 @@
+# ============================================
+# Green Logistics AI - Configuration
+# ============================================
+
+# Application Settings
+app:
+  name: "Green Logistics AI"
+  version: "0.1.0"
+  environment: development  # development, staging, production
+  debug: true
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
+
+# AI/LLM Configuration
+ai:
+  provider: google  # google, openai, nvidia
+  model: gemini-2.0-flash
+  temperature: 0.7
+  max_tokens: 4096
+  
+  # API Keys (use environment variables in production)
+  google_api_key: "${GOOGLE_API_KEY}"
+  openai_api_key: "${OPENAI_API_KEY}"
+  nvidia_api_key: "${NVIDIA_API_KEY}"
+
+# Multi-Agent System
+agents:
+  coordinator:
+    optimization_interval_minutes: 30
+    max_concurrent_optimizations: 5
+  
+  supply:
+    default_capacity_tons: 20
+    prediction_horizon_days: 7
+  
+  logistics:
+    fleet_size: 10
+    default_vehicle_capacity_tons: 20
+    co2_emission_rate_kg_per_km: 0.85
+    cost_per_km_sek: 2.6
+  
+  market:
+    co2_price_sek_per_kg: 0.5
+    default_material_prices:
+      mixed_waste: 150
+      metal_scrap: 800
+      wood_waste: 200
+      plastic: 450
+      concrete: 100
+
+# Optimization
+optimization:
+  solver: ortools  # ortools, heuristic
+  time_limit_seconds: 30
+  distance_method: osm  # osm, haversine
+  
+  # Multi-objective weights
+  weights:
+    cost: 0.4
+    distance: 0.3
+    co2_emissions: 0.3
+
+# Geographic Settings
+geography:
+  region: "Sweden"
+  default_location:
+    lat: 57.7089  # Borås
+    lon: 14.1618
+  osm:
+    network_type: drive
+    cache_enabled: true
+
+# Data Generation
+synthetic_data:
+  seed: 42
+  iot:
+    telemetry_interval_minutes: 5
+    default_duration_hours: 8
+  supply:
+    intervals_per_day: 24
+  demand:
+    priority_weights:
+      low: 10
+      normal: 50
+      high: 30
+      urgent: 10
+
+# Database (optional, for persistence)
+database:
+  enabled: false
+  type: sqlite  # sqlite, postgresql
+  path: "data_storage/green_logistics.db"
+  
+  # PostgreSQL settings
+  # host: localhost
+  # port: 5432
+  # name: green_logistics
+  # user: postgres
+  # password: "${DB_PASSWORD}"
+
+# Redis Cache
+redis:
+  enabled: false
+  host: localhost
+  port: 6379
+  db: 0
+
+# Logging
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {module} | {message}"
+  file: "logs/green_logistics.log"
+  rotation: "10 MB"
+  retention: "7 days"
+
+# Monitoring
+monitoring:
+  enabled: false
+  prometheus_port: 9090
+  health_check_interval_seconds: 30
+
+# Frontend
+frontend:
+  enabled: true
+  port: 3000
+  build_dir: "web/frontend/dist"

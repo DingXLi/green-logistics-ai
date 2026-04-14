@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # --- Backend API ---
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: green-logistics-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./agents:/app/agents
+      - ./optimization:/app/optimization
+      - ./data:/app/data
+      - ./synthetic:/app/synthetic
+      - ./config:/app/config
+      - ./data_storage:/app/data_storage
+    networks:
+      - green-logistics-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- Frontend ---
+  frontend:
+    build:
+      context: ./web/frontend
+      dockerfile: Dockerfile
+    container_name: green-logistics-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - green-logistics-net
+    restart: unless-stopped
+
+  # --- Redis Cache (optional) ---
+  redis:
+    image: redis:7-alpine
+    container_name: green-logistics-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - green-logistics-net
+    restart: unless-stopped
+
+networks:
+  green-logistics-net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  data_storage:
