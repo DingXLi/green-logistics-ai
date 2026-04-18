@@ -9,7 +9,7 @@
 """
 
 from google.adk import Agent
-from google.adk.tools import Tool
+from google.adk import tools
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
@@ -147,10 +147,11 @@ class MarketAgent:
         
         for supply in supply_offers:
             for demand in demand_requests:
-                if supply["material_type"] in demand["preferred_materials"]:
+                # 检查材料类型是否匹配
+                if supply.get("material_type") in demand.get("preferred_materials", []):
                     match_tons = min(
-                        supply["available_tons"],
-                        demand["current_demand_tons"]
+                        supply.get("available_tons", 0),
+                        demand.get("demand_tons", demand.get("current_demand_tons", 0))
                     )
                     if match_tons > 0:
                         matches.append({
@@ -190,31 +191,11 @@ class MarketAgent:
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
         return [
-            Tool(
-                name="get_demand_status",
-                description="Get status of all demand points",
-                callback=self.get_demand_status
-            ),
-            Tool(
-                name="get_material_price",
-                description="Get current price for a material type",
-                callback=self.get_material_price
-            ),
-            Tool(
-                name="calculate_profit",
-                description="Calculate profit for a transaction",
-                callback=self.calculate_profit
-            ),
-            Tool(
-                name="match_supply_demand",
-                description="Match supply offers with demand requests",
-                callback=self.match_supply_demand
-            ),
-            Tool(
-                name="predict_demand",
-                description="Predict demand for next N days",
-                callback=self.predict_demand
-            )
+            self.get_demand_status,
+            self.get_material_price,
+            self.calculate_profit,
+            self.match_supply_demand,
+            self.predict_demand
         ]
 
 

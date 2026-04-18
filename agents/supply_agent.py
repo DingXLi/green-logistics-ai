@@ -8,7 +8,7 @@
 """
 
 from google.adk import Agent
-from google.adk.tools import Tool
+from google.adk import tools
 from typing import Optional, Dict, Any
 from datetime import datetime
 import asyncio
@@ -96,22 +96,12 @@ class SupplyAgent:
     
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
+        # 注：新版 ADK 使用 FunctionTool，但简单场景可以直接调用方法
+        # 这里返回方法引用供协调器调用
         return [
-            Tool(
-                name="get_stock",
-                description="Get current waste stock at this supply point",
-                callback=self.get_current_stock
-            ),
-            Tool(
-                name="predict_supply",
-                description="Predict future waste supply for next N days",
-                callback=self.predict_supply
-            ),
-            Tool(
-                name="request_collection",
-                description="Request waste collection from logistics agent",
-                callback=self.request_collection
-            )
+            self.get_current_stock,
+            self.predict_supply,
+            self.request_collection
         ]
 
 

@@ -9,7 +9,7 @@
 """
 
 from google.adk import Agent
-from google.adk.tools import Tool
+from google.adk import tools
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
@@ -161,31 +161,11 @@ class LogisticsAgent:
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
         return [
-            Tool(
-                name="get_fleet_status",
-                description="Get current fleet status and availability",
-                callback=self.get_fleet_status
-            ),
-            Tool(
-                name="get_vehicle_details",
-                description="Get details of a specific vehicle",
-                callback=self.get_vehicle_details
-            ),
-            Tool(
-                name="assign_route",
-                description="Assign a route to an available vehicle",
-                callback=self.assign_route
-            ),
-            Tool(
-                name="calculate_route_cost",
-                description="Calculate cost breakdown for a route",
-                callback=self.calculate_route_cost
-            ),
-            Tool(
-                name="optimize_routes",
-                description="Optimize routes for multiple vehicles using VRP solver",
-                callback=self.optimize_routes
-            )
+            self.get_fleet_status,
+            self.get_vehicle_details,
+            self.assign_route,
+            self.calculate_route_cost,
+            self.optimize_routes
         ]
 
 
