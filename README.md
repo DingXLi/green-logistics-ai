@@ -1,122 +1,174 @@
-# 🦞 多智能体 AI 系统 - 绿色物流优化
+# 🦞 Multi-Agent AI System for Green Logistics Optimization
+# 多智能体 AI 系统 - 绿色物流优化
 
-**Multi-Agent AI System for Green Logistics**
+---
 
-瑞典布罗斯大学 (University of Borås) 实习项目
+## 🌍 English Version
 
-## 📋 项目概述
+### Overview
 
-开发一个多智能体 AI 系统，优化瑞典循环经济中的废料物流，实现：
-- ✅ 最大化利润
-- ✅ 最小化碳排放
-- ✅ 减少空驶运输
+A multi-agent AI system for optimizing waste material logistics in the Swedish circular economy.
 
-## 🏗️ 系统架构
+**Goals:**
+- ✅ Maximize profitability
+- ✅ Minimize carbon emissions
+- ✅ Reduce empty transport runs
+
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Web Dashboard (React)                     │
-│              地图可视化 + KPI 展示 + 模拟控制                  │
+│              Map Visualization + KPI Display + Sim Control    │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Backend API (FastAPI)                      │
-│              请求路由 + 结果缓存 + 数据服务                    │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  Multi-Agent System (ADK)                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ Supply Agent │  │ Market Agent │  │Logistics Agent│      │
-│  │  供应智能体   │  │  市场智能体   │  │  物流智能体    │      │
+│  │ Supply Agent │  │ Market Agent │  │Logistics Agent│       │
 │  └──────────────┘  └──────────────┘  └──────────────┘       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Optimization Engine (OR-Tools + GPU)            │
-│                    VRP 求解器 + 多目标优化                      │
+│              Optimization Engine (OR-Tools + GPU)             │
+│                    VRP Solver + Multi-Objective               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Data Layer (Synthetic + OSM)                    │
-│    合成数据引擎 + OpenStreetMap + IoT 遥测模拟                 │
+│         Synthetic Data Engine + OSM + IoT Telemetry          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 目录结构
+### Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| **Agent Framework** | Google ADK |
+| **AI Model** | Google Gemini |
+| **Optimization** | Google OR-Tools |
+| **Web Backend** | FastAPI |
+| **Web Frontend** | React + Vite |
+| **Maps** | Leaflet/Mapbox |
+| **Geospatial** | OSMnx, NetworkX, Geopandas |
+| **Synthetic Data** | NVIDIA DataDesigner |
+| **Containerization** | Docker, Docker Compose |
+
+### Quick Start
+
+```bash
+# Clone
+git clone git@github.com:DingXLi/green-logistics-ai.git
+cd green-logistics-ai
+
+# Setup venv
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure API keys
+export GOOGLE_API_KEY="your-key-here"
+
+# Run
+python -m agents.coordinator
+# or: docker-compose up -d
+```
+
+### Project Structure
 
 ```
 green-logistics-ai/
-├── agents/                 # 多智能体系统
-│   ├── supply_agent.py     # 供应智能体
-│   ├── market_agent.py     # 市场智能体
-│   ├── logistics_agent.py  # 物流智能体
-│   └── coordinator.py      # 协调器
-├── optimization/           # 优化求解
-│   ├── vrp_solver.py       # VRP 求解器
-│   ├── cost_matrix.py      # 成本矩阵计算
-│   └── multi_objective.py  # 多目标优化
-├── data/                   # 数据处理
-│   ├── osm_loader.py       # OSM 数据加载
-│   ├── distance_matrix.py  # 距离矩阵计算
-│   └── nodes.py            # 物流节点定义
-├── synthetic/              # 合成数据
-│   ├── data_generator.py   # 数据生成器
-│   ├── iot_simulator.py    # IoT 遥测模拟
-│   └── validators.py       # 数据验证
-├── web/                    # Web 应用
-│   ├── frontend/           # React 前端
-│   └── backend/            # FastAPI 后端
-├── config/                 # 配置文件
-├── tests/                  # 测试
-├── docs/                   # 文档
-├── requirements.txt        # Python 依赖
-├── docker-compose.yml      # Docker 配置
-└── README.md
+├── agents/                 # Multi-agent system
+│   ├── supply_agent.py     # Supply agent
+│   ├── market_agent.py     # Market agent
+│   ├── logistics_agent.py  # Logistics agent
+│   └── coordinator.py      # Coordinator
+├── optimization/           # Optimization engine
+│   └── vrp_solver.py       # VRP solver
+├── data/                   # Data processing
+│   └── osm_loader.py       # OSM data loader
+├── synthetic/              # Synthetic data
+│   └── data_generator.py   # Data generator
+├── web/                    # Web application
+│   ├── frontend/           # React frontend
+│   └── backend/           # FastAPI backend
+├── tests/                  # Tests
+├── requirements.txt        # Dependencies
+└── docker-compose.yml      # Docker config
 ```
 
-## 🚀 快速开始
+### Core Features
 
-### 1. 环境准备
+1. **Geospatial Modeling** - OSM-based Swedish logistics network
+2. **Synthetic Data Engine** - Supply, demand, IoT telemetry simulation
+3. **VRP Baseline** - OR-Tools powered vehicle routing
+4. **Multi-Agent Coordination** - Supply-Market-Logistics agent communication
 
-```bash
-# 克隆项目
-cd green-logistics-ai
+### References
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
+- [Google ADK](https://github.com/google/adk-python)
+- [NVIDIA DataDesigner](https://github.com/NVIDIA-NeMo/DataDesigner)
+- [Google OR-Tools VRP](https://developers.google.com/optimization/routing/vrp)
+- [OpenStreetMap](https://www.openstreetmap.org)
 
-# 安装依赖
-pip install -r requirements.txt
+---
+
+## 🇨🇳 中文版
+
+### 项目概述
+
+用于优化瑞典循环经济中废料物流的多智能体 AI 系统。
+
+**核心目标：**
+- ✅ 最大化利润
+- ✅ 最小化碳排放
+- ✅ 减少空驶运输
+
+### 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Web Dashboard (React)                     │
+│                  地图可视化 + KPI 展示 + 模拟控制              │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Backend API (FastAPI)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Multi-Agent System (ADK)                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │ 供应智能体    │  │  市场智能体   │  │  物流智能体   │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Optimization Engine (OR-Tools + GPU)           │
+│                    VRP 求解器 + 多目标优化                    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Data Layer (Synthetic + OSM)                   │
+│         合成数据引擎 + OpenStreetMap + IoT 遥测              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 2. 配置 API Keys
-
-```bash
-# Google Gemini (免费)
-export GOOGLE_API_KEY="your-key-here"
-
-# NVIDIA (可选，用于 DataDesigner)
-export NVIDIA_API_KEY="your-key-here"
-```
-
-### 3. 运行
-
-```bash
-# 开发模式
-docker-compose up -d
-
-# 或直接运行 Python
-python -m agents.coordinator
-```
-
-## 🛠️ 技术栈
+### 技术栈
 
 | 类别 | 技术 |
 |------|------|
@@ -130,44 +182,65 @@ python -m agents.coordinator
 | **合成数据** | NVIDIA DataDesigner |
 | **容器化** | Docker, Docker Compose |
 
-## 📊 核心功能
+### 快速开始
 
-### 1. 地理空间数据建模
-- 使用 OpenStreetMap 定义瑞典物流节点
-- 计算全量道路距离矩阵
-- 节点类型：供应源、破碎厂、需求点、仓库
+```bash
+# 克隆项目
+git clone git@github.com:DingXLi/green-logistics-ai.git
+cd green-logistics-ai
 
-### 2. 合成数据引擎
-- 每日废料供应量模拟
-- 需求点动态生成
-- IoT 设备遥测数据（位置、负载、碳排放）
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或: venv\Scripts\activate  # Windows
 
-### 3. VRP 基线求解
-- OR-Tools 实现基础 VRP
-- 性能基准对比
-- 多目标成本矩阵（成本/距离/碳排放）
+# 安装依赖
+pip install -r requirements.txt
 
-### 4. 多智能体协调
-- 供应 - 市场 - 物流智能体通信
-- 分布式决策
-- 实时优化响应
+# 配置 API Keys
+export GOOGLE_API_KEY="your-key-here"
 
-## 📝 开发日志
+# 运行
+python -m agents.coordinator
+# 或: docker-compose up -d
+```
 
-- **2026-04-13**: 项目初始化，搭建基础框架
+### 目录结构
 
-## 📚 参考资料
+```
+green-logistics-ai/
+├── agents/                 # 多智能体系统
+│   ├── supply_agent.py     # 供应智能体
+│   ├── market_agent.py     # 市场智能体
+│   ├── logistics_agent.py  # 物流智能体
+│   └── coordinator.py      # 协调器
+├── optimization/           # 优化求解
+│   └── vrp_solver.py       # VRP 求解器
+├── data/                   # 数据处理
+│   └── osm_loader.py       # OSM 数据加载
+├── synthetic/              # 合成数据
+│   └── data_generator.py   # 数据生成器
+├── web/                    # Web 应用
+│   ├── frontend/           # React 前端
+│   └── backend/            # FastAPI 后端
+├── tests/                  # 测试
+├── requirements.txt        # Python 依赖
+└── docker-compose.yml      # Docker 配置
+```
+
+### 核心功能
+
+1. **地理空间建模** - 基于 OSM 的瑞典物流网络
+2. **合成数据引擎** - 供应、需求、IoT 遥测模拟
+3. **VRP 基线求解** - OR-Tools 驱动的车辆路径优化
+4. **多智能体协调** - 供应-市场-物流智能体通信
+
+### 参考资料
 
 - [Google ADK](https://github.com/google/adk-python)
 - [NVIDIA DataDesigner](https://github.com/NVIDIA-NeMo/DataDesigner)
 - [Google OR-Tools VRP](https://developers.google.com/optimization/routing/vrp)
 - [OpenStreetMap](https://www.openstreetmap.org)
-
-## 👥 团队
-
-- **实习开发者**: [你的名字]
-- **导师**: University of Borås - Industrial Engineering and Management
-- **AI 助手**: 代码龙虾 🦞
 
 ---
 
