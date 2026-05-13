@@ -1,4 +1,4 @@
-# 🦞 Multi-Agent AI System for Green Logistics Optimization
+# ♻️ Multi-Agent AI System for Green Logistics Optimization
 # 多智能体 AI 系统 - 绿色物流优化
 
 ---
