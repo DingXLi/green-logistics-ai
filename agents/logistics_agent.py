@@ -146,17 +146,63 @@ class LogisticsAgent:
         """
         优化多车辆路径
         
-        TODO: 集成 OR-Tools VRP 求解器
-        当前为简化版本
+        集成 OR-Tools VRP 求解器
         """
-        # 这里将调用 optimization/vrp_solver.py
-        return {
-            "status": "optimization_pending",
-            "message": "VRP solver integration pending",
-            "pickup_count": len(pickup_locations),
-            "delivery_count": len(delivery_locations),
-            "available_vehicles": sum(1 for v in self.vehicles if v["status"] == "available")
-        }
+        from optimization.vrp_solver import VRPSolver, Location, Vehicle
+        
+        solver = VRPSolver()
+        
+        # 添加 depot 作为起点
+        depot = Location(
+            id="DEPOT",
+            lat=self.depot_location["lat"],
+            lon=self.depot_location["lon"],
+            type="depot"
+        )
+        solver.add_location(depot)
+        
+        # 添加 pickup 点
+        for i, loc in enumerate(pickup_locations):
+            solver.add_location(Location(
+                id=loc.get("id", f"PICKUP{i}"),
+                lat=loc.get("lat", loc.get("location", {}).get("lat", 57.7)),
+                lon=loc.get("lon", loc.get("location", {}).get("lon", 14.2)),
+                demand_tons=loc.get("tons", 5.0),
+                type="pickup"
+            ))
+        
+        # 添加 delivery 点
+        for i, loc in enumerate(delivery_locations):
+            solver.add_location(Location(
+                id=loc.get("id", f"DELIVERY{i}"),
+                lat=loc.get("lat", loc.get("location", {}).get("lat", 57.7)),
+                lon=loc.get("lon", loc.get("location", {}).get("lon", 14.2)),
+                demand_tons=-loc.get("tons", 8.0),  # 负值表示卸货
+                type="delivery"
+            ))
+        
+        # 添加车辆（从可用车辆中分配）
+        available_vehicles = [v for v in self.vehicles if v["status"] == "available"]
+        for i, vehicle in enumerate(available_vehicles[:len(pickup_locations)]):
+            solver.add_vehicle(Vehicle(
+                id=vehicle["vehicle_id"],
+                capacity_tons=vehicle["max_capacity_tons"],
+                start_location=depot,
+                co2_rate=vehicle["co2_emission_rate"],
+                cost_per_km=2.6
+            ))
+        
+        # 求解
+        result = solver.solve(time_limit_seconds=30)
+        
+        # 更新车辆状态
+        for route_info in result.get("routes", []):
+            for vehicle in self.vehicles:
+                if vehicle["vehicle_id"] == route_info["vehicle_id"]:
+                    vehicle["status"] = "en_route"
+                    break
+        
+        return result
     
     def get_tools(self) -> list:
         """返回智能体可用的工具"""

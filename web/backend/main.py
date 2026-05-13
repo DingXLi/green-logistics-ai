@@ -12,6 +12,7 @@ from datetime import datetime
 from loguru import logger
 import sys
 import os
+import random
 
 # 添加父目录到路径以便导入
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -223,9 +224,25 @@ async def get_fleet_snapshot():
     vehicle_ids = [f"VEH{i:03d}" for i in range(10)]
     snapshot = data_generator.generate_fleet_snapshot(vehicle_ids)
     
+    # 转换为前端期望的格式
+    vehicles = []
+    for v in snapshot:
+        vehicles.append({
+            "vehicle_id": v["vehicle_id"],
+            "status": v["status"],
+            "latitude": v["location"]["lat"],
+            "longitude": v["location"]["lon"],
+            "battery_level": v["fuel_level"],
+            "cargo_load": v["current_load_tons"],
+            "speed": 0 if v["status"] == "available" else random.uniform(30, 70),
+            "carbon_emission_rate": 0.85,
+            "heading": random.uniform(0, 360),
+            "last_update": v["last_update"]
+        })
+    
     return {
         "timestamp": datetime.now().isoformat(),
-        "vehicles": snapshot
+        "vehicles": vehicles
     }
 
 

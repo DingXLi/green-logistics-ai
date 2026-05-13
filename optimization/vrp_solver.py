@@ -192,14 +192,23 @@ class VRPSolver:
         for v in range(len(self.vehicles)):
             index = routing.Start(v)
             route = []
+            waypoints = []  # 带坐标的路径点
             route_distance = 0
             
             while not routing.IsEnd(index):
                 node = manager.IndexToNode(index)
+                loc = self.locations[node]
                 route.append({
-                    "location_id": self.locations[node].id,
-                    "location_type": self.locations[node].type,
-                    "demand_tons": self.locations[node].demand_tons
+                    "location_id": loc.id,
+                    "location_type": loc.type,
+                    "demand_tons": loc.demand_tons
+                })
+                # 添加坐标供地图使用
+                waypoints.append({
+                    "lat": loc.lat,
+                    "lon": loc.lon,
+                    "location_id": loc.id,
+                    "type": loc.type
                 })
                 
                 previous_index = index
@@ -218,9 +227,12 @@ class VRPSolver:
             routes.append({
                 "vehicle_id": vehicle.id,
                 "route": route,
+                "waypoints": waypoints,  # 供地图使用的坐标
                 "distance_km": round(route_distance, 2),
                 "cost_sek": round(route_cost, 2),
-                "co2_kg": round(route_co2, 2)
+                "co2_kg": round(route_co2, 2),
+                "cargo_tons": sum(self.locations[manager.NodeToIndex(node)].demand_tons 
+                                  for node in range(len(self.locations)))
             })
         
         return {
@@ -230,7 +242,8 @@ class VRPSolver:
             "total_cost_sek": round(total_cost, 2),
             "total_co2_kg": round(total_co2, 2),
             "num_vehicles_used": sum(1 for r in routes if len(r["route"]) > 1),
-            "computation_method": "OR-Tools"
+            "computation_method": "OR-Tools",
+            "objective": "balanced"
         }
     
     def _solve_fallback(self) -> Dict[str, Any]:

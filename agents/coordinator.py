@@ -110,14 +110,37 @@ class MultiAgentCoordinator:
         
         # 4. 优化物流路径
         if matches["total_matches"] > 0:
-            pickup_locations = [
-                {"id": m["supply_id"], "tons": m["tons"]}
-                for m in matches["matches"]
-            ]
-            delivery_locations = [
-                {"id": m["demand_id"], "tons": m["tons"]}
-                for m in matches["matches"]
-            ]
+            pickup_locations = []
+            delivery_locations = []
+            
+            for m in matches["matches"]:
+                # 获取供应点坐标
+                supply_loc = None
+                for agent_id, agent in self.supply_agents.items():
+                    if agent_id == m["supply_id"]:
+                        stock = await agent.get_current_stock()
+                        supply_loc = stock["location"]
+                        break
+                
+                # 获取需求点坐标
+                demand_loc = None
+                for dp in demand_status:
+                    if dp["id"] == m["demand_id"]:
+                        demand_loc = dp["location"]
+                        break
+                
+                pickup_locations.append({
+                    "id": m["supply_id"],
+                    "tons": m["tons"],
+                    "lat": supply_loc["lat"] if supply_loc else 57.7,
+                    "lon": supply_loc["lon"] if supply_loc else 14.2
+                })
+                delivery_locations.append({
+                    "id": m["demand_id"],
+                    "tons": m["tons"],
+                    "lat": demand_loc["lat"] if demand_loc else 57.7,
+                    "lon": demand_loc["lon"] if demand_loc else 14.2
+                })
             
             route_optimization = await self.logistics_agent.optimize_routes(
                 pickup_locations=pickup_locations,
