@@ -1,17 +1,16 @@
 /**
- * LogisticsNodes.jsx - 物流节点标记
+ * LogisticsNodes.jsx - Logistics Node Markers
  * 
- * 显示：
- * - 供应点（绿色 - 废料来源）
- * - 需求点（蓝色 - 回收厂/买家）
- * - 仓库/中转站（黄色）
+ * Displays:
+ * - Supply points (green - waste sources)
+ * - Demand points (blue - recycling plants/buyers)
+ * - Depots/Warehouses (yellow)
  */
 
 import { Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import { useMemo } from 'react'
 
-// 自定义图标创建函数
 const createIcon = (color, symbol) => {
   return L.divIcon({
     className: 'custom-marker',
@@ -37,16 +36,14 @@ const createIcon = (color, symbol) => {
   })
 }
 
-// 节点类型对应的图标
 const ICONS = {
-  supply: createIcon('#22c55e', '📦'),    // 绿色 - 供应点
-  demand: createIcon('#3b82f6', '🏭'),    // 蓝色 - 需求点
-  depot: createIcon('#eab308', '🏬'),    // 黄色 - 仓库
-  crusher: createIcon('#f97316', '⚙️')     // 橙色 - 破碎厂
+  supply: createIcon('#22c55e', '📦'),
+  demand: createIcon('#3b82f6', '🏭'),
+  depot: createIcon('#eab308', '🏬'),
+  crusher: createIcon('#f97316', '⚙️')
 }
 
 function LogisticsNodes({ supplyPoints = [], demandPoints = [] }) {
-  // 渲染供应点标记
   const supplyMarkers = useMemo(() => {
     return supplyPoints.map((point) => (
       <Marker
@@ -57,20 +54,20 @@ function LogisticsNodes({ supplyPoints = [], demandPoints = [] }) {
         <Popup>
           <div style={{ minWidth: '180px' }}>
             <h4 style={{ margin: '0 0 8px 0', color: '#22c55e' }}>
-              📦 供应点 {point.agent_id}
+              📦 Supply Point {point.agent_id}
             </h4>
             <table style={{ fontSize: '12px', width: '100%' }}>
               <tbody>
                 <tr>
-                  <td><strong>库存:</strong></td>
-                  <td>{point.stock_tons.toFixed(1)} 吨</td>
+                  <td><strong>Stock:</strong></td>
+                  <td>{point.stock_tons.toFixed(1)} tons</td>
                 </tr>
                 <tr>
-                  <td><strong>物料:</strong></td>
+                  <td><strong>Material:</strong></td>
                   <td>{point.material_type}</td>
                 </tr>
                 <tr>
-                  <td><strong>位置:</strong></td>
+                  <td><strong>Location:</strong></td>
                   <td>
                     {point.location.lat.toFixed(4)}, 
                     {point.location.lon.toFixed(4)}
@@ -84,7 +81,6 @@ function LogisticsNodes({ supplyPoints = [], demandPoints = [] }) {
     ))
   }, [supplyPoints])
 
-  // 渲染需求点标记
   const demandMarkers = useMemo(() => {
     return demandPoints.map((point, index) => (
       <Marker
@@ -95,17 +91,17 @@ function LogisticsNodes({ supplyPoints = [], demandPoints = [] }) {
         <Popup>
           <div style={{ minWidth: '180px' }}>
             <h4 style={{ margin: '0 0 8px 0', color: '#3b82f6' }}>
-              🏭 需求点 {point.id || `DEM${index + 1}`}
+              🏭 Demand Point {point.id || `DEM${index + 1}`}
             </h4>
             <table style={{ fontSize: '12px', width: '100%' }}>
               <tbody>
                 <tr>
-                  <td><strong>需求:</strong></td>
-                  <td>{point.current_demand_tons?.toFixed(1) || point.demand_tons?.toFixed(1) || 'N/A'} 吨</td>
+                  <td><strong>Demand:</strong></td>
+                  <td>{point.current_demand_tons?.toFixed(1) || point.demand_tons?.toFixed(1) || 'N/A'} tons</td>
                 </tr>
                 <tr>
-                  <td><strong>物料:</strong></td>
-                  <td>{point.preferred_materials?.join(', ') || '混合'}</td>
+                  <td><strong>Materials:</strong></td>
+                  <td>{point.preferred_materials?.join(', ') || 'Mixed'}</td>
                 </tr>
               </tbody>
             </table>

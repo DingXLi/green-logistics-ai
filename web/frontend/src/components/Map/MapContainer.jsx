@@ -1,10 +1,10 @@
 /**
- * MapContainer.jsx - 物流地图主组件
+ * MapContainer.jsx - Main Logistics Map Component
  * 
- * 功能：
- * - 瑞典地图初始化（中心：斯德哥尔摩）
- * - 缩放控件
- * - 实时刷新车辆位置
+ * Features:
+ * - Sweden map initialization (centered on Stockholm)
+ * - Zoom controls
+ * - Real-time vehicle position refresh
  */
 
 import { useState, useEffect } from 'react'
@@ -12,12 +12,12 @@ import { MapContainer as LeafletMap, TileLayer, ZoomControl } from 'react-leafle
 import LogisticsNodes from './LogisticsNodes'
 import VehicleLayer from './VehicleLayer'
 import RouteLayer from './RouteLayer'
-import MapLegend from './Legend'
+import MapLegend from './MapLegend'
 import 'leaflet/dist/leaflet.css'
 
 const API_BASE = 'http://localhost:8000/api'
 
-// 瑞典中心坐标
+// Sweden center coordinates
 const SWEDEN_CENTER = [62.173, 16.545]
 const DEFAULT_ZOOM = 5
 
@@ -27,7 +27,6 @@ function MapContainer({ optimizationResult }) {
   const [vehicleSnapshot, setVehicleSnapshot] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // 获取供应点数据
   const fetchSupplyPoints = async () => {
     try {
       const res = await fetch(`${API_BASE}/supply-points`)
@@ -38,12 +37,10 @@ function MapContainer({ optimizationResult }) {
     }
   }
 
-  // 获取需求点数据
   const fetchDemandPoints = async () => {
     try {
       const res = await fetch(`${API_BASE}/status`)
       const data = await res.json()
-      // 从 API 响应中提取需求点（如果有的话）
       if (data.demand_status) {
         setDemandPoints(data.demand_status)
       }
@@ -52,7 +49,6 @@ function MapContainer({ optimizationResult }) {
     }
   }
 
-  // 获取车队快照
   const fetchFleetSnapshot = async () => {
     try {
       const res = await fetch(`${API_BASE}/fleet-snapshot`)
@@ -63,7 +59,6 @@ function MapContainer({ optimizationResult }) {
     }
   }
 
-  // 初始加载 + 定时刷新
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
@@ -77,12 +72,11 @@ function MapContainer({ optimizationResult }) {
 
     loadData()
 
-    // 每 10 秒刷新车辆位置
+    // Refresh vehicle positions every 10 seconds
     const interval = setInterval(fetchFleetSnapshot, 10000)
     return () => clearInterval(interval)
   }, [])
 
-  // 当有新的优化结果时，刷新数据
   useEffect(() => {
     if (optimizationResult) {
       fetchSupplyPoints()
@@ -98,34 +92,34 @@ function MapContainer({ optimizationResult }) {
         zoomControl={false}
         style={{ height: '100%', width: '100%' }}
       >
-        {/* OSM 图层 - 免费无需 API key */}
+        {/* OSM tile layer - free, no API key needed */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* 缩放控件 - 右上角 */}
+        {/* Zoom controls - top right */}
         <ZoomControl position="topright" />
 
-        {/* 物流节点层 */}
+        {/* Logistics nodes layer */}
         <LogisticsNodes 
           supplyPoints={supplyPoints} 
           demandPoints={demandPoints}
         />
 
-        {/* 车辆位置层 */}
+        {/* Vehicle positions layer */}
         <VehicleLayer vehicles={vehicleSnapshot} />
 
-        {/* 路线可视化层 */}
+        {/* Route visualization layer */}
         <RouteLayer optimizationResult={optimizationResult} />
 
-        {/* 图例 */}
+        {/* Legend */}
         <MapLegend />
       </LeafletMap>
 
       {loading && (
         <div className="map-loading-overlay">
-          <span>🗺️ 加载地图数据...</span>
+          <span>🗺️ Loading map data...</span>
         </div>
       )}
     </div>

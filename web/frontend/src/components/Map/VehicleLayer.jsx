@@ -1,26 +1,24 @@
 /**
- * VehicleLayer.jsx - 车辆实时位置层
+ * VehicleLayer.jsx - Real-time Vehicle Position Layer
  * 
- * 功能：
- * - 显示车队当前位置
- * - 根据状态着色（行驶中/空闲/充电中）
- * - 点击显示详情
- * - 轨迹历史（可选）
+ * Features:
+ * - Display fleet current positions
+ * - Color by status (en_route/available/charging/idle)
+ * - Click for details
+ * - Trail history (optional)
  */
 
 import { Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet'
 import { useMemo, useState } from 'react'
 
-// 车辆状态颜色
 const STATUS_COLORS = {
-  en_route: '#3b82f6',    // 蓝色 - 行驶中
-  available: '#22c55e',    // 绿色 - 可用
-  charging: '#eab308',    // 黄色 - 充电中
-  idle: '#9ca3af'         // 灰色 - 闲置
+  en_route: '#3b82f6',
+  available: '#22c55e',
+  charging: '#eab308',
+  idle: '#9ca3af'
 }
 
-// 车辆图标
 const createVehicleIcon = (status, heading = 0) => {
   const color = STATUS_COLORS[status] || STATUS_COLORS.idle
   const rotation = heading || 0
@@ -45,13 +43,10 @@ const createVehicleIcon = (status, heading = 0) => {
 }
 
 function VehicleLayer({ vehicles = [] }) {
-  const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [showTrails, setShowTrails] = useState(false)
 
-  // 车辆标记
   const vehicleMarkers = useMemo(() => {
     return vehicles.map((vehicle) => {
-      // 跳过无效坐标
       if (!vehicle.latitude || !vehicle.longitude) return null
       
       return (
@@ -59,9 +54,6 @@ function VehicleLayer({ vehicles = [] }) {
           key={vehicle.vehicle_id}
           position={[vehicle.latitude, vehicle.longitude]}
           icon={createVehicleIcon(vehicle.status, vehicle.heading)}
-          eventHandlers={{
-            click: () => setSelectedVehicle(vehicle)
-          }}
         >
           <Popup>
             <div style={{ minWidth: '200px' }}>
@@ -71,25 +63,25 @@ function VehicleLayer({ vehicles = [] }) {
               <table style={{ fontSize: '11px', width: '100%' }}>
                 <tbody>
                   <tr>
-                    <td><strong>状态:</strong></td>
+                    <td><strong>Status:</strong></td>
                     <td style={{ color: STATUS_COLORS[vehicle.status] }}>
                       {getStatusText(vehicle.status)}
                     </td>
                   </tr>
                   <tr>
-                    <td><strong>载重:</strong></td>
-                    <td>{vehicle.cargo_load?.toFixed(1) || 0} 吨</td>
+                    <td><strong>Load:</strong></td>
+                    <td>{vehicle.cargo_load?.toFixed(1) || 0} tons</td>
                   </tr>
                   <tr>
-                    <td><strong>电量:</strong></td>
+                    <td><strong>Battery:</strong></td>
                     <td>{vehicle.battery_level || 100}%</td>
                   </tr>
                   <tr>
-                    <td><strong>速度:</strong></td>
+                    <td><strong>Speed:</strong></td>
                     <td>{vehicle.speed || 0} km/h</td>
                   </tr>
                   <tr>
-                    <td><strong>碳排率:</strong></td>
+                    <td><strong>CO₂ Rate:</strong></td>
                     <td>{vehicle.carbon_emission_rate?.toFixed(2) || 0} kg/km</td>
                   </tr>
                 </tbody>
@@ -101,7 +93,6 @@ function VehicleLayer({ vehicles = [] }) {
     })
   }, [vehicles])
 
-  // 轨迹线（如果启用）
   const trailLines = useMemo(() => {
     if (!showTrails) return null
 
@@ -123,7 +114,6 @@ function VehicleLayer({ vehicles = [] }) {
       {vehicleMarkers}
       {trailLines}
       
-      {/* 轨迹切换按钮 */}
       <div className="vehicle-layer-controls" style={{
         position: 'absolute',
         top: '10px',
@@ -140,20 +130,19 @@ function VehicleLayer({ vehicles = [] }) {
             checked={showTrails}
             onChange={(e) => setShowTrails(e.target.checked)}
           />
-          显示轨迹
+          Show Trails
         </label>
       </div>
     </>
   )
 }
 
-// 状态文本映射
 function getStatusText(status) {
   const statusMap = {
-    en_route: '🚛 行驶中',
-    available: '✅ 可用',
-    charging: '🔌 充电中',
-    idle: '⏸️ 闲置'
+    en_route: '🚛 En Route',
+    available: '✅ Available',
+    charging: '🔌 Charging',
+    idle: '⏸️ Idle'
   }
   return statusMap[status] || status
 }

@@ -1,10 +1,10 @@
 /**
- * MapLegend.jsx - 地图图例组件
+ * MapLegend.jsx - Map Legend Component
  * 
- * 显示：
- * - 节点类型图例
- * - 车辆状态图例
- * - 路线颜色图例
+ * Displays:
+ * - Node type legend
+ * - Vehicle status legend
+ * - Route color legend
  */
 
 function MapLegend() {
@@ -59,59 +59,56 @@ function MapLegend() {
 
   return (
     <div style={legendStyle} className="map-legend">
-      {/* 节点类型 */}
       <div style={sectionStyle}>
-        <div style={sectionTitleStyle}>📍 物流节点</div>
+        <div style={sectionTitleStyle}>📍 Logistics Nodes</div>
         <div style={itemStyle}>
           <div style={colorBox('#22c55e')}></div>
-          <span>供应点 (废料源)</span>
+          <span>Supply Points</span>
         </div>
         <div style={itemStyle}>
           <div style={colorBox('#3b82f6')}></div>
-          <span>需求点 (回收厂)</span>
+          <span>Demand Points</span>
         </div>
         <div style={itemStyle}>
           <div style={colorBox('#eab308')}></div>
-          <span>仓库/中转站</span>
+          <span>Depots</span>
         </div>
         <div style={itemStyle}>
           <div style={colorBox('#f97316')}></div>
-          <span>破碎厂</span>
+          <span>Crushers</span>
         </div>
       </div>
 
-      {/* 车辆状态 */}
       <div style={sectionStyle}>
-        <div style={sectionTitleStyle}>🚛 车辆状态</div>
+        <div style={sectionTitleStyle}>🚛 Vehicle Status</div>
         <div style={itemStyle}>
           <svg style={vehicleIcon('#3b82f6')} viewBox="0 0 24 24" fill="#3b82f6">
             <path d="M12 2L4 12l3 2v6h10v-6l3-2L12 2z"/>
           </svg>
-          <span>行驶中</span>
+          <span>En Route</span>
         </div>
         <div style={itemStyle}>
           <svg style={vehicleIcon('#22c55e')} viewBox="0 0 24 24" fill="#22c55e">
             <path d="M12 2L4 12l3 2v6h10v-6l3-2L12 2z"/>
           </svg>
-          <span>可用</span>
+          <span>Available</span>
         </div>
         <div style={itemStyle}>
           <svg style={vehicleIcon('#eab308')} viewBox="0 0 24 24" fill="#eab308">
             <path d="M12 2L4 12l3 2v6h10v-6l3-2L12 2z"/>
           </svg>
-          <span>充电中</span>
+          <span>Charging</span>
         </div>
         <div style={itemStyle}>
           <svg style={vehicleIcon('#9ca3af')} viewBox="0 0 24 24" fill="#9ca3af">
             <path d="M12 2L4 12l3 2v6h10v-6l3-2L12 2z"/>
           </svg>
-          <span>闲置</span>
+          <span>Idle</span>
         </div>
       </div>
 
-      {/* 优化目标 */}
       <div style={{ ...sectionStyle, marginBottom: 0 }}>
-        <div style={sectionTitleStyle}>📊 优化目标</div>
+        <div style={sectionTitleStyle}>📊 Optimization Objective</div>
         <div style={itemStyle}>
           <div style={{
             width: '24px',
@@ -119,7 +116,7 @@ function MapLegend() {
             backgroundColor: '#22c55e',
             borderRadius: '2px'
           }}></div>
-          <span>利润优先</span>
+          <span>Profit First</span>
         </div>
         <div style={itemStyle}>
           <div style={{
@@ -128,7 +125,7 @@ function MapLegend() {
             backgroundColor: '#3b82f6',
             borderRadius: '2px'
           }}></div>
-          <span>碳排优先</span>
+          <span>Carbon First</span>
         </div>
         <div style={itemStyle}>
           <div style={{
@@ -137,7 +134,7 @@ function MapLegend() {
             backgroundColor: '#f97316',
             borderRadius: '2px'
           }}></div>
-          <span>成本优先</span>
+          <span>Cost First</span>
         </div>
         <div style={itemStyle}>
           <div style={{
@@ -146,7 +143,7 @@ function MapLegend() {
             backgroundColor: '#8b5cf6',
             borderRadius: '2px'
           }}></div>
-          <span>均衡</span>
+          <span>Balanced</span>
         </div>
       </div>
     </div>
