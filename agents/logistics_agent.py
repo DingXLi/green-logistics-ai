@@ -77,6 +77,31 @@ class LogisticsAgent:
             "utilization_rate": (self.fleet_size - available) / self.fleet_size * 100,
             "timestamp": datetime.now().isoformat()
         }
+
+    # ------------------------------------------------------------
+    # 由 WorldBuilder / Coordinator 调用的状态注入接口
+    # ------------------------------------------------------------
+
+    def inject_fleet(self, vehicles: List[Dict[str, Any]]) -> None:
+        """
+        注入车辆（来自 WorldBuilder 的预生成车队）。
+        覆盖 self.fleet_size 和 self.vehicles。
+        """
+        self.fleet_size = len(vehicles)
+        self.vehicles = vehicles
+
+    def reset_vehicles_for_new_cycle(self) -> None:
+        """
+        加速时钟下，每个 sim-day 开始时重置车辆状态：
+        - 所有 en_route / loading / unloading → available
+        - 保留 current_location（作为下一次出发位置）
+        - 保留 total_distance_km 累计
+        """
+        for v in self.vehicles:
+            if v["status"] in ("en_route", "loading", "unloading"):
+                v["status"] = "available"
+            # 重置负载（货物已卸）
+            v["current_load_tons"] = 0.0
     
     async def get_vehicle_details(self, vehicle_id: str) -> Optional[Dict[str, Any]]:
         """获取特定车辆详情"""
@@ -193,7 +218,7 @@ class LogisticsAgent:
             ))
         
         # 求解
-        result = solver.solve(time_limit_seconds=30)
+        result = solver.solve(time_limit_seconds=10)
         
         # 更新车辆状态
         for route_info in result.get("routes", []):

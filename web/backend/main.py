@@ -18,6 +18,7 @@ import random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from agents.coordinator import MultiAgentCoordinator
+from agents.world_builder import WorldConfig
 from optimization.vrp_solver import VRPSolver, Location, Vehicle
 from synthetic.data_generator import SyntheticDataGenerator
 
@@ -51,26 +52,29 @@ data_generator: Optional[SyntheticDataGenerator] = None
 async def startup_event():
     """应用启动时初始化"""
     global coordinator, data_generator
-    
-    logger.info("初始化 Green Logistics AI 后端...")
-    
-    # 初始化协调器
-    coordinator = MultiAgentCoordinator()
-    
-    # 注册示例供应点
-    coordinator.register_supply_agent("SUP001", {"lat": 57.7089, "lon": 14.1618})
-    coordinator.register_supply_agent("SUP002", {"lat": 57.7089, "lon": 11.9746})
-    coordinator.register_supply_agent("SUP003", {"lat": 59.3293, "lon": 18.0686})
-    
-    # 设置初始库存
-    for agent in coordinator.supply_agents.values():
-        agent.current_stock = 15.0
-        agent.daily_capacity = 20.0
-    
-    # 初始化数据生成器
+
+    logger.info("初始化 Green Logistics AI 后端 (V2)...")
+
+    # 初始化协调器（V2：自动从 WorldBuilder 引导 20/10/30 世界）
+    world_config = WorldConfig(
+        n_supply_points=20,
+        n_demand_points=10,
+        n_vehicles=30,
+        seed=42,
+    )
+    coordinator = MultiAgentCoordinator(
+        config=world_config,
+        db_path="data/simulation.db",
+    )
+
+    # 初始化数据生成器（IoT/fleet 端点用）
     data_generator = SyntheticDataGenerator(seed=42)
-    
-    logger.info("后端初始化完成")
+
+    logger.info(
+        f"后端初始化完成：{len(coordinator.supply_agents)} supply / "
+        f"{len(coordinator.market_agent.demand_points)} demand / "
+        f"{len(coordinator.logistics_agent.vehicles)} vehicles"
+    )
 
 
 # ============================================
@@ -270,6 +274,34 @@ async def get_sample_supply_data(location_id: str, days: int = 1):
         "data_points": len(all_data),
         "data": all_data
     }
+
+
+# ============================================
+# V2 新增：持久化 KPI 查询端点
+# ============================================
+
+@app.get("/api/persistence/recent-cycles")
+async def get_recent_cycles(limit: int = 10):
+    """获取最近 N 个优化周期的 KPI（从 SQLite 读）"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_recent_cycles(limit=limit)
+
+
+@app.get("/api/persistence/kpi-timeseries")
+async def get_kpi_timeseries():
+    """KPI 时间序列（按 sim_day 聚合）"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_kpi_timeseries()
+
+
+@app.get("/api/persistence/summary")
+async def get_persistence_summary():
+    """全局统计汇总"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_summary()
 
 
 # ============================================

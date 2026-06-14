@@ -219,7 +219,192 @@ class TestVRPSolver:
         ))
         
         result = solver.solve()
-        
+
         assert result["status"] in ["optimal", "heuristic"]
         assert "routes" in result
         assert "total_distance_km" in result
+
+
+# ============================================
+# V2 集成测试：WorldBuilder + SimClock + Persistence + Coordinator
+# ============================================
+
+from agents.world_builder import WorldBuilder, WorldConfig
+from agents.coordinator import MultiAgentCoordinator
+from agents.clock import SimClock
+from agents.persistence import Persistence
+
+
+class TestSimClock:
+    """加速时钟测试"""
+
+    def test_initial_state(self):
+        clock = SimClock()
+        assert clock.now.day == 0
+        assert clock.now.hour == 0
+        # 0 点是夜间
+        assert clock.activity_factor == 0.5
+
+    def test_advance_day(self):
+        clock = SimClock()
+        clock.advance_day()
+        assert clock.now.day == 1
+        assert clock.now.hour == 0
+        assert clock.total_cycles == 1
+
+    def test_activity_factor_day(self):
+        clock = SimClock(start_hour=12)  # 中午
+        assert clock.activity_factor == 1.5
+
+    def test_advance_hours_rollover(self):
+        clock = SimClock(start_day=0, start_hour=20)
+        clock.advance_hours(10)  # 20 + 10 = 30 → day 1, hour 6
+        assert clock.now.day == 1
+        assert clock.now.hour == 6
+
+
+class TestWorldBuilder:
+    """世界构建器测试"""
+
+    def test_build_reproducible(self):
+        cfg = WorldConfig(n_supply_points=5, n_demand_points=3, n_vehicles=4, seed=42)
+        w1 = WorldBuilder(cfg).build()
+        w2 = WorldBuilder(cfg).build()
+        # 同一 seed 必须可复现（deadline 用 wall-clock，不参与比较）
+        s1 = {k: v for k, v in w1["supplies"][0].items()}
+        s2 = {k: v for k, v in w2["supplies"][0].items()}
+        assert s1 == s2
+        d1 = {k: v for k, v in w1["demands"][0].items() if k != "deadline"}
+        d2 = {k: v for k, v in w2["demands"][0].items() if k != "deadline"}
+        assert d1 == d2
+
+    def test_build_supply_count(self):
+        cfg = WorldConfig(n_supply_points=10, n_demand_points=3, n_vehicles=5, seed=1)
+        world = WorldBuilder(cfg).build()
+        assert len(world["supplies"]) == 10
+        assert len(world["demands"]) == 3
+        assert len(world["fleet"]) == 5
+
+    def test_supply_has_required_fields(self):
+        cfg = WorldConfig(n_supply_points=2, n_demand_points=1, n_vehicles=2, seed=1)
+        world = WorldBuilder(cfg).build()
+        sup = world["supplies"][0]
+        assert "agent_id" in sup
+        assert "location" in sup
+        assert "lat" in sup["location"]
+        assert "lon" in sup["location"]
+        assert sup["current_stock"] > 0
+        assert sup["daily_capacity"] > 0
+
+
+class TestPersistence:
+    """SQLite 持久化测试"""
+
+    def test_create_and_persist(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        p = Persistence(db_path=db_path)
+
+        p.begin_cycle("OPT0001", sim_day=0, sim_hour=0, activity_factor=1.5)
+        p.record_supply("OPT0001", {
+            "agent_id": "SUP001",
+            "location": {"lat": 57.7, "lon": 14.2},
+            "material_type": "mixed_waste",
+            "available_tons": 25.5,
+            "moisture_percent": 22.0,
+            "quality_score": 80.0,
+        })
+        p.record_demand("OPT0001", {
+            "id": "DEM001",
+            "name": "Test Plant",
+            "location": {"lat": 57.8, "lon": 14.1},
+            "material_type": "metal_scrap",
+            "required_tons": 50.0,
+            "priority": "high",
+            "deadline": "2026-06-20T00:00:00",
+        })
+        p.record_match("OPT0001", {
+            "supply_id": "SUP001",
+            "demand_id": "DEM001",
+            "material_type": "mixed_waste",
+            "tons": 20.0,
+            "distance_km": 12.5,
+            "estimated_profit_sek": 1500.0,
+        })
+        p.commit_cycle("OPT0001", {
+            "n_matches": 1, "total_tons": 20.0, "total_cost_sek": 800.0,
+            "total_co2_kg": 100.0, "total_distance_km": 50.0,
+            "n_vehicles_used": 1, "n_vehicles_available": 5,
+            "fleet_utilization_pct": 20.0, "solver_status": "optimal",
+        }, wall_duration_ms=42)
+
+        recent = p.get_recent_cycles(limit=5)
+        assert len(recent) == 1
+        assert recent[0]["cycle_id"] == "OPT0001"
+        assert recent[0]["total_tons"] == 20.0
+
+        summary = p.get_summary()
+        assert summary["n_cycles"] == 1
+        assert summary["total_tons"] == 20.0
+
+
+class TestCoordinatorV2Integration:
+    """V2 协调器集成测试（小规模，确保跑通）"""
+
+    @pytest.mark.asyncio
+    async def test_full_cycle(self, tmp_path):
+        db_path = str(tmp_path / "integration.db")
+        cfg = WorldConfig(
+            n_supply_points=5,
+            n_demand_points=3,
+            n_vehicles=5,
+            seed=42,
+        )
+        coord = MultiAgentCoordinator(config=cfg, db_path=db_path)
+
+        overview = await coord.get_system_overview()
+        assert overview["supply_points"] == 5
+        assert overview["demand_points"] == 3
+        assert overview["fleet_status"]["total_vehicles"] == 5
+
+        result = await coord.run_optimization_cycle()
+        assert result["optimization_id"] == "OPT0001"
+        assert result["sim_day"] == 1
+        assert "kpi" in result
+        assert "wall_duration_ms" in result
+
+        # 持久化
+        recent = coord.persistence.get_recent_cycles(limit=5)
+        assert len(recent) == 1
+        assert recent[0]["cycle_id"] == "OPT0001"
+
+    @pytest.mark.asyncio
+    async def test_simulate_3_days(self, tmp_path):
+        db_path = str(tmp_path / "sim3.db")
+        cfg = WorldConfig(
+            n_supply_points=4,
+            n_demand_points=2,
+            n_vehicles=4,
+            seed=7,
+        )
+        coord = MultiAgentCoordinator(config=cfg, db_path=db_path)
+        results = await coord.simulate_day(days=3)
+        assert len(results) == 3
+        assert results[0]["sim_day"] == 1
+        assert results[2]["sim_day"] == 3
+
+        # KPI 时间序列
+        ts = coord.persistence.get_kpi_timeseries()
+        assert len(ts) == 3
+
+    @pytest.mark.asyncio
+    async def test_stock_accumulation(self, tmp_path):
+        """库存每个 cycle 都会自然增长"""
+        db_path = str(tmp_path / "acc.db")
+        cfg = WorldConfig(n_supply_points=3, n_demand_points=1, n_vehicles=3, seed=1)
+        coord = MultiAgentCoordinator(config=cfg, db_path=db_path)
+
+        before = sum(a.current_stock for a in coord.supply_agents.values())
+        await coord.run_optimization_cycle()
+        after = sum(a.current_stock for a in coord.supply_agents.values())
+        # 库存应该增加了（因为 accumulate_stock 在 day start 执行）
+        assert after > before

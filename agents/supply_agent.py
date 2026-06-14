@@ -25,6 +25,8 @@ class SupplyAgent:
         self.current_stock = 0.0  # 吨
         self.daily_capacity = 0.0  # 吨/天
         self.material_type = "mixed_waste"  # 废料类型
+        self.moisture_percent = 25.0
+        self.quality_score = 75.0
         
         # 创建 ADK Agent
         self.agent = Agent(
@@ -93,7 +95,37 @@ class SupplyAgent:
             self.current_stock -= collected_tons
             return True
         return False
-    
+
+    # ------------------------------------------------------------
+    # 由 WorldBuilder / Coordinator 调用的状态注入接口
+    # ------------------------------------------------------------
+
+    def set_inventory(
+        self,
+        current_stock: float = None,
+        daily_capacity: float = None,
+        material_type: str = None,
+        moisture_percent: float = None,
+        quality_score: float = None,
+    ) -> None:
+        """从合成数据/外部世界注入库存和属性（替代手动赋值）"""
+        if current_stock is not None:
+            self.current_stock = current_stock
+        if daily_capacity is not None:
+            self.daily_capacity = daily_capacity
+        if material_type is not None:
+            self.material_type = material_type
+        if moisture_percent is not None:
+            self.moisture_percent = moisture_percent
+        if quality_score is not None:
+            self.quality_score = quality_score
+
+    def accumulate_stock(self, factor: float = 1.0) -> None:
+        """每个 cycle 调用：模拟一天自然积累库存（factor 取自 SimClock.activity_factor）"""
+        self.current_stock = round(
+            self.current_stock + self.daily_capacity * 0.5 * factor, 2
+        )
+
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
         # 注：新版 ADK 使用 FunctionTool，但简单场景可以直接调用方法

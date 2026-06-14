@@ -1,0 +1,168 @@
+"""
+世界构建器 (World Builder)
+
+用 SyntheticDataGenerator 在瑞典 Borås / Göteborg / Stockholm 三角区域
+生成 supply / demand / fleet 三类节点，作为 Coordinator 的初始化世界。
+
+Design:
+- Supply 在 3 个城市的 jittered cluster 内随机分布（建模仿真城市废料）
+- Demand 在 3 个城市的工厂/回收厂坐标附近，3 个固定种子位置 + jitter
+- Vehicle 全部在 Borås 仓库出发（depot 中心）
+- 位置用 Borås 中心 + 半径 ~0.5° 随机化（≈ 50km 半径）
+"""
+
+import random
+from typing import List, Dict, Any, Tuple
+from dataclasses import dataclass
+
+from synthetic.data_generator import (
+    SyntheticDataGenerator,
+    SupplyReading,
+    DemandReading,
+)
+
+
+# 瑞典 3 个主要城市的废料/回收中心
+CITY_CENTERS = {
+    "Borås":      (57.7089, 14.1618),  # 西南，纺织品/废料回收
+    "Göteborg":   (57.7089, 11.9746),  # 西海岸，大港口
+    "Stockholm":  (59.3293, 18.0686),  # 东，最大城市
+}
+
+# 工厂 / 回收厂 / 破碎机（按需求点类型）
+DEMAND_FACILITIES = [
+    {"id": "DEM001", "name": "Borås Recycling Plant",     "city": "Borås",     "preferred_materials": ["mixed_waste", "metal_scrap"]},
+    {"id": "DEM002", "name": "Göteborg Harbor Crusher",   "city": "Göteborg",  "preferred_materials": ["concrete", "wood_waste"]},
+    {"id": "DEM003", "name": "Stockholm Processing",      "city": "Stockholm", "preferred_materials": ["mixed_waste", "plastic"]},
+    {"id": "DEM004", "name": "Borås Metal Recovery",      "city": "Borås",     "preferred_materials": ["metal_scrap"]},
+    {"id": "DEM005", "name": "Göteborg Paper Mill",       "city": "Göteborg",  "preferred_materials": ["paper_cardboard", "wood_waste"]},
+    {"id": "DEM006", "name": "Stockholm Plastic Plant",   "city": "Stockholm", "preferred_materials": ["plastic"]},
+    {"id": "DEM007", "name": "Borås Concrete Recycler",   "city": "Borås",     "preferred_materials": ["concrete"]},
+    {"id": "DEM008", "name": "Göteborg Composite Plant",  "city": "Göteborg",  "preferred_materials": ["mixed_waste", "paper_cardboard"]},
+    {"id": "DEM009", "name": "Stockholm Energy Recovery", "city": "Stockholm", "preferred_materials": ["mixed_waste", "wood_waste"]},
+    {"id": "DEM010", "name": "Borås Textile Recycling",   "city": "Borås",     "preferred_materials": ["mixed_waste"]},
+]
+
+
+@dataclass
+class WorldConfig:
+    """世界配置"""
+    n_supply_points: int = 20
+    n_demand_points: int = 10
+    n_vehicles: int = 30
+    seed: int = 42
+    # 供应点 jitter 半径（度，~0.3° ≈ 30km）
+    supply_jitter: float = 0.3
+    # 需求点 jitter 半径
+    demand_jitter: float = 0.1
+    # depot 位置（Borås 中心）
+    depot_location: Tuple[float, float] = CITY_CENTERS["Borås"]
+
+
+class WorldBuilder:
+    """
+    从 SyntheticDataGenerator 引导一个完整的仿真世界
+    """
+
+    def __init__(self, config: WorldConfig = None):
+        self.config = config or WorldConfig()
+        self.data_gen = SyntheticDataGenerator(seed=self.config.seed)
+        # 显式重置内部 RNG，确保可复现
+        random.seed(self.config.seed)
+
+    def build_supply_points(self) -> List[Dict[str, Any]]:
+        """
+        构建供应点列表。每个 supply 有：
+        - id, location {lat, lon}
+        - material_type（按 data_generator 抽样）
+        - current_stock（吨）
+        - daily_capacity（吨/天）
+        """
+        supplies = []
+        for i in range(self.config.n_supply_points):
+            loc_id = f"SUP{i:03d}"
+            city_name = random.choice(list(CITY_CENTERS.keys()))
+            base_lat, base_lon = CITY_CENTERS[city_name]
+            lat = base_lat + random.uniform(-self.config.supply_jitter, self.config.supply_jitter)
+            lon = base_lon + random.uniform(-self.config.supply_jitter, self.config.supply_jitter)
+
+            # 用 data_generator 的 generate_supply_reading 抽样 material + weight
+            reading = self.data_gen.generate_supply_reading(loc_id)
+            stock = round(reading.weight_tons * 1.5, 2)        # 当前库存 ≈ 1.5x 单读数
+            daily_cap = round(reading.weight_tons * 0.6, 2)    # 日产能 ≈ 0.6x 单读数
+
+            supplies.append({
+                "agent_id": loc_id,
+                "location": {"lat": round(lat, 6), "lon": round(lon, 6)},
+                "material_type": reading.material_type,
+                "current_stock": stock,
+                "daily_capacity": daily_cap,
+                "moisture_percent": reading.moisture_percent,
+                "quality_score": reading.quality_score,
+                "city": city_name,
+            })
+        return supplies
+
+    def build_demand_points(self) -> List[Dict[str, Any]]:
+        """
+        构建需求点列表。每个 demand 有：
+        - id, name, location, preferred_materials
+        - required_tons（当前需求）
+        - priority, deadline
+        """
+        demands = []
+        # 取前 n_demand_points 个工厂模板
+        facility_templates = DEMAND_FACILITIES[: self.config.n_demand_points]
+
+        for template in facility_templates:
+            base_lat, base_lon = CITY_CENTERS[template["city"]]
+            lat = base_lat + random.uniform(-self.config.demand_jitter, self.config.demand_jitter)
+            lon = base_lon + random.uniform(-self.config.demand_jitter, self.config.demand_jitter)
+
+            # 用 data_generator 抽 demand 字段
+            reading = self.data_gen.generate_demand_reading(template["id"])
+            # 选该 facility 的第一个 preferred material 作为主要 material
+            primary_material = template["preferred_materials"][0]
+
+            demands.append({
+                "id": template["id"],
+                "name": template["name"],
+                "location": {"lat": round(lat, 6), "lon": round(lon, 6)},
+                "preferred_materials": template["preferred_materials"],
+                "material_type": primary_material,
+                "current_demand_tons": reading.required_tons,
+                "daily_capacity_tons": round(reading.required_tons * 1.5, 2),
+                "priority": reading.priority,
+                "deadline": reading.deadline,
+                "city": template["city"],
+            })
+        return demands
+
+    def build_fleet(self) -> List[Dict[str, Any]]:
+        """构建车辆（位置在 Borås depot）"""
+        vehicles = []
+        for i in range(self.config.n_vehicles):
+            vehicles.append({
+                "vehicle_id": f"VEH{i:03d}",
+                "status": "available",
+                "current_location": {
+                    "lat": self.config.depot_location[0],
+                    "lon": self.config.depot_location[1],
+                },
+                "current_load_tons": 0.0,
+                "max_capacity_tons": 20.0,
+                "fuel_level": 100.0,
+                "co2_emission_rate": 0.85,
+                "total_distance_km": 0.0,
+                "route_history": [],
+            })
+        return vehicles
+
+    def build(self) -> Dict[str, Any]:
+        """一次性构建整个世界"""
+        return {
+            "supplies": self.build_supply_points(),
+            "demands": self.build_demand_points(),
+            "fleet": self.build_fleet(),
+            "config": self.config,
+        }

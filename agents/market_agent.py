@@ -13,6 +13,7 @@ from google.adk import tools
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
+from loguru import logger
 
 
 class MarketAgent:
@@ -97,6 +98,18 @@ class MarketAgent:
             }
             for dp in self.demand_points
         ]
+
+    # ------------------------------------------------------------
+    # 由 WorldBuilder / Coordinator 调用的状态注入接口
+    # ------------------------------------------------------------
+
+    def inject_demands(self, demands: List[Dict[str, Any]]) -> None:
+        """
+        注入需求点（来自 WorldBuilder 或运行时合成数据）。
+        每次调用会完整替换 self.demand_points。
+        """
+        self.demand_points = demands
+        logger.info(f"市场智能体已注入 {len(demands)} 个需求点")
     
     async def get_material_price(self, material_type: str) -> Dict[str, Any]:
         """获取材料价格"""
@@ -149,9 +162,13 @@ class MarketAgent:
             for demand in demand_requests:
                 # 检查材料类型是否匹配
                 if supply.get("material_type") in demand.get("preferred_materials", []):
+                    # Cap at typical vehicle capacity (20t) so VRP 不超过单车上限
+                    # 多出来的需求可以由后续供应或下一天补上
+                    MAX_VEHICLE_TONS = 20.0
                     match_tons = min(
                         supply.get("available_tons", 0),
-                        demand.get("demand_tons", demand.get("current_demand_tons", 0))
+                        demand.get("demand_tons", demand.get("current_demand_tons", 0)),
+                        MAX_VEHICLE_TONS,
                     )
                     if match_tons > 0:
                         matches.append({
