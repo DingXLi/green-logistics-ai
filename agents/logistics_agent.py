@@ -14,6 +14,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
 
+from .llm_config import MODEL  # 中心化 model 名 (env > yaml > 默认)
+
 
 class LogisticsAgent:
     """
@@ -30,7 +32,7 @@ class LogisticsAgent:
         # 创建 ADK Agent
         self.agent = Agent(
             name="logistics_coordinator",
-            model="gemini-2.0-flash",
+            model=MODEL,
             description="Logistics agent for vehicle routing and optimization",
             instruction=self._get_instruction(),
         )
