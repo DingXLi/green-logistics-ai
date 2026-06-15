@@ -59,7 +59,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🦞 Green Logistics AI</h1>
+        <h1>♻️ Green Logistics AI</h1>
         <p>Multi-Agent System for Green Logistics Optimization</p>
         
         <nav className="tab-nav">

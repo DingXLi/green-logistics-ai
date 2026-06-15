@@ -178,7 +178,7 @@ def test_api_connection():
 async def run_full_diagnostic():
     """运行完整诊断"""
     logger.info("\n")
-    logger.info("🦞 " + "=" * 58)
+    logger.info("♻️ " + "=" * 58)
     logger.info("   Green Logistics AI - 调试诊断")
     logger.info("=" * 60)
     logger.info(f"时间：{datetime.now().isoformat()}")

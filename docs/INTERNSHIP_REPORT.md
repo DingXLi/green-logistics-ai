@@ -1,10 +1,27 @@
 # Multi-Agent AI System for Green Logistics — Internship Report
 # 绿色物流多智能体系统 — 实习报告
 
-**项目**: `/home/liding/.openclaw/workspace-coder/green-logistics-ai`
-**作者**: Li D (Borås University)
-**日期**: 2026-06-15
-**状态**: V2 + V3 全落地，30 天仿真验证
+**项目 / Project**: `/home/liding/.openclaw/workspace-coder/green-logistics-ai`
+**作者 / Author**: Li D (Borås University)
+**日期 / Date**: 2026-06-15
+**状态 / Status**: V2 + V3 全落地，30 天仿真验证 / V2 + V3 fully implemented, validated with 30-day simulation
+
+---
+
+## 🌐 English Abstract
+
+This internship project explores how a **multi-agent system (MAS)** combined with a **multi-objective Vehicle Routing Problem (VRP)** solver can model and optimize green-logistics operations in Sweden's circular economy. The case study is the Borås / Sjuhärad waste-recycling network: 4 pickup sites, 2 crusher / processing sites, 4 vehicles (2 diesel + 2 EV), and 1 depot.
+
+**Three research questions**:
+1. How can a multi-agent system model a waste-material supply chain?
+2. Can the simulation capture the trade-off between economic cost and environmental impact?
+3. Does a real road network + multi-objective VRP yield a Pareto-feasible set of routing plans?
+
+**Methodology**: A `MultiAgentCoordinator` orchestrates three agents — Supply (per-site inventory accumulation), Market (demand + price), Logistics (route optimisation). Each simulation cycle represents one sim-day; a `SimClock` controls day/hour/activity factors. The Logistics agent calls an OR-Tools VRP solver that jointly minimises a weighted sum of cost (SEK/km) and CO₂ (kg/km × SEK/kg). A SQLite persistence layer stores cycle-level KPIs plus child rows (supply, demand, matches, routes) for offline analysis and figure rendering. A 30-day simulation produced 30 701 t moved, 300 885 SEK total cost, 98 366 kg CO₂, 66.7% average fleet utilisation. A 5-point Pareto scan shows cost sweeping 50.6 → 151.9 SEK as CO₂ weight rises.
+
+**Tech stack**: Google ADK, Gemini Flash (configured but not yet called in the loop), OR-Tools, SQLite, OSMnx, FastAPI, React + Leaflet.
+
+**Limitations / future work**: LLM-driven agent decisions are wired in but not invoked, so the simulation is currently deterministic. Real OSM distance for the wider Sweden network, real-data validation, and full LLM integration are the natural next steps.
 
 ---
 

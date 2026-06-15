@@ -182,4 +182,5 @@ cd web/frontend && npm install && npm run dev
 
 ---
 
-_有问题随时问！_ 🦞
+_有问题随时问！_ / _Questions? Open an issue._
+♻️ branding note: the project logo is the recycling symbol (was previously a different emoji).

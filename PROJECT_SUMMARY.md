@@ -1,8 +1,20 @@
-# 📋 项目搭建总结
+# 📋 项目搭建总结 / Project Build Summary
 
-**项目**: Multi-Agent AI System for Green Logistics  
-**日期**: 2026-04-13  
-**状态**: ✅ 基础框架完成
+**项目 / Project**: Multi-Agent AI System for Green Logistics  
+**日期 / Date**: 2026-04-13  
+**状态 / Status**: ✅ 基础框架完成 / Foundation framework complete
+
+---
+
+## 🌐 English Summary (for collaborators)
+
+This project is a **multi-agent AI system** for green / circular-economy logistics in the Borås / Sjuhärad region of Sweden. It models a waste-material pickup-and-delivery network as a multi-objective Vehicle Routing Problem (VRP), trading off transport cost vs. CO₂ emissions, and exposes a FastAPI backend + React/Leaflet frontend.
+
+**Tech stack**: Google ADK (agent framework, Gemini Flash as the LLM), OR-Tools (VRP solver), SQLite (persistence), OSMnx (real road-network distances), FastAPI (backend), React + Vite + Leaflet + Recharts (frontend).
+
+**What's done**: 3 agents (Supply, Market, Logistics) orchestrated by a `MultiAgentCoordinator`; SyntheticDataGenerator + WorldBuilder to bootstrap a 20-supply / 10-demand / 30-vehicle world; V2 data-driven event loop with per-cycle KPI persistence; Pareto-frontier VRP solver; OSM-based distance; map + dashboard UI; 30-day simulation script + KPI charts; data-quality check script.
+
+**What to do next** (sections below) walks a new contributor through the first session. The codebase is intentionally deterministic — the Gemini LLM is wired up but not yet called inside the simulation loop, so all results are bit-reproducible from a seed.
 
 ---
 
@@ -196,25 +208,34 @@ docker-compose up -d
 
 ---
 
-## 🦞 代码龙虾的建议
+## 🛠️ 下一步建议 / Next Steps
 
-### 立即可做的
+### 立即可做的 / Quick wins
 1. 先运行 `python -m agents.coordinator` 看看多智能体系统如何工作
+   Run `python -m agents.coordinator` first to see the multi-agent system in action.
 2. 访问 `http://localhost:8000/docs` 查看完整的 API 文档
+   Visit `http://localhost:8000/docs` for the full OpenAPI / Swagger documentation.
 3. 阅读各个模块的代码，理解架构设计
+   Read through each module to understand the architecture.
 
-### 本周目标
+### 本周目标 / Weekly goals
 1. 完成地图集成（Leaflet + 瑞典地图）
+   Finish map integration (Leaflet + Sweden).
 2. 添加实时数据可视化
+   Add real-time data visualization.
 3. 测试真实的 OSM 距离计算
+   Test real OSM distance computation.
 
-### 注意事项
+### 注意事项 / Caveats
 - OR-Tools 和 OSMnx 可能需要额外的系统依赖（GDAL 等）
+  OR-Tools and OSMnx may need extra system deps (GDAL, etc.).
 - 首次运行 OSM 数据下载可能需要较长时间
+  First-time OSM data download can be slow.
 - Google Gemini API 有免费额度，注意使用量
+  Google Gemini API has a free tier — mind the rate limits.
 
 ---
 
-**有任何问题随时问我！** 🦞💻
+有任何问题，请在 GitHub Issues 提问 / Open a GitHub issue for questions.
 
 _项目已就绪，开始你的实习之旅吧！_ 🚀
