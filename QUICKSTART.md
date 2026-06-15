@@ -1,11 +1,17 @@
-# 🚀 快速开始指南
+# 🚀 快速开始指南 / Quick Start Guide
 
-## 1. 环境准备
+## 🌐 English Summary
 
-### 系统要求
+This is a 5-minute quickstart for the **Green Logistics AI** project — a multi-agent system (Google ADK + Gemini Flash) that solves a multi-objective Vehicle Routing Problem (OR-Tools) for Swedish circular-economy waste recycling. It exposes a FastAPI backend and a React/Leaflet frontend. To get up and running: install Python deps in a virtualenv, install npm deps in `web/frontend/`, set your `GOOGLE_API_KEY` in `.env`, run `python -m agents.coordinator` to see the multi-agent demo, then `uvicorn web.backend.main:app` for the API and `npm run dev` in `web/frontend/` for the UI. A 30-day simulation lives at `python scripts/run_month.py`. The data-quality checker (`python scripts/data_quality.py`) reports KPI variability, schema completeness, and solver health.
+
+For full step-by-step instructions including troubleshooting, continue in Chinese below.
+
+## 1. 环境准备 / Environment
+
+### 系统要求 / System requirements
 - Python 3.11+
-- Node.js 18+ (前端开发)
-- Docker & Docker Compose (可选，用于容器化部署)
+- Node.js 18+ (前端开发 / frontend dev)
+- Docker & Docker Compose (可选 / optional, for containerised deployment)
 
 ### 安装依赖
 
@@ -193,4 +199,5 @@ brew install gdal
 
 ---
 
-有问题随时问代码龙虾！🦞💻
+有问题随时在 GitHub Issues 提问！
+Questions? Please open a GitHub issue.

@@ -1,15 +1,20 @@
-# 🔧 调试指南
+# 🔧 调试指南 / Debugging Guide
 
 本文档介绍如何调试 Green Logistics AI 项目。
+This document explains how to debug the Green Logistics AI project.
 
----
+## 🌐 English Summary
 
-## 📋 目录
+The project ships a **debug script** (`debug_script.py`) that runs a full diagnostic in <30s — DB schema, world-builder bootstrap, end-to-end multi-agent cycle, KPI capture, and OSMnx availability check. The recommended local debug workflow is: (1) start a virtualenv and `pip install -r requirements.txt`; (2) `python debug_script.py` for a quick smoke test; (3) `pytest tests/test_agents.py` for the test suite; (4) for visual debugging, run the FastAPI backend (`uvicorn web.backend.main:app --reload`) and the Vite dev server (`cd web/frontend && npm run dev`). Common pitfalls are listed in the troubleshooting section below — solver timeouts on small-ton cycles, missing OSMnx system deps, and Gemini API key typos (the key must start with `AIzaSy`, not `AlzaSy`). GitHub Actions CI runs on every push to `main` and `pull_request`; check the Actions tab for the latest run.
 
-1. [本地调试](#本地调试)
+For the full Chinese walkthrough including Docker, continue below.
+
+## 📋 目录 / Table of contents
+
+1. [本地调试 / Local debugging](#本地调试)
 2. [GitHub Actions CI/CD](#github-actions-cicd)
-3. [Docker 调试](#docker-调试)
-4. [常见问题排查](#常见问题排查)
+3. [Docker 调试 / Docker debugging](#docker-调试)
+4. [常见问题排查 / Troubleshooting](#常见问题排查)
 
 ---
 
@@ -326,4 +331,4 @@ docker-compose logs -f backend
 
 ---
 
-_祝调试顺利！🦞💻_
+_祝调试顺利！_ / _Happy debugging!_
