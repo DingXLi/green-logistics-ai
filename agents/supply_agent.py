@@ -134,6 +134,22 @@ class SupplyAgent:
             self.current_stock + self.daily_capacity * 0.5 * factor, 2
         )
 
+    def consume_shipped(self, shipped_tons: float, hard_cap_tons: float = 30.0) -> None:
+        """每个 cycle 末尾调用：根据实际被匹配的出运量扣减库存。
+
+        设计动机：原实现只有 accumulate，没有 consume，导致 30 天后库存
+        持续递增到远大于单车容量，VRP 在单车 20t cap 下把 total_tons
+        锁死成“1 车 1 趟 20t × N”的平台值。引入本方法后，库存可与
+        仿真形成 quasi-steady 状态，total_tons 会随扰动真正变化。
+
+        hard_cap_tons 是安全上限，防止单点库存失控（默认 30t）。
+        """
+        if shipped_tons and shipped_tons > 0:
+            self.current_stock = round(max(0.0, self.current_stock - shipped_tons), 2)
+        # 安全网：就算 consume 不平衡（极端扰动），也不要让单点涨到荒谬的值
+        if self.current_stock > hard_cap_tons:
+            self.current_stock = hard_cap_tons
+
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
         # 注：新版 ADK 使用 FunctionTool，但简单场景可以直接调用方法

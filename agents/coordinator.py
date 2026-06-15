@@ -22,7 +22,9 @@
 """
 
 import asyncio
+import math
 import time
+from collections import defaultdict
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from loguru import logger
@@ -195,21 +197,31 @@ class MultiAgentCoordinator:
                 "quality_score": agent.quality_score,
             })
 
-        # 3. 收集需求 requests
+        # 3. 收集需求 requests（带 per-cycle 扰动：weekday × bounded-noise × per-id jitter）
+        day = self.clock.now.day
+        cycle_mult = self._compute_demand_multiplier(day)
         demand_status = await self.market_agent.get_demand_status()
-        demand_requests = [
-            {
+        demand_requests = []
+        for dp in demand_status:
+            # 以 base_demand_tons 为唯一来源重新计算，避免在 in-memory 上累乘造成失控
+            base = dp.get("base_demand_tons") or dp.get("current_demand_tons", 0)
+            jitter = self._per_demand_jitter(dp["id"], day)
+            perturbed = round(base * cycle_mult * jitter, 2)
+            # 同步 in-memory 状态供 dashboard / 下游使用
+            for live_dp in self.market_agent.demand_points:
+                if live_dp.get("id") == dp["id"]:
+                    live_dp["current_demand_tons"] = perturbed
+                    break
+            demand_requests.append({
                 "id": dp["id"],
                 "name": dp["name"],
-                "demand_tons": dp["current_demand_tons"],
+                "demand_tons": perturbed,
                 "preferred_materials": dp["preferred_materials"],
                 "location": dp["location"],
                 "priority": dp.get("priority", "normal"),
                 "deadline": dp.get("deadline"),
                 "material_type": dp.get("material_type"),
-            }
-            for dp in demand_status
-        ]
+            })
 
         # 4. 持久化：开始周期 + 写子数据
         self.persistence.begin_cycle(
@@ -247,6 +259,27 @@ class MultiAgentCoordinator:
             for route in route_optimization.get("routes", []):
                 self.persistence.record_route(cycle_id, route)
 
+        # 6b. 让 supply 库存反映本周期实际被出运的量（quasi-steady，避免单调递增
+        # 锁死在单车 cap 上）。**只有当 route opt 真的成功时**才扣减，否则 no_solution
+        # 那天会白白消耗 stock、产生下行螺旋，tens → 0。
+        shipped_by_supply: Dict[str, float] = defaultdict(float)
+        if route_optimization.get("status") in ("optimal", "feasible"):
+            # 优先用 routes 的 stops 反算实际出运量；如果没有则退到 matches。
+            for r in route_optimization.get("routes", []):
+                for stop in r.get("stops", []):
+                    sid = stop.get("id")
+                    t = float(stop.get("tons", 0) or 0)
+                    if sid and t > 0:
+                        shipped_by_supply[sid] += t
+            if not shipped_by_supply:
+                for m in matches.get("matches", []):
+                    sid = m.get("supply_id")
+                    if sid:
+                        shipped_by_supply[sid] += float(m.get("tons", 0) or 0)
+        for sid, tons in shipped_by_supply.items():
+            if sid in self.supply_agents:
+                self.supply_agents[sid].consume_shipped(tons)
+
         # 7. KPI
         fleet_status = await self.logistics_agent.get_fleet_status()
         kpi = self._extract_kpi(matches, route_optimization, fleet_status)
@@ -280,6 +313,32 @@ class MultiAgentCoordinator:
             f"({wall_ms}ms)"
         )
         return result
+
+    # ------------------------------------------------------------
+    # 扰动函数（per-cycle demand variability）
+    # ------------------------------------------------------------
+
+    @staticmethod
+    def _compute_demand_multiplier(day: int) -> float:
+        """每周期需求乘子。
+        设计：
+        - weekday 0-4 （Mon-Fri）= 1.0，weekday 5-6 （Sat/Sun）= 0.85（现实里废料产量周末下降）
+        - bounded noise = 0.90 + 0.10 * sin(day * 0.91)，结果在 [0.80, 1.00]
+        两者相乘后范围约 [0.68, 1.00] 决定扰动。
+        保守选择：保证 perturb 后需求不会太极端，VRP 可用性可接受。
+        """
+        weekday = day % 7
+        weekend_factor = 0.85 if weekday >= 5 else 1.0
+        noise = 0.90 + 0.10 * math.sin(day * 0.91)
+        return round(weekend_factor * noise, 3)
+
+    @staticmethod
+    def _per_demand_jitter(demand_id: str, day: int) -> float:
+        """每个 demand 点在当天的额外 jitter。
+        hash((id, day)) → [0.90, 1.10] 的小偏移，避免所有点同步变化。
+        """
+        h = hash((demand_id, day)) % 1000
+        return 0.90 + 0.2 * (h / 1000.0)
 
     def _build_vrp_inputs(self, matches, supply_offers, demand_status):
         """从 matches + supply_offers + demand_status 构造 VRP 输入

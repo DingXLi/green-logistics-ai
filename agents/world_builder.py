@@ -134,6 +134,10 @@ class WorldBuilder:
                 "location": {"lat": round(lat, 6), "lon": round(lon, 6)},
                 "preferred_materials": template["preferred_materials"],
                 "material_type": primary_material,
+                # base_demand_tons 是该 facility 的“理论日需求”上限，per-cycle 真实 demand_tons
+                # 会由 Coordinator 在每周期用 weekday × noise × per-id jitter 扰动后写入
+                # current_demand_tons。这样可以让 KPI 真正随时间变化。
+                "base_demand_tons": reading.required_tons,
                 "current_demand_tons": reading.required_tons,
                 "daily_capacity_tons": round(reading.required_tons * 1.5, 2),
                 "priority": reading.priority,

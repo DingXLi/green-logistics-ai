@@ -56,6 +56,10 @@ class SimClock:
         self.base_date = base_date or datetime.now()
         self.total_cycles = 0
 
+    # 每天的小时不再固定 0，按一个 7-步的 sequence 轮转，覆盖白天/夜晚，
+    # 让 activity_factor 真正随 cycle 变化（白天 6-18h = 1.5x，夜晚 = 0.5x）。
+    HOUR_PATTERN = (8, 12, 18, 0, 6, 14, 22)
+
     @property
     def activity_factor(self) -> float:
         """当前小时对应的活动因子（用于供应/需求建模）"""
@@ -69,9 +73,12 @@ class SimClock:
         return self.now.to_iso(self.base_date)
 
     def advance_day(self) -> SimTime:
-        """推进 1 个完整模拟日（0→24h）"""
-        self.now = SimTime(day=self.now.day + 1, hour=0)
+        """推进 1 个完整模拟日。
+        hour 从 HOUR_PATTERN 里按 total_cycles 选一个，保证可复现又覆盖 24h。
+        """
         self.total_cycles += 1
+        hour = self.HOUR_PATTERN[(self.total_cycles - 1) % len(self.HOUR_PATTERN)]
+        self.now = SimTime(day=self.now.day + 1, hour=hour)
         return self.now
 
     def advance_hours(self, hours: int) -> SimTime:

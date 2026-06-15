@@ -349,7 +349,9 @@ class TestSimClock:
         clock = SimClock()
         clock.advance_day()
         assert clock.now.day == 1
-        assert clock.now.hour == 0
+        # hour 从 HOUR_PATTERN = (8, 12, 18, 0, 6, 14, 22) 里按 total_cycles 选
+        # 第一个 cycle 选 8（覆盖白天，避免原来 hour 永远 0 的问题）
+        assert clock.now.hour == 8
         assert clock.total_cycles == 1
 
     def test_activity_factor_day(self):
@@ -498,15 +500,19 @@ class TestCoordinatorV2Integration:
 
     @pytest.mark.asyncio
     async def test_stock_accumulation(self, tmp_path):
-        """库存每个 cycle 都会自然增长"""
+        """库存每个 cycle 都会自然增长。
+        注意：per-cycle 后 supply 会被 consume_shipped 扣减（如果 route opt 成功）。
+        这里用 10 supply / 1 demand 这样一个 supply 远多于 demand 的配置，
+        保证 accumulate 的总量 > consume 的总量，总量净增长。
+        """
         db_path = str(tmp_path / "acc.db")
-        cfg = WorldConfig(n_supply_points=3, n_demand_points=1, n_vehicles=3, seed=1)
+        cfg = WorldConfig(n_supply_points=10, n_demand_points=1, n_vehicles=3, seed=1)
         coord = MultiAgentCoordinator(config=cfg, db_path=db_path)
 
         before = sum(a.current_stock for a in coord.supply_agents.values())
         await coord.run_optimization_cycle()
         after = sum(a.current_stock for a in coord.supply_agents.values())
-        # 库存应该增加了（因为 accumulate_stock 在 day start 执行）
+        # supply >> demand 场景下，accumulate 应能压过 consume，总量增长
         assert after > before
 
 

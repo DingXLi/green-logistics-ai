@@ -218,7 +218,7 @@ class LogisticsAgent:
             ))
         
         # 求解
-        result = solver.solve(time_limit_seconds=10)
+        result = solver.solve(time_limit_seconds=15)
         
         # 更新车辆状态
         for route_info in result.get("routes", []):
