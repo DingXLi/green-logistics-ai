@@ -175,7 +175,7 @@ async def run_optimization(request: OptimizationRequest = None):
     """运行优化"""
     if coordinator is None:
         raise HTTPException(status_code=503, detail="System not initialized")
-    
+
     if request and request.run_simulation:
         # 运行模拟
         results = await coordinator.simulate_day(days=request.simulation_days)
@@ -183,11 +183,11 @@ async def run_optimization(request: OptimizationRequest = None):
     else:
         # 单次优化
         last_result = await coordinator.run_optimization_cycle()
-    
+
     # 提取关键指标
     matches = last_result.get("matches", {})
     routes = last_result.get("route_optimization", {})
-    
+
     return OptimizationResponse(
         status="success",
         optimization_id=last_result.get("optimization_id"),
@@ -197,6 +197,156 @@ async def run_optimization(request: OptimizationRequest = None):
         total_cost_sek=routes.get("total_cost_sek", 0),
         total_co2_kg=routes.get("total_co2_kg", 0)
     )
+
+
+# ============================================
+# V3: Pareto 前沿端点
+# ============================================
+@app.get("/api/optimize/pareto")
+async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
+    """
+    返回多目标 (cost vs CO2) Pareto 前沿
+
+    - n_points: 扫描权重点数 (2..20)
+    - time_limit_seconds: 每个点的 OR-Tools 时限
+
+    用 coordinator 当前世界的 supply/demand/vehicle 状态构建 VRPSolver。
+    """
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    if n_points < 2 or n_points > 20:
+        raise HTTPException(
+            status_code=400,
+            detail="n_points must be in [2, 20]",
+        )
+
+    from optimization.vrp_solver import VRPSolver, Location, Vehicle
+
+    # 收集当前 supply / demand 状态
+    supply_offers = []
+    for agent_id, agent in coordinator.supply_agents.items():
+        stock = await agent.get_current_stock()
+        if stock["stock_tons"] > 0.5:
+            supply_offers.append({
+                "agent_id": agent_id,
+                "available_tons": stock["stock_tons"],
+                "material_type": stock["material_type"],
+                "location": stock["location"],
+            })
+
+    demand_requests = []
+    for dp in coordinator.market_agent.demand_points:
+        demand_requests.append({
+            "id": dp["id"],
+            "name": dp["name"],
+            "demand_tons": dp["current_demand_tons"],
+            "preferred_materials": dp["preferred_materials"],
+            "location": dp["location"],
+            "material_type": dp.get("material_type"),
+        })
+
+    # 重新匹配
+    matches_result = await coordinator.market_agent.match_supply_demand(
+        supply_offers=supply_offers,
+        demand_requests=demand_requests,
+    )
+    matches = matches_result.get("matches", [])
+
+    if not matches:
+        raise HTTPException(
+            status_code=404,
+            detail="No matches available to build VRP problem",
+        )
+
+    # 取前 15 个匹配，避免 OR-Tools 超时
+    matches = matches[:15]
+
+    # 收集 depot + pickup + delivery
+    depot_loc = coordinator.logistics_agent.depot_location
+    depot = Location(id="DEPOT", lat=depot_loc["lat"], lon=depot_loc["lon"], type="depot")
+
+    supply_idx = {a.agent_id: a for a in coordinator.supply_agents.values()}
+    demand_idx = {d["id"]: d for d in coordinator.market_agent.demand_points}
+
+    pickup_locations = []
+    delivery_locations = []
+    for m in matches:
+        sid = m.get("supply_id")
+        did = m.get("demand_id")
+        if sid not in supply_idx or did not in demand_idx:
+            continue
+        sup = supply_idx[sid]
+        dem = demand_idx[did]
+        pickup_locations.append({
+            "id": sid, "lat": sup.lat, "lon": sup.lon,
+            "tons": m.get("tons", 5.0),
+        })
+        delivery_locations.append({
+            "id": did, "lat": dem["location"]["lat"], "lon": dem["location"]["lon"],
+            "tons": m.get("tons", 5.0),
+        })
+
+    if not pickup_locations:
+        raise HTTPException(
+            status_code=404,
+            detail="No usable supply/demand locations",
+        )
+
+    # 配车辆（不超过 pickup 数）
+    vehicles_data = [
+        v for v in coordinator.logistics_agent.vehicles
+        if v.get("status") == "available"
+    ][:len(pickup_locations)]
+    if not vehicles_data:
+        raise HTTPException(status_code=404, detail="No vehicles available")
+
+    # 构建 solver 并扫描 Pareto
+    solver = VRPSolver()
+    solver.add_location(depot)
+    for loc in pickup_locations:
+        solver.add_location(Location(
+            id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+            demand_tons=loc["tons"], type="pickup",
+        ))
+    for loc in delivery_locations:
+        solver.add_location(Location(
+            id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+            demand_tons=-loc["tons"], type="delivery",
+        ))
+    for vd in vehicles_data:
+        solver.add_vehicle(Vehicle(
+            id=vd["vehicle_id"],
+            capacity_tons=vd.get("max_capacity_tons", 20.0),
+            start_location=depot,
+            co2_rate=vd.get("co2_emission_rate", 0.85),
+            cost_per_km=2.6,
+        ))
+
+    pareto = solver.solve_pareto(
+        n_points=n_points, time_limit_seconds=time_limit_seconds,
+    )
+
+    # 序列化：去掉完整 routes（保留数量）
+    summary = []
+    for p in pareto:
+        summary.append({
+            "cost_weight": p["cost_weight"],
+            "co2_weight": p["co2_weight"],
+            "cost_sek": p["cost_sek"],
+            "co2_kg": p["co2_kg"],
+            "total_objective": p["total_objective"],
+            "total_distance_km": p["total_distance_km"],
+            "n_routes": len(p["routes"]),
+            "status": p["status"],
+        })
+
+    return {
+        "n_points": len(summary),
+        "n_pickups": len(pickup_locations),
+        "n_deliveries": len(delivery_locations),
+        "n_vehicles": len(vehicles_data),
+        "pareto": summary,
+    }
 
 
 @app.get("/api/iot-telemetry/{vehicle_id}")

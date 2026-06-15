@@ -82,11 +82,19 @@ class SupplyAgent:
                 "priority": "normal" if self.current_stock < self.daily_capacity else "high"
             }
         else:
+            # Bug fix: daily_capacity may be 0/unset → avoid ZeroDivisionError.
+            if self.daily_capacity <= 0:
+                estimated_wait_hours = None
+                reason = "daily_capacity_unset"
+            else:
+                estimated_wait_hours = (min_load_tons - self.current_stock) / (self.daily_capacity / 24)
+                reason = None
             return {
                 "status": "insufficient",
                 "current_tons": self.current_stock,
                 "required_tons": min_load_tons,
-                "estimated_wait_hours": (min_load_tons - self.current_stock) / (self.daily_capacity / 24)
+                "estimated_wait_hours": estimated_wait_hours,
+                "reason": reason,
             }
     
     async def update_stock(self, collected_tons: float) -> bool:

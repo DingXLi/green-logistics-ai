@@ -194,13 +194,13 @@ class TestVRPSolver:
     def test_fallback_solver(self):
         """测试回退求解器"""
         from optimization.vrp_solver import VRPSolver, Location, Vehicle
-        
+
         solver = VRPSolver()
-        
+
         # 添加 depot
         depot = Location(id="DEPOT", lat=57.7089, lon=14.1618, type="depot")
         solver.add_location(depot)
-        
+
         # 添加 pickup 点
         for i in range(3):
             solver.add_location(Location(
@@ -210,19 +210,119 @@ class TestVRPSolver:
                 demand_tons=5.0,
                 type="pickup"
             ))
-        
+
         # 添加车辆
         solver.add_vehicle(Vehicle(
             id="V1",
             capacity_tons=20.0,
             start_location=depot
         ))
-        
+
         result = solver.solve()
 
         assert result["status"] in ["optimal", "heuristic"]
         assert "routes" in result
         assert "total_distance_km" in result
+
+    def test_weighted_solve(self):
+        """多目标加权 solve：返回 total_objective / cost_weight / co2_weight"""
+        from optimization.vrp_solver import VRPSolver, Location, Vehicle
+
+        solver = VRPSolver()
+        depot = Location(id="DEPOT", lat=57.7089, lon=14.1618, type="depot")
+        solver.add_location(depot)
+        for i in range(3):
+            solver.add_location(Location(
+                id=f"P{i}",
+                lat=57.7089 + (i * 0.05),
+                lon=14.1618 + (i * 0.05),
+                demand_tons=4.0,
+                type="pickup",
+            ))
+        for i in range(2):
+            solver.add_location(Location(
+                id=f"D{i}",
+                lat=57.6 + (i * 0.05),
+                lon=14.0 + (i * 0.05),
+                demand_tons=-6.0,
+                type="delivery",
+            ))
+        for i in range(3):
+            solver.add_vehicle(Vehicle(
+                id=f"V{i}",
+                capacity_tons=20.0,
+                start_location=depot,
+            ))
+
+        result = solver.solve(time_limit_seconds=3, cost_weight=0.7, co2_weight=0.3)
+        assert result["status"] in ("optimal", "heuristic")
+        assert "total_objective" in result
+        assert "total_cost_sek" in result
+        assert "total_co2_kg" in result
+        assert result["cost_weight"] == 0.7
+        assert result["co2_weight"] == 0.3
+        # total_objective = cost * cost_w + co2 * co2_price * co2_w
+        co2_price = result["co2_price_sek_per_kg"]
+        expected_obj = (
+            result["total_cost_sek"] * 0.7
+            + result["total_co2_kg"] * co2_price * 0.3
+        )
+        assert abs(result["total_objective"] - round(expected_obj, 2)) < 0.5
+
+    def test_pareto_front(self):
+        """Pareto 前沿：n_points 个点，覆盖 [1,0] -> [0,1] 权重扫描"""
+        from optimization.vrp_solver import VRPSolver, Location, Vehicle
+
+        solver = VRPSolver()
+        depot = Location(id="DEPOT", lat=57.7089, lon=14.1618, type="depot")
+        solver.add_location(depot)
+        for i in range(3):
+            solver.add_location(Location(
+                id=f"P{i}",
+                lat=57.7089 + (i * 0.05),
+                lon=14.1618 + (i * 0.05),
+                demand_tons=4.0,
+                type="pickup",
+            ))
+        for i in range(2):
+            solver.add_location(Location(
+                id=f"D{i}",
+                lat=57.6 + (i * 0.05),
+                lon=14.0 + (i * 0.05),
+                demand_tons=-6.0,
+                type="delivery",
+            ))
+        for i in range(3):
+            solver.add_vehicle(Vehicle(
+                id=f"V{i}",
+                capacity_tons=20.0,
+                start_location=depot,
+            ))
+
+        n = 5
+        pareto = solver.solve_pareto(n_points=n, time_limit_seconds=3)
+
+        assert isinstance(pareto, list)
+        assert len(pareto) == n
+        for i, p in enumerate(pareto):
+            assert set(p.keys()) >= {
+                "cost_weight", "co2_weight", "cost_sek", "co2_kg",
+                "total_objective", "routes", "status",
+            }
+            # 权重单调变化
+            expected_cost_w = 1.0 - i / max(n - 1, 1)
+            assert abs(p["cost_weight"] - expected_cost_w) < 1e-6
+            # cost + co2 权重和为 1
+            assert abs(p["cost_weight"] + p["co2_weight"] - 1.0) < 1e-6
+
+        # 第一个点 cost_w=1.0 → total_objective 应该 == cost_sek
+        first = pareto[0]
+        assert abs(first["total_objective"] - first["cost_sek"]) < 0.01
+        # 最后一个点 co2_w=1.0 → total_objective == co2_kg * co2_price
+        last = pareto[-1]
+        co2_price = 1.5  # default
+        expected = last["co2_kg"] * co2_price
+        assert abs(last["total_objective"] - round(expected, 2)) < 0.5
 
 
 # ============================================
@@ -408,3 +508,71 @@ class TestCoordinatorV2Integration:
         after = sum(a.current_stock for a in coord.supply_agents.values())
         # 库存应该增加了（因为 accumulate_stock 在 day start 执行）
         assert after > before
+
+
+# ============================================
+# V3 OSM Road Network 测试（按网络/超时自动 skip）
+# ============================================
+class TestOSMRoadNetwork:
+    """OSM Road Network 集成测试 — 需要网络访问 Overpass"""
+
+    @pytest.fixture
+    def rn(self):
+        from data.osm_loader import OSMRoadNetwork, OSMNX_AVAILABLE
+        if not OSMNX_AVAILABLE:
+            pytest.skip("osmnx not installed")
+        rn = OSMRoadNetwork()
+        try:
+            # 小半径 5km 加快测试，120s 超时
+            info = rn.load_region(
+                57.7089, 14.1618,  # Borås
+                dist_meters=5000,
+                timeout=120,
+            )
+        except Exception as e:
+            pytest.skip(f"OSM download failed or timed out: {e}")
+        if not rn.is_loaded():
+            pytest.skip("OSM graph not loaded")
+        return rn
+
+    def test_load_region_returns_metadata(self, rn):
+        """load_region 返回节点/边元数据"""
+        assert rn.graph is not None
+        assert len(rn.graph.nodes) > 0
+        assert len(rn.graph.edges) > 0
+        assert rn.dist_meters == 5000
+
+    def test_shortest_path_distance_known_pair(self, rn):
+        """同一点距离应为 0；不同点距离应为正"""
+        d_same = rn.shortest_path_distance(57.7089, 14.1618, 57.7089, 14.1618)
+        assert d_same == 0.0
+        # 5km 半径内另一个点
+        d_other = rn.shortest_path_distance(
+            57.7089, 14.1618,
+            57.7300, 14.2000,
+        )
+        assert d_other > 0
+        # 不应超过 50km（5km 半径缓冲）
+        assert d_other < 50.0
+
+    def test_get_distance_matrix(self, rn):
+        """N 个点 → NxN 对称距离矩阵"""
+        locs = [
+            {"lat": 57.7089, "lon": 14.1618},
+            {"lat": 57.7200, "lon": 14.1800},
+            {"lat": 57.6900, "lon": 14.1400},
+        ]
+        D = rn.get_distance_matrix(locs)
+        assert D.shape == (3, 3)
+        # 对角线为 0
+        assert D[0, 0] == 0.0
+        assert D[1, 1] == 0.0
+        assert D[2, 2] == 0.0
+        # 对称
+        assert abs(D[0, 1] - D[1, 0]) < 1e-6
+        assert abs(D[0, 2] - D[2, 0]) < 1e-6
+        assert abs(D[1, 2] - D[2, 1]) < 1e-6
+        # 正距离
+        assert D[0, 1] > 0
+        assert D[0, 2] > 0
+        assert D[1, 2] > 0
