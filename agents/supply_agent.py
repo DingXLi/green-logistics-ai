@@ -9,7 +9,7 @@
 
 from google.adk import Agent
 from google.adk import tools
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import asyncio
 
@@ -65,7 +65,7 @@ class SupplyAgent:
         """预测未来 N 天的供应量"""
         # TODO: 实现基于历史数据的预测模型
         daily_prediction = self.daily_capacity * 0.8  # 简化版本
-        
+
         return {
             "agent_id": self.agent_id,
             "prediction_days": days,
@@ -73,6 +73,121 @@ class SupplyAgent:
             "total_tons": daily_prediction * days,
             "confidence": 0.85
         }
+
+    @classmethod
+    async def predict_supply_batch(
+        cls,
+        agents: List["SupplyAgent"],
+        days: int = 1,
+        sim_day: int = 0,
+        weekday: int = 0,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        LLM-driven 供应预测 (单次调用) 返回所有 supply 点的 multiplier。
+
+        Args:
+            agents: 同一世界里的 SupplyAgent 列表
+            days: 预测天数 (1 = next day)
+            sim_day: 当前 sim day (给 LLM 上文)
+            weekday: 0-6 (Mon-Sun)
+
+        Returns:
+            {agent_id: {multiplier, trend, confidence, reason, source}}
+
+        Fallback: LLM 调不到 / JSON 错 / 任意 4xx → 统一 multiplier=1.0
+        """
+        from .llm_caller import call_gemini, GeminiAPIError
+        import json as _json
+        import re as _re
+
+        if not agents:
+            return {}
+
+        supply_summaries = [
+            {
+                "id": a.agent_id,
+                "material_type": a.material_type,
+                "current_stock_tons": round(a.current_stock, 2),
+                "daily_capacity_tons": round(a.daily_capacity, 2),
+                "location": a.location,
+            }
+            for a in agents
+        ]
+        weekday_name = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][weekday % 7]
+        system_inst = (
+            "You are a senior waste-supply analyst for a Swedish circular-economy "
+            "logistics network. You give concise, evidence-based next-day "
+            "accumulation-rate forecasts. Always respond with strictly valid JSON — "
+            "no prose, no code fences, no trailing commas."
+        )
+        user_prompt = (
+            f"Forecast next-day stock-accumulation multipliers for a Swedish waste-recycling network.\n\n"
+            f"**Context**\n"
+            f"- Sim day: {sim_day} ({weekday_name})\n"
+            f"- Region: Borås / Göteborg / Stockholm triangle, Sweden\n"
+            f"- Season: summer (active construction, more waste generated)\n"
+            f"- Supply points: {len(supply_summaries)}\n\n"
+            f"**Supply points (JSON)**:\n"
+            f"{_json.dumps(supply_summaries, ensure_ascii=False, indent=2)}\n\n"
+            f"**Task**: For EACH supply point, predict a next-day accumulation multiplier:\n"
+            f"- `id`: supply point id (keep as-is)\n"
+            f"- `multiplier`: float in [0.3, 1.8] — how much MORE or LESS than baseline to accumulate tomorrow\n"
+            f"  (1.0 = baseline, 1.5 = 50% more, 0.5 = 50% less, <0.3 = no accumulation today)\n"
+            f"- `trend`: one of \"rising\", \"stable\", \"falling\"\n"
+            f"- `confidence`: float in [0.0, 1.0]\n"
+            f"- `reason`: 1 short sentence (≤15 words) explaining\n\n"
+            f"**Output**: Return ONLY a JSON array. Example:\n"
+            f'[{{"id":"SUP000","multiplier":1.2,"trend":"rising","confidence":0.8,"reason":"Construction peak"}}]'
+        )
+
+        try:
+            text = call_gemini(
+                user_prompt,
+                system_instruction=system_inst,
+                max_tokens=2048,
+            )
+            text = text.strip()
+            text = _re.sub(r"^```(?:json)?\s*", "", text)
+            text = _re.sub(r"\s*```\s*$", "", text)
+            raw_list = _json.loads(text)
+            if not isinstance(raw_list, list):
+                raise ValueError(f"expected JSON array, got {type(raw_list).__name__}")
+
+            predictions: Dict[str, Dict[str, Any]] = {}
+            for p in raw_list:
+                if not isinstance(p, dict) or "id" not in p or "multiplier" not in p:
+                    continue
+                m = float(p["multiplier"])
+                m = max(0.1, min(2.0, m))  # supply side: wider clamp
+                aid = str(p["id"])
+                predictions[aid] = {
+                    "id": aid,
+                    "multiplier": round(m, 3),
+                    "trend": str(p.get("trend", "stable"))[:16],
+                    "confidence": round(float(p.get("confidence", 0.5)), 2),
+                    "reason": str(p.get("reason", ""))[:200],
+                    "source": "llm",
+                }
+            if not predictions:
+                raise ValueError("LLM returned no valid predictions")
+            return predictions
+        except (GeminiAPIError, _json.JSONDecodeError, ValueError, KeyError) as e:
+            import logging
+            logging.warning(
+                f"predict_supply_batch LLM call failed ({type(e).__name__}: {e}), "
+                f"falling back to uniform multiplier=1.0"
+            )
+            return {
+                a.agent_id: {
+                    "id": a.agent_id,
+                    "multiplier": 1.0,
+                    "trend": "stable",
+                    "confidence": 0.4,
+                    "reason": "fallback: LLM unavailable",
+                    "source": "fallback",
+                }
+                for a in agents
+            }
     
     async def request_collection(self, min_load_tons: float) -> Dict[str, Any]:
         """请求废料收集"""
@@ -130,10 +245,16 @@ class SupplyAgent:
         if quality_score is not None:
             self.quality_score = quality_score
 
-    def accumulate_stock(self, factor: float = 1.0) -> None:
-        """每个 cycle 调用：模拟一天自然积累库存（factor 取自 SimClock.activity_factor）"""
+    def accumulate_stock(self, factor: float = 1.0, llm_multiplier: float = 1.0) -> None:
+        """每个 cycle 调用：模拟一天自然积累库存。
+
+        Args:
+            factor: SimClock.activity_factor (昼夜 0.5/1.5x)
+            llm_multiplier: LLM 预测的 multiplier (默认 1.0 = 无影响),
+                            由 SupplyAgent.predict_supply_batch 给出
+        """
         self.current_stock = round(
-            self.current_stock + self.daily_capacity * 0.5 * factor, 2
+            self.current_stock + self.daily_capacity * 0.5 * factor * llm_multiplier, 2
         )
 
     def consume_shipped(self, shipped_tons: float, hard_cap_tons: float = 30.0) -> None:

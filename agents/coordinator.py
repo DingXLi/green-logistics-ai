@@ -175,31 +175,47 @@ class MultiAgentCoordinator:
         self.clock.advance_day()
         cycle_id = f"OPT{self.clock.total_cycles:04d}"
         factor = self.clock.activity_factor
+        day = self.clock.now.day
+        weekday = day % 7
         logger.info(f"开始周期 {cycle_id} @ {self.clock.now} (factor={factor})")
 
-        # 1. 库存自然积累 + 车辆状态重置（加速时钟下每天开始时全部归队）
-        for agent in self.supply_agents.values():
-            agent.accumulate_stock(factor=factor)
+        # 0. LLM 供应预测 (单次调用拿全部 supply 点的 accumulation multiplier)
+        supply_llm = await SupplyAgent.predict_supply_batch(
+            list(self.supply_agents.values()),
+            days=1, sim_day=day, weekday=weekday,
+        )
+
+        # 1. 库存自然积累 + 车辆状态重置（LLM multiplier 影响 accumulation 速率）
+        for agent_id, agent in self.supply_agents.items():
+            llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
+            agent.accumulate_stock(factor=factor, llm_multiplier=llm_m)
         self.logistics_agent.reset_vehicles_for_new_cycle()
 
-        # 2. 收集供应 offers
+        # 2. 收集供应 offers (使用 LLM multiplier 调整 predicted_tons)
         supply_offers = []
         for agent_id, agent in self.supply_agents.items():
             stock = await agent.get_current_stock()
-            prediction = await agent.predict_supply(days=1)
+            base_pred = agent.daily_capacity * 0.8 * 1  # 原本 = daily_cap * 0.8 * days
+            llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
+            predicted_tons = round(base_pred * llm_m, 2)
+            sup_meta = supply_llm.get(agent_id, {})
             supply_offers.append({
                 "agent_id": agent_id,
                 "available_tons": stock["stock_tons"],
-                "predicted_tons": prediction["total_tons"],
+                "predicted_tons": predicted_tons,
                 "material_type": stock["material_type"],
                 "location": stock["location"],
                 "moisture_percent": agent.moisture_percent,
                 "quality_score": agent.quality_score,
+                # LLM 决策可追溯
+                "llm_multiplier": round(llm_m, 3),
+                "llm_trend": sup_meta.get("trend"),
+                "llm_confidence": sup_meta.get("confidence"),
+                "llm_reason": sup_meta.get("reason"),
+                "llm_source": sup_meta.get("source", "unknown"),
             })
 
         # 3. 收集需求 requests（LLM 驱动的 multiplier + 小幅 deterministic jitter）
-        day = self.clock.now.day
-        weekday = day % 7
         # 优先 LLM 预测 (per-point multiplier)；失败 / 不可用时 fallback 到 deterministic
         llm_pred = await self.market_agent.predict_demand(
             days=1, sim_day=day, weekday=weekday
@@ -259,6 +275,25 @@ class MultiAgentCoordinator:
             self.persistence.record_supply(cycle_id, sup)
         for dem in demand_requests:
             self.persistence.record_demand(cycle_id, dem)
+        # 持久化 LLM 决策 (供报告画图)
+        if supply_llm:
+            self.persistence.record_llm_decisions_batch(
+                cycle_id=cycle_id,
+                decision_type="supply_prediction",
+                target_type="supply_point",
+                predictions=list(supply_llm.values()),
+                sim_day=day,
+                sim_hour=self.clock.now.hour,
+            )
+        if llm_pred.get("predictions"):
+            self.persistence.record_llm_decisions_batch(
+                cycle_id=cycle_id,
+                decision_type="demand_prediction",
+                target_type="demand_point",
+                predictions=llm_pred["predictions"],
+                sim_day=day,
+                sim_hour=self.clock.now.hour,
+            )
 
         # 5. 匹配供需
         matches = await self.market_agent.match_supply_demand(

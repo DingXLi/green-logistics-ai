@@ -291,3 +291,155 @@ class TestPredictDemandLLM:
         # 只有 DEM001 被采纳
         assert len(result["predictions"]) == 1
         assert result["predictions"][0]["id"] == "DEM001"
+
+
+# ============================================================
+# SupplyAgent.predict_supply_batch (LLM 驱动) 测试
+# ============================================================
+
+class TestPredictSupplyBatchLLM:
+    @pytest.fixture
+    def two_agents(self):
+        from agents.supply_agent import SupplyAgent
+        a1 = SupplyAgent("SUP000", {"lat": 57.7, "lon": 14.2})
+        a1.set_inventory(current_stock=5.0, daily_capacity=10.0, material_type="metal_scrap")
+        a2 = SupplyAgent("SUP001", {"lat": 59.3, "lon": 18.1})
+        a2.set_inventory(current_stock=2.0, daily_capacity=8.0, material_type="concrete")
+        return [a1, a2]
+
+    def _import_sa(self):
+        from agents.supply_agent import SupplyAgent
+        return SupplyAgent
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_returns_per_agent_multiplier(self, mock_genai, two_agents):
+        SupplyAgent = self._import_sa()
+        llm_json = (
+            '[{"id":"SUP000","multiplier":1.2,"trend":"rising","confidence":0.8,"reason":"Construction peak"},'
+            '{"id":"SUP001","multiplier":0.6,"trend":"falling","confidence":0.7,"reason":"Plant holiday"}]'
+        )
+        resp = MagicMock()
+        resp.text = llm_json
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await SupplyAgent.predict_supply_batch(two_agents, days=1, sim_day=2, weekday=1)
+        assert set(result.keys()) == {"SUP000", "SUP001"}
+        assert result["SUP000"]["multiplier"] == 1.2
+        assert result["SUP000"]["source"] == "llm"
+        assert result["SUP001"]["trend"] == "falling"
+        assert "Plant holiday" in result["SUP001"]["reason"]
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_clamps_extreme_values(self, mock_genai, two_agents):
+        SupplyAgent = self._import_sa()
+        llm_json = '[{"id":"SUP000","multiplier":10.0,"trend":"rising","confidence":0.5,"reason":"moon"},' \
+                    '{"id":"SUP001","multiplier":-1.0,"trend":"falling","confidence":0.5,"reason":"neg"}]'
+        resp = MagicMock()
+        resp.text = llm_json
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
+        # supply clamp [0.1, 2.0]
+        assert result["SUP000"]["multiplier"] == 2.0
+        assert result["SUP001"]["multiplier"] == 0.1
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_fallback_on_429(self, mock_genai, two_agents):
+        SupplyAgent = self._import_sa()
+        from google.api_core.exceptions import ResourceExhausted  # type: ignore
+        mock_genai.GenerativeModel.return_value.generate_content.side_effect = ResourceExhausted("429")
+
+        result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
+        assert all(p["source"] == "fallback" for p in result.values())
+        assert all(p["multiplier"] == 1.0 for p in result.values())
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_fallback_on_malformed_json(self, mock_genai, two_agents):
+        SupplyAgent = self._import_sa()
+        resp = MagicMock()
+        resp.text = "not a json"
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
+        assert all(p["source"] == "fallback" for p in result.values())
+
+    @pytest.mark.asyncio
+    async def test_empty_agents_returns_empty_dict(self):
+        SupplyAgent = self._import_sa()
+        result = await SupplyAgent.predict_supply_batch([], sim_day=1, weekday=0)
+        assert result == {}
+
+
+# ============================================================
+# Persistence.llm_decisions 测试
+# ============================================================
+
+class TestLLMDecisionsPersistence:
+    @pytest.fixture
+    def p(self, tmp_path):
+        from agents.persistence import Persistence
+        return Persistence(str(tmp_path / "llm.db"))
+
+    def test_schema_has_llm_decisions_table(self, p):
+        with p._conn() as con:
+            cur = con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='llm_decisions'"
+            )
+            assert cur.fetchone() is not None
+
+    def test_record_single_and_get(self, p):
+        p.begin_cycle("OPT0001", sim_day=1, sim_hour=0, activity_factor=1.0)
+        p.record_llm_decision(
+            cycle_id="OPT0001", decision_type="demand_prediction",
+            target_id="DEM001", target_type="demand_point",
+            multiplier=1.2, trend="rising", confidence=0.8,
+            reason="Test", source="llm", sim_day=1, sim_hour=0,
+        )
+        rows = p.get_llm_decisions(decision_type="demand_prediction")
+        assert len(rows) == 1
+        assert rows[0]["target_id"] == "DEM001"
+        assert rows[0]["multiplier"] == 1.2
+
+    def test_record_batch_and_timeseries(self, p):
+        p.begin_cycle("OPT0001", sim_day=1, sim_hour=0, activity_factor=1.0)
+        n = p.record_llm_decisions_batch(
+            cycle_id="OPT0001",
+            decision_type="demand_prediction",
+            target_type="demand_point",
+            predictions=[
+                {"id": "DEM001", "multiplier": 1.1, "trend": "rising", "confidence": 0.8, "reason": "a", "source": "llm"},
+                {"id": "DEM002", "multiplier": 0.9, "trend": "stable", "confidence": 0.7, "reason": "b", "source": "llm"},
+            ],
+            sim_day=1, sim_hour=0,
+        )
+        assert n == 2
+        ts = p.get_llm_timeseries("demand_prediction")
+        assert len(ts) == 1
+        assert ts[0]["n"] == 2
+        assert ts[0]["llm_n"] == 2
+        assert ts[0]["fb_n"] == 0
+
+    def test_get_summary_includes_llm(self, p):
+        p.begin_cycle("OPT0001", sim_day=1, sim_hour=0, activity_factor=1.0)
+        p.record_llm_decisions_batch(
+            cycle_id="OPT0001", decision_type="supply_prediction",
+            target_type="supply_point",
+            predictions=[
+                {"id": "SUP000", "multiplier": 1.5, "trend": "rising", "confidence": 0.7, "reason": "x", "source": "llm"},
+                {"id": "SUP001", "multiplier": 1.0, "trend": "stable", "confidence": 0.4, "reason": "y", "source": "fallback"},
+            ],
+            sim_day=1, sim_hour=0,
+        )
+        summary = p.get_summary()
+        assert "llm_decisions" in summary
+        assert summary["llm_decisions"]["n_total"] == 2
+        assert summary["llm_decisions"]["n_real_llm"] == 1
+        assert summary["llm_decisions"]["n_fallback"] == 1
