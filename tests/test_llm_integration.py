@@ -171,3 +171,123 @@ class TestRealGeminiIntegration:
         text = call_gemini("用一句话说 hi", max_tokens=50)
         assert isinstance(text, str)
         assert len(text) > 0
+
+
+# ============================================================
+# MarketAgent.predict_demand (LLM 驱动) 测试
+# ============================================================
+
+class TestPredictDemandLLM:
+    """用 mock 验证 LLM 驱动 predict_demand 的所有路径。"""
+
+    @pytest.fixture
+    def market(self):
+        from agents.market_agent import MarketAgent
+        m = MarketAgent()
+        m.demand_points = [
+            {"id": "DEM001", "name": "Borås Plant", "city": "Borås",
+             "preferred_materials": ["mixed_waste", "metal_scrap"],
+             "base_demand_tons": 50.0, "current_demand_tons": 50.0,
+             "daily_capacity_tons": 75.0},
+            {"id": "DEM002", "name": "Gbg Harbor", "city": "Göteborg",
+             "preferred_materials": ["concrete"],
+             "base_demand_tons": 80.0, "current_demand_tons": 80.0,
+             "daily_capacity_tons": 120.0},
+        ]
+        return m
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_llm_path_returns_per_point_multipliers(self, mock_genai, market):
+        # 构造 LLM 返回 (像真实 API 的 JSON 数组)
+        llm_json = (
+            '[{"id":"DEM001","multiplier":1.2,"trend":"rising","confidence":0.8,'
+            '"reason":"Construction season peak in Borås"},'
+            '{"id":"DEM002","multiplier":0.7,"trend":"falling","confidence":0.6,'
+            '"reason":"Plant maintenance scheduled"}]'
+        )
+        resp = MagicMock()
+        resp.text = llm_json
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await market.predict_demand(days=1, sim_day=5, weekday=2)
+        assert result["source"] == "llm"
+        assert len(result["predictions"]) == 2
+        by_id = {p["id"]: p for p in result["predictions"]}
+        assert by_id["DEM001"]["multiplier"] == 1.2
+        assert by_id["DEM002"]["trend"] == "falling"
+        assert "Construction season" in by_id["DEM001"]["reason"]
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_clamps_extreme_multipliers(self, mock_genai, market):
+        # LLM 返回超出 [0.3, 1.8] 范围的值 — 应该被 clamp
+        llm_json = '[{"id":"DEM001","multiplier":5.0,"trend":"rising","confidence":0.5,"reason":"hype"},' \
+                    '{"id":"DEM002","multiplier":0.05,"trend":"falling","confidence":0.5,"reason":"closed"}]'
+        resp = MagicMock()
+        resp.text = llm_json
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await market.predict_demand(sim_day=1, weekday=0)
+        by_id = {p["id"]: p for p in result["predictions"]}
+        assert by_id["DEM001"]["multiplier"] == 1.8  # clamped to upper
+        assert by_id["DEM002"]["multiplier"] == 0.3  # clamped to lower
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_strips_code_fences(self, mock_genai, market):
+        # LLM 把 JSON 包在 ```json ... ``` 里
+        llm_text = "```json\n[{\"id\":\"DEM001\",\"multiplier\":1.0,\"trend\":\"stable\",\"confidence\":0.5,\"reason\":\"ok\"}]\n```"
+        resp = MagicMock()
+        resp.text = llm_text
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await market.predict_demand(sim_day=1, weekday=0)
+        assert result["source"] == "llm"
+        assert len(result["predictions"]) == 1
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_fallback_on_429(self, mock_genai, market):
+        from google.api_core.exceptions import ResourceExhausted  # type: ignore
+        mock_genai.GenerativeModel.return_value.generate_content.side_effect = ResourceExhausted("429")
+
+        result = await market.predict_demand(sim_day=1, weekday=5)  # Sat
+        assert result["source"] == "fallback"
+        # weekend fallback = 0.85
+        for p in result["predictions"]:
+            assert p["multiplier"] == 0.85
+            assert "fallback" in p["reason"].lower()
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_fallback_on_invalid_json(self, mock_genai, market):
+        resp = MagicMock()
+        resp.text = "sorry, I cannot predict demand"  # not JSON
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await market.predict_demand(sim_day=1, weekday=0)
+        assert result["source"] == "fallback"
+        assert all(p["multiplier"] == 1.0 for p in result["predictions"])  # weekday non-weekend
+
+    @pytest.mark.asyncio
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    async def test_skips_malformed_entries(self, mock_genai, market):
+        # 一条缺 id,一条缺 multiplier — 都该被跳过
+        llm_json = '[{"id":"DEM001","multiplier":1.0,"trend":"stable","confidence":0.5,"reason":"ok"},' \
+                    '{"name":"oops"},{"id":"DEM002"}]'
+        resp = MagicMock()
+        resp.text = llm_json
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        result = await market.predict_demand(sim_day=1, weekday=0)
+        assert result["source"] == "llm"
+        # 只有 DEM001 被采纳
+        assert len(result["predictions"]) == 1
+        assert result["predictions"][0]["id"] == "DEM001"

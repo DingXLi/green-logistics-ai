@@ -202,23 +202,124 @@ class MarketAgent:
             "optimization_status": "basic_matching"  # TODO: 升级为优化算法
         }
     
-    async def predict_demand(self, days: int = 7) -> Dict[str, Any]:
-        """预测未来需求"""
-        # TODO: 实现基于历史数据和市场趋势的预测
-        predictions = []
-        for dp in self.demand_points:
-            predictions.append({
-                "demand_point_id": dp["id"],
-                "daily_avg_tons": dp["daily_capacity_tons"] * 0.6,
-                "confidence": 0.75,
-                "trend": "stable"
-            })
-        
-        return {
-            "prediction_days": days,
-            "demand_points": predictions,
-            "total_daily_demand_tons": sum(p["daily_avg_tons"] for p in predictions)
-        }
+    async def predict_demand(
+        self,
+        days: int = 1,
+        sim_day: int = 0,
+        weekday: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        LLM-driven 需求预测。
+
+        单次 Gemini 调用: 让模型根据上下文 (region、material、weekday、season)
+        给所有需求点一个 next-day multiplier (+ trend + reason)。
+        失败 fallback 到简单的 deterministic 估计。
+
+        预算:
+          - 1 LLM call / cycle,30 days = 30 calls,远低于 250 RPD 限制
+          - 8 分钟仿真 3.75 calls/min,低于 10 RPM 限制
+        """
+        from .llm_caller import call_gemini, GeminiAPIError
+        import json as _json
+        import re as _re
+
+        # 构造简明上下文 (为了节省 token)
+        demand_summaries = [
+            {
+                "id": dp["id"],
+                "name": dp.get("name", dp["id"]),
+                "city": dp.get("city", "unknown"),
+                "preferred_materials": dp.get("preferred_materials", []),
+                "base_demand_tons": dp.get(
+                    "base_demand_tons", dp.get("current_demand_tons", 0)
+                ),
+            }
+            for dp in self.demand_points
+        ]
+        weekday_name = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][weekday % 7]
+        system_inst = (
+            "You are a senior logistics analyst for a Swedish circular-economy "
+            "waste-recycling network. You give concise, evidence-based demand "
+            "forecasts. Always respond with strictly valid JSON — no prose, no "
+            "code fences, no trailing commas."
+        )
+        user_prompt = (
+            f"Forecast next-day demand multipliers for a Swedish waste-recycling network.\n\n"
+            f"**Context**\n"
+            f"- Sim day: {sim_day} ({weekday_name})\n"
+            f"- Region: Borås / Göteborg / Stockholm triangle, Sweden\n"
+            f"- Season: summer (long days, active construction)\n"
+            f"- Demand points: {len(demand_summaries)}\n\n"
+            f"**Demand points (JSON)**:\n"
+            f"{_json.dumps(demand_summaries, ensure_ascii=False, indent=2)}\n\n"
+            f"**Task**: For EACH demand point, predict a next-day multiplier:\n"
+            f"- `id`: demand point id (keep as-is)\n"
+            f"- `multiplier`: float in [0.5, 1.5] — next-day demand vs base\n"
+            f"- `trend`: one of \"rising\", \"stable\", \"falling\"\n"
+            f"- `confidence`: float in [0.0, 1.0]\n"
+            f"- `reason`: 1 short sentence (≤15 words) explaining\n\n"
+            f"**Output**: Return ONLY a JSON array. Example:\n"
+            f'[{{"id":"DEM001","multiplier":1.1,"trend":"rising","confidence":0.8,"reason":"Construction season peak"}}]'
+        )
+
+        try:
+            text = call_gemini(
+                user_prompt,
+                system_instruction=system_inst,
+                max_tokens=2048,
+            )
+            # 去掉 ```json fences
+            text = text.strip()
+            text = _re.sub(r"^```(?:json)?\s*", "", text)
+            text = _re.sub(r"\s*```\s*$", "", text)
+            raw_list = _json.loads(text)
+            if not isinstance(raw_list, list):
+                raise ValueError(f"expected JSON array, got {type(raw_list).__name__}")
+
+            predictions = []
+            for p in raw_list:
+                if not isinstance(p, dict) or "id" not in p or "multiplier" not in p:
+                    continue
+                m = float(p["multiplier"])
+                m = max(0.3, min(1.8, m))  # 安全 clamp
+                predictions.append({
+                    "id": str(p["id"]),
+                    "multiplier": round(m, 3),
+                    "trend": str(p.get("trend", "stable"))[:16],
+                    "confidence": round(float(p.get("confidence", 0.5)), 2),
+                    "reason": str(p.get("reason", ""))[:200],
+                })
+            if not predictions:
+                raise ValueError("LLM returned no valid predictions")
+            return {
+                "predictions": predictions,
+                "source": "llm",
+                "sim_day": sim_day,
+                "weekday": weekday,
+            }
+        except (GeminiAPIError, _json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.warning(
+                f"predict_demand LLM call failed ({type(e).__name__}: {e}), "
+                f"falling back to deterministic estimate"
+            )
+            # Fallback: 跟之前 _compute_demand_multiplier 一致
+            fallback_mult = 0.85 if weekday >= 5 else 1.0
+            return {
+                "predictions": [
+                    {
+                        "id": dp["id"],
+                        "multiplier": fallback_mult,
+                        "trend": "stable",
+                        "confidence": 0.4,
+                        "reason": "fallback: LLM unavailable",
+                    }
+                    for dp in self.demand_points
+                ],
+                "source": "fallback",
+                "sim_day": sim_day,
+                "weekday": weekday,
+                "error": str(e),
+            }
     
     def get_tools(self) -> list:
         """返回智能体可用的工具"""
