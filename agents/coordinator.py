@@ -197,8 +197,23 @@ class MultiAgentCoordinator:
                 "quality_score": agent.quality_score,
             })
 
-        # 3. 收集需求 requests（带 per-cycle 扰动：weekday × bounded-noise × per-id jitter）
+        # 3. 收集需求 requests（LLM 驱动的 multiplier + 小幅 deterministic jitter）
         day = self.clock.now.day
+        weekday = day % 7
+        # 优先 LLM 预测 (per-point multiplier)；失败 / 不可用时 fallback 到 deterministic
+        llm_pred = await self.market_agent.predict_demand(
+            days=1, sim_day=day, weekday=weekday
+        )
+        llm_mults = {p["id"]: p["multiplier"] for p in llm_pred.get("predictions", [])}
+        llm_meta_by_id = {
+            p["id"]: {
+                "trend": p.get("trend", "unknown"),
+                "confidence": p.get("confidence", 0.0),
+                "reason": p.get("reason", ""),
+            }
+            for p in llm_pred.get("predictions", [])
+        }
+        # Fallback 全局 multiplier (仅在 LLM 没给某 id 时使用)
         cycle_mult = self._compute_demand_multiplier(day)
         demand_status = await self.market_agent.get_demand_status()
         demand_requests = []
@@ -206,12 +221,14 @@ class MultiAgentCoordinator:
             # 以 base_demand_tons 为唯一来源重新计算，避免在 in-memory 上累乘造成失控
             base = dp.get("base_demand_tons") or dp.get("current_demand_tons", 0)
             jitter = self._per_demand_jitter(dp["id"], day)
-            perturbed = round(base * cycle_mult * jitter, 2)
+            llm_m = llm_mults.get(dp["id"], cycle_mult)  # LLM 缺某 id 时用 deterministic
+            perturbed = round(base * llm_m * jitter, 2)
             # 同步 in-memory 状态供 dashboard / 下游使用
             for live_dp in self.market_agent.demand_points:
                 if live_dp.get("id") == dp["id"]:
                     live_dp["current_demand_tons"] = perturbed
                     break
+            llm_meta = llm_meta_by_id.get(dp["id"], {})
             demand_requests.append({
                 "id": dp["id"],
                 "name": dp["name"],
@@ -221,6 +238,12 @@ class MultiAgentCoordinator:
                 "priority": dp.get("priority", "normal"),
                 "deadline": dp.get("deadline"),
                 "material_type": dp.get("material_type"),
+                # 额外：让 LLM 决策可追溯
+                "llm_multiplier": round(llm_m, 3),
+                "llm_trend": llm_meta.get("trend"),
+                "llm_confidence": llm_meta.get("confidence"),
+                "llm_reason": llm_meta.get("reason"),
+                "llm_source": llm_pred.get("source", "unknown"),
             })
 
         # 4. 持久化：开始周期 + 写子数据
