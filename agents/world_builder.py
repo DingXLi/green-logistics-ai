@@ -88,8 +88,12 @@ class WorldBuilder:
 
             # 用 data_generator 的 generate_supply_reading 抽样 material + weight
             reading = self.data_gen.generate_supply_reading(loc_id)
-            stock = round(reading.weight_tons * 1.5, 2)        # 当前库存 ≈ 1.5x 单读数
-            daily_cap = round(reading.weight_tons * 0.6, 2)    # 日产能 ≈ 0.6x 单读数
+            # Bug fix: cap current_stock / daily_capacity at 20t.
+            # OR-Tools VRP has a per-vehicle capacity ceiling (~20t); a single supply
+            # point with weight_tons > 13.3t would push current_stock > 20t and the
+            # solver would return no_solution (routes=0). Clamp both for safety.
+            stock = round(min(20.0, reading.weight_tons * 1.5), 2)        # 当前库存 ≤ 20t
+            daily_cap = round(min(20.0, reading.weight_tons * 0.6), 2)    # 日产能 ≤ 20t
 
             supplies.append({
                 "agent_id": loc_id,

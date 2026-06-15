@@ -7,12 +7,17 @@
 - 容量约束
 - 时间窗口（可选）
 - 多目标优化（成本 + 碳排放）
+- Pareto 前沿扫描 (solve_pareto)
 """
 
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
+import copy
 import numpy as np
 from loguru import logger
+
+# 碳价参考 (SEK / kg CO2) — Swedish/EU ETS ~ 1.5 SEK/kg
+DEFAULT_CO2_PRICE_SEK_PER_KG = 1.5
 
 try:
     from ortools.constraint_solver import routing_enums_pb2, pywrapcp
@@ -109,46 +114,100 @@ class VRPSolver:
         
         return R * c
     
-    def solve(self, time_limit_seconds: int = 30) -> Dict[str, Any]:
+    def solve(
+        self,
+        time_limit_seconds: int = 30,
+        cost_weight: float = 0.5,
+        co2_weight: float = 0.5,
+        co2_price: float = DEFAULT_CO2_PRICE_SEK_PER_KG,
+    ) -> Dict[str, Any]:
         """
         求解 VRP 问题
-        
+
+        多目标：成本 + 碳排放
+        - cost_weight: 成本权重 (SEK/km)
+        - co2_weight:  碳排放权重 (kg CO2/km × co2_price → SEK/km)
+        - co2_price:   碳价 (SEK/kg CO2)
+
+        OR-Tools 优化目标是这两个目标的加权和；最终按实际距离
+        单独计算 cost_sek / co2_kg / total_objective。
+
         返回：
         - 每辆车的路线
         - 总距离
-        - 总成本
-        - 总碳排放
+        - 总成本 (SEK)
+        - 总碳排放 (kg)
+        - 总目标值 (加权 SEK)
         """
-        
+
         if not ORTOOLS_AVAILABLE:
-            return self._solve_fallback()
-        
+            return self._solve_fallback(
+                cost_weight=cost_weight,
+                co2_weight=co2_weight,
+                co2_price=co2_price,
+            )
+
         if self.distance_matrix is None:
             self.distance_matrix = self._calculate_distance_matrix_haversine()
-        
+
         n = len(self.locations)
         num_vehicles = len(self.vehicles)
-        
+
         # 创建路由模型
         manager = pywrapcp.RoutingIndexManager(n, num_vehicles, 0)  # 0 = depot
         routing = pywrapcp.RoutingModel(manager)
-        
-        # 设置距离成本
-        def distance_callback(from_index, to_index):
-            from_node = manager.IndexToNode(from_index)
-            to_node = manager.IndexToNode(to_index)
-            return int(self.distance_matrix[from_node, to_node] * 1000)  # OR-Tools 使用整数
-        
-        transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-        routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-        
+
+        # 设置加权成本回调
+        # - 如果所有 vehicle 的 cost_per_km / co2_rate 一致，使用 SetArcCostEvaluatorOfAllVehicles
+        # - 否则为每辆车单独注册回调，支持异构车队产生真正的 Pareto 权衡
+        if num_vehicles > 0:
+            first_w = (
+                self.vehicles[0].cost_per_km * cost_weight
+                + self.vehicles[0].co2_rate * co2_price * co2_weight
+            )
+            homogeneous = all(
+                abs(
+                    (v.cost_per_km * cost_weight + v.co2_rate * co2_price * co2_weight)
+                    - first_w
+                ) < 1e-9
+                for v in self.vehicles
+            )
+        else:
+            homogeneous = True
+            first_w = 0.0
+
+        def make_callback(weighted_cost_per_km):
+            def _cb(from_index, to_index):
+                from_node = manager.IndexToNode(from_index)
+                to_node = manager.IndexToNode(to_index)
+                # distance_km × weighted_cost_per_km × 10000 (整数精度)
+                return int(
+                    self.distance_matrix[from_node, to_node]
+                    * weighted_cost_per_km
+                    * 10000
+                )
+            return _cb
+
+        if homogeneous and num_vehicles > 0:
+            cb_idx = routing.RegisterTransitCallback(make_callback(first_w))
+            routing.SetArcCostEvaluatorOfAllVehicles(cb_idx)
+        else:
+            # 异构车队：per-vehicle 回调
+            for v_idx, vehicle in enumerate(self.vehicles):
+                w_v = (
+                    vehicle.cost_per_km * cost_weight
+                    + vehicle.co2_rate * co2_price * co2_weight
+                )
+                cb_idx = routing.RegisterTransitCallback(make_callback(w_v))
+                routing.SetArcCostEvaluatorOfVehicle(cb_idx, v_idx)
+
         # 添加容量约束
         def demand_callback(from_index):
             from_node = manager.IndexToNode(from_index)
             return int(self.locations[from_node].demand_tons * 1000)
-        
+
         demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
-        
+
         for v in range(num_vehicles):
             capacity = int(self.vehicles[v].capacity_tons * 1000)
             routing.AddDimensionWithVehicleCapacity(
@@ -158,7 +217,7 @@ class VRPSolver:
                 True,  # start cumul to zero
                 "Capacity"
             )
-        
+
         # 设置搜索参数
         search_params = pywrapcp.DefaultRoutingSearchParameters()
         search_params.first_solution_strategy = (
@@ -168,33 +227,117 @@ class VRPSolver:
         search_params.local_search_metaheuristic = (
             routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
         )
-        
+
         # 求解
         solution = routing.SolveWithParameters(search_params)
-        
+
         if solution:
-            return self._extract_solution(routing, manager, solution)
+            return self._extract_solution(
+                routing, manager, solution,
+                cost_weight=cost_weight,
+                co2_weight=co2_weight,
+                co2_price=co2_price,
+            )
         else:
             return {"status": "no_solution", "message": "No feasible solution found"}
+
+    def _snapshot(self) -> "VRPSolver":
+        """深拷贝当前 solver 状态（用于 pareto 扫描时复制）"""
+        new_solver = VRPSolver.__new__(VRPSolver)
+        new_solver.locations = copy.deepcopy(self.locations)
+        new_solver.vehicles = copy.deepcopy(self.vehicles)
+        new_solver.distance_matrix = (
+            copy.deepcopy(self.distance_matrix)
+            if self.distance_matrix is not None
+            else None
+        )
+        new_solver.cost_matrix = (
+            copy.deepcopy(self.cost_matrix)
+            if self.cost_matrix is not None
+            else None
+        )
+        return new_solver
+
+    def solve_pareto(
+        self,
+        n_points: int = 10,
+        time_limit_seconds: int = 10,
+        co2_price: float = DEFAULT_CO2_PRICE_SEK_PER_KG,
+    ) -> List[Dict[str, Any]]:
+        """
+        扫描 cost_weight 从 1.0 到 0.0，返回 Pareto 前沿点列表。
+
+        每个点：{cost_weight, co2_weight, cost_sek, co2_kg,
+                total_objective, total_distance_km, routes, status}
+        """
+        pareto: List[Dict[str, Any]] = []
+        # linspace: 从全成本 (1,0) 到全碳排 (0,1)
+        for i in range(n_points):
+            w = 1.0 - i / max(n_points - 1, 1)
+            cost_weight = float(w)
+            co2_weight = float(1.0 - w)
+
+            # 复制 solver 状态独立求解
+            snap = self._snapshot()
+            result = snap.solve(
+                time_limit_seconds=time_limit_seconds,
+                cost_weight=cost_weight,
+                co2_weight=co2_weight,
+                co2_price=co2_price,
+            )
+
+            if result.get("status") in ("optimal", "heuristic"):
+                pareto.append({
+                    "cost_weight": cost_weight,
+                    "co2_weight": co2_weight,
+                    "cost_sek": result["total_cost_sek"],
+                    "co2_kg": result["total_co2_kg"],
+                    "total_objective": result["total_objective"],
+                    "total_distance_km": result["total_distance_km"],
+                    "routes": result["routes"],
+                    "status": result["status"],
+                })
+            else:
+                logger.warning(
+                    f"pareto point {i+1}/{n_points} (cost_w={cost_weight:.2f}) "
+                    f"无解：{result.get('status')}"
+                )
+                pareto.append({
+                    "cost_weight": cost_weight,
+                    "co2_weight": co2_weight,
+                    "cost_sek": None,
+                    "co2_kg": None,
+                    "total_objective": None,
+                    "total_distance_km": None,
+                    "routes": [],
+                    "status": result.get("status", "unknown"),
+                })
+
+        logger.info(f"Pareto 前沿计算完成：{len(pareto)} 个点")
+        return pareto
     
     def _extract_solution(
         self,
         routing: pywrapcp.RoutingModel,
         manager: pywrapcp.RoutingIndexManager,
-        solution: pywrapcp.Assignment
+        solution: pywrapcp.Assignment,
+        cost_weight: float = 0.5,
+        co2_weight: float = 0.5,
+        co2_price: float = DEFAULT_CO2_PRICE_SEK_PER_KG,
     ) -> Dict[str, Any]:
-        """提取求解结果"""
+        """提取求解结果（按实际 distance_matrix 计算 cost / co2 / objective）"""
         routes = []
-        total_distance = 0
-        total_cost = 0
-        total_co2 = 0
-        
+        total_distance = 0.0
+        total_cost = 0.0
+        total_co2 = 0.0
+        total_objective = 0.0
+
         for v in range(len(self.vehicles)):
             index = routing.Start(v)
             route = []
             waypoints = []  # 带坐标的路径点
-            route_distance = 0
-            
+            node_sequence: List[int] = []  # 节点 ID 序列，用于按 distance_matrix 算距离
+
             while not routing.IsEnd(index):
                 node = manager.IndexToNode(index)
                 loc = self.locations[node]
@@ -203,27 +346,50 @@ class VRPSolver:
                     "location_type": loc.type,
                     "demand_tons": loc.demand_tons
                 })
-                # 添加坐标供地图使用
                 waypoints.append({
                     "lat": loc.lat,
                     "lon": loc.lon,
                     "location_id": loc.id,
                     "type": loc.type
                 })
-                
+                node_sequence.append(node)
                 previous_index = index
                 index = solution.Value(routing.NextVar(index))
-                route_distance += routing.GetArcCostForVehicle(previous_index, index, v)
-            
-            route_distance /= 1000  # 转换回 km
+
+            # 终点 (depot) 加入序列
+            end_node = manager.IndexToNode(index)
+            node_sequence.append(end_node)
+            route.append({
+                "location_id": self.locations[end_node].id,
+                "location_type": self.locations[end_node].type,
+                "demand_tons": self.locations[end_node].demand_tons
+            })
+            waypoints.append({
+                "lat": self.locations[end_node].lat,
+                "lon": self.locations[end_node].lon,
+                "location_id": self.locations[end_node].id,
+                "type": self.locations[end_node].type
+            })
+
+            # 用 distance_matrix 累加真实距离（与 OR-Tools 优化目标无关）
+            route_distance = 0.0
+            for k in range(len(node_sequence) - 1):
+                route_distance += self.distance_matrix[node_sequence[k], node_sequence[k + 1]]
+
             total_distance += route_distance
-            
+
             vehicle = self.vehicles[v]
             route_cost = route_distance * vehicle.cost_per_km
             route_co2 = route_distance * vehicle.co2_rate
+            # 加权目标（SEK 等价值）
+            route_objective = (
+                route_cost * cost_weight
+                + route_co2 * co2_price * co2_weight
+            )
             total_cost += route_cost
             total_co2 += route_co2
-            
+            total_objective += route_objective
+
             routes.append({
                 "vehicle_id": vehicle.id,
                 "route": route,
@@ -231,95 +397,118 @@ class VRPSolver:
                 "distance_km": round(route_distance, 2),
                 "cost_sek": round(route_cost, 2),
                 "co2_kg": round(route_co2, 2),
-                "cargo_tons": sum(self.locations[manager.NodeToIndex(node)].demand_tons 
+                "objective_sek": round(route_objective, 2),
+                "cargo_tons": sum(self.locations[manager.NodeToIndex(node)].demand_tons
                                   for node in range(len(self.locations)))
             })
-        
+
         return {
             "status": "optimal",
             "routes": routes,
             "total_distance_km": round(total_distance, 2),
             "total_cost_sek": round(total_cost, 2),
             "total_co2_kg": round(total_co2, 2),
+            "total_objective": round(total_objective, 2),
             "num_vehicles_used": sum(1 for r in routes if len(r["route"]) > 1),
             "computation_method": "OR-Tools",
-            "objective": "balanced"
+            "objective": "weighted_cost_co2",
+            "cost_weight": cost_weight,
+            "co2_weight": co2_weight,
+            "co2_price_sek_per_kg": co2_price,
         }
     
-    def _solve_fallback(self) -> Dict[str, Any]:
+    def _solve_fallback(
+        self,
+        cost_weight: float = 0.5,
+        co2_weight: float = 0.5,
+        co2_price: float = DEFAULT_CO2_PRICE_SEK_PER_KG,
+    ) -> Dict[str, Any]:
         """
         OR-Tools 不可用时的回退方案
-        
-        使用简单的最近邻启发式算法
+
+        使用简单的最近邻启发式算法（按加权 cost 选最近点）
         """
         logger.warning("使用回退求解器（最近邻启发式）")
-        
+
         if self.distance_matrix is None:
             self.distance_matrix = self._calculate_distance_matrix_haversine()
-        
+
         routes = []
-        total_distance = 0
-        total_cost = 0
-        total_co2 = 0
-        
+        total_distance = 0.0
+        total_cost = 0.0
+        total_co2 = 0.0
+        total_objective = 0.0
+
         # 简单分配：每辆车服务最近的几个点
         unvisited = set(range(1, len(self.locations)))  # 排除 depot
-        
+
         for v, vehicle in enumerate(self.vehicles):
             if not unvisited:
                 break
-            
+
             route = [{"location_id": self.locations[0].id, "location_type": "depot", "demand_tons": 0}]
             current = 0
-            route_distance = 0
-            route_load = 0
-            
+            route_distance = 0.0
+            route_load = 0.0
+
             while unvisited and route_load < vehicle.capacity_tons * 0.8:
-                # 找最近的未访问点
+                # 找最近的未访问点（按加权 cost 排序）
                 nearest = min(
                     unvisited,
-                    key=lambda i: self.distance_matrix[current, i]
+                    key=lambda i: (
+                        self.distance_matrix[current, i]
+                        * (vehicle.cost_per_km * cost_weight
+                           + vehicle.co2_rate * co2_price * co2_weight)
+                    )
                 )
-                
+
                 route_distance += self.distance_matrix[current, nearest]
                 route_load += self.locations[nearest].demand_tons
-                
+
                 route.append({
                     "location_id": self.locations[nearest].id,
                     "location_type": self.locations[nearest].type,
                     "demand_tons": self.locations[nearest].demand_tons
                 })
-                
+
                 unvisited.remove(nearest)
                 current = nearest
-            
+
             # 返回 depot
             route_distance += self.distance_matrix[current, 0]
             route.append({"location_id": self.locations[0].id, "location_type": "depot", "demand_tons": 0})
-            
+
             route_cost = route_distance * vehicle.cost_per_km
             route_co2 = route_distance * vehicle.co2_rate
-            
+            route_objective = route_cost * cost_weight + route_co2 * co2_price * co2_weight
+
             total_distance += route_distance
             total_cost += route_cost
             total_co2 += route_co2
-            
+            total_objective += route_objective
+
             routes.append({
                 "vehicle_id": vehicle.id,
                 "route": route,
                 "distance_km": round(route_distance, 2),
                 "cost_sek": round(route_cost, 2),
-                "co2_kg": round(route_co2, 2)
+                "co2_kg": round(route_co2, 2),
+                "objective_sek": round(route_objective, 2),
             })
-        
+
         return {
             "status": "heuristic",
             "routes": routes,
             "total_distance_km": round(total_distance, 2),
             "total_cost_sek": round(total_cost, 2),
             "total_co2_kg": round(total_co2, 2),
+            "total_objective": round(total_objective, 2),
             "num_vehicles_used": len(routes),
-            "computation_method": "Nearest Neighbor Heuristic"
+            "computation_method": "Nearest Neighbor Heuristic",
+            "objective": "weighted_cost_co2",
+            "cost_weight": cost_weight,
+            "co2_weight": co2_weight,
+            "co2_price_sek_per_kg": co2_price,
         }
 
 
