@@ -85,15 +85,25 @@ class MarketAgent:
 """
     
     async def get_demand_status(self) -> List[Dict[str, Any]]:
-        """获取所有需求点状态"""
+        """获取所有需求点状态
+
+        必须把 material_type / priority / deadline 一起返回，
+        否则下游 coordinator 在写 demand_requests 持久化时这些字段会变成 NULL。
+        """
         return [
             {
                 "id": dp["id"],
                 "name": dp["name"],
                 "current_demand_tons": dp["current_demand_tons"],
                 "capacity_tons": dp["daily_capacity_tons"],
-                "utilization_rate": dp["current_demand_tons"] / dp["daily_capacity_tons"] * 100,
+                "utilization_rate": (
+                    dp["current_demand_tons"] / dp["daily_capacity_tons"] * 100
+                    if dp["daily_capacity_tons"] else 0
+                ),
                 "preferred_materials": dp["preferred_materials"],
+                "material_type": dp.get("material_type"),
+                "priority": dp.get("priority", "normal"),
+                "deadline": dp.get("deadline"),
                 "location": dp["location"]
             }
             for dp in self.demand_points
@@ -165,12 +175,15 @@ class MarketAgent:
                     # Cap at typical vehicle capacity (20t) so VRP 不超过单车上限
                     # 多出来的需求可以由后续供应或下一天补上
                     MAX_VEHICLE_TONS = 20.0
+                    # 跳过碎屑 match（< 0.5t），减少 OR-Tools 的节点压力，
+                    # 让 solver 更集中于“真正的业务量”，避免 no_solution。
+                    MIN_MATCH_TONS = 0.5
                     match_tons = min(
                         supply.get("available_tons", 0),
                         demand.get("demand_tons", demand.get("current_demand_tons", 0)),
                         MAX_VEHICLE_TONS,
                     )
-                    if match_tons > 0:
+                    if match_tons >= MIN_MATCH_TONS:
                         matches.append({
                             "supply_id": supply["agent_id"],
                             "demand_id": demand["id"],
