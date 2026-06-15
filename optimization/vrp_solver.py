@@ -238,8 +238,14 @@ class VRPSolver:
                 co2_weight=co2_weight,
                 co2_price=co2_price,
             )
-        else:
-            return {"status": "no_solution", "message": "No feasible solution found"}
+        # OR-Tools 在 time_limit 內沒找到解（如小量、节点数太多）。退回最近邻启发式，
+        # 这样 KPI 不会全为 0，数据还可用。
+        logger.warning("OR-Tools 未找到可行解（time_limit 或 infeasible），退到最近邻 fallback")
+        return self._solve_fallback(
+            cost_weight=cost_weight,
+            co2_weight=co2_weight,
+            co2_price=co2_price,
+        ) | {"status": "fallback_nearest_neighbor"}
 
     def _snapshot(self) -> "VRPSolver":
         """深拷贝当前 solver 状态（用于 pareto 扫描时复制）"""
