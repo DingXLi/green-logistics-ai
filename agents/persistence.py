@@ -106,6 +106,28 @@ CREATE TABLE IF NOT EXISTS routes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_routes_cycle ON routes(cycle_id);
+
+CREATE TABLE IF NOT EXISTS llm_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_id TEXT NOT NULL,
+    sim_day INTEGER NOT NULL,
+    sim_hour INTEGER,
+    decision_type TEXT NOT NULL,        -- 'demand_prediction' | 'supply_prediction'
+    target_id TEXT NOT NULL,            -- 'DEM001' | 'SUP000'
+    target_type TEXT,                    -- 'demand_point' | 'supply_point'
+    multiplier REAL,                     -- LLM 提供的 next-day multiplier (0.3-1.8)
+    trend TEXT,                          -- 'rising' | 'stable' | 'falling'
+    confidence REAL,                     -- 0-1
+    reason TEXT,                         -- 1 句解释
+    source TEXT,                         -- 'llm' | 'fallback'
+    raw_json TEXT,                       -- 完整 LLM 响应 (调试用)
+    wall_timestamp TEXT,
+    FOREIGN KEY(cycle_id) REFERENCES optimization_cycles(cycle_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_cycle ON llm_decisions(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_llm_day ON llm_decisions(sim_day);
+CREATE INDEX IF NOT EXISTS idx_llm_type ON llm_decisions(decision_type);
 """
 
 
@@ -293,6 +315,137 @@ class Persistence:
     # 查询（论文 / dashboard 用）
     # ------------------------------------------------------------
 
+    # ------------------------------------------------------------
+    # 记录 LLM 决策
+    # ------------------------------------------------------------
+
+    def record_llm_decision(
+        self,
+        cycle_id: str,
+        decision_type: str,
+        target_id: str,
+        target_type: str = "",
+        multiplier: Optional[float] = None,
+        trend: Optional[str] = None,
+        confidence: Optional[float] = None,
+        reason: Optional[str] = None,
+        source: str = "unknown",
+        raw_json: Optional[str] = None,
+        sim_day: Optional[int] = None,
+        sim_hour: Optional[int] = None,
+    ) -> None:
+        """记一条 LLM 决策。决策后可以查询给报告画图。"""
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT INTO llm_decisions
+                   (cycle_id, sim_day, sim_hour, decision_type, target_id, target_type,
+                    multiplier, trend, confidence, reason, source, raw_json, wall_timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    cycle_id,
+                    sim_day,
+                    sim_hour,
+                    decision_type,
+                    target_id,
+                    target_type,
+                    multiplier,
+                    trend,
+                    confidence,
+                    reason,
+                    source,
+                    raw_json,
+                    datetime.now().isoformat(),
+                )
+            )
+
+    def record_llm_decisions_batch(
+        self,
+        cycle_id: str,
+        decision_type: str,
+        target_type: str,
+        predictions: List[Dict[str, Any]],
+        sim_day: Optional[int] = None,
+        sim_hour: Optional[int] = None,
+    ) -> int:
+        """批量记 LLM 决策。返回插入行数。"""
+        import json as _json
+        if not predictions:
+            return 0
+        with self._conn() as conn:
+            conn.executemany(
+                """INSERT INTO llm_decisions
+                   (cycle_id, sim_day, sim_hour, decision_type, target_id, target_type,
+                    multiplier, trend, confidence, reason, source, raw_json, wall_timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    (
+                        cycle_id,
+                        sim_day,
+                        sim_hour,
+                        decision_type,
+                        p.get("id") or p.get("target_id", ""),
+                        target_type,
+                        p.get("multiplier"),
+                        p.get("trend"),
+                        p.get("confidence"),
+                        p.get("reason"),
+                        p.get("source", "unknown"),
+                        _json.dumps(p, ensure_ascii=False),
+                        datetime.now().isoformat(),
+                    )
+                    for p in predictions
+                ]
+            )
+        return len(predictions)
+
+    def get_llm_decisions(
+        self,
+        decision_type: Optional[str] = None,
+        target_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """查询 LLM 决策。可按类型/目标过滤。"""
+        sql = "SELECT * FROM llm_decisions"
+        clauses: List[str] = []
+        params: List[Any] = []
+        if decision_type:
+            clauses.append("decision_type = ?")
+            params.append(decision_type)
+        if target_id:
+            clauses.append("target_id = ?")
+            params.append(target_id)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY sim_day, id"
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_llm_timeseries(self, decision_type: str = "demand_prediction") -> List[Dict[str, Any]]:
+        """LLM 决策时间序列 (按 sim_day 求 avg multiplier / confidence)。
+
+        返回: [{sim_day, n_decisions, avg_multiplier, avg_confidence,
+                 llm_count, fallback_count, ...}, ...]
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT sim_day,
+                          COUNT(*) as n,
+                          ROUND(AVG(multiplier), 3) as avg_mult,
+                          ROUND(AVG(confidence), 3) as avg_conf,
+                          SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) as llm_n,
+                          SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END) as fb_n
+                   FROM llm_decisions
+                   WHERE decision_type = ?
+                   GROUP BY sim_day
+                   ORDER BY sim_day""",
+                (decision_type,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------
+    # 查询（论文 / dashboard 用）
+    # ------------------------------------------------------------
+
     def get_recent_cycles(self, limit: int = 10) -> List[Dict[str, Any]]:
         with self._conn() as conn:
             rows = conn.execute(
@@ -319,7 +472,7 @@ class Persistence:
             return [dict(r) for r in rows]
 
     def get_summary(self) -> Dict[str, Any]:
-        """全局统计 summary"""
+        """全局统计 summary (含 LLM 决策统计)"""
         with self._conn() as conn:
             row = conn.execute(
                 """SELECT COUNT(*) as n_cycles,
@@ -329,4 +482,17 @@ class Persistence:
                           AVG(fleet_utilization_pct) as avg_utilization
                    FROM optimization_cycles"""
             ).fetchone()
-            return dict(row) if row else {}
+            base = dict(row) if row else {}
+            # 加上 LLM 决策统计
+            try:
+                llm_row = conn.execute(
+                    """SELECT COUNT(*) as n_total,
+                              SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) as n_real_llm,
+                              SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END) as n_fallback,
+                              COUNT(DISTINCT decision_type) as n_types
+                       FROM llm_decisions"""
+                ).fetchone()
+                base["llm_decisions"] = dict(llm_row) if llm_row else {}
+            except Exception:
+                base["llm_decisions"] = {}
+            return base

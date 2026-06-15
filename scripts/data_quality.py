@@ -166,6 +166,52 @@ def check_temporal_diversity(con: sqlite3.Connection) -> List[Tuple[str, str]]:
     return issues
 
 
+def check_llm_decisions(con: sqlite3.Connection) -> List[Tuple[str, str]]:
+    """检查 LLM 决策表的健康度。"""
+    issues: List[Tuple[str, str]] = []
+    # 表是否存在
+    cur = con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='llm_decisions'"
+    )
+    if not cur.fetchone():
+        return [("info", "llm_decisions 表不存在 (LLM 集成未启用)")]
+
+    cur = con.execute(
+        "SELECT COUNT(*), "
+        "SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END), "
+        "SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END), "
+        "COUNT(DISTINCT decision_type) "
+        "FROM llm_decisions"
+    )
+    total, llm_n, fb_n, n_types = (cur.fetchone() or (0, 0, 0, 0))
+    total = total or 0
+    llm_n = llm_n or 0
+    fb_n = fb_n or 0
+
+    if total == 0:
+        return [("warn", "llm_decisions 表存在但无记录")]
+
+    # 来源分布
+    llm_pct = 100 * llm_n / total if total else 0
+    if llm_pct < 50:
+        issues.append(("warn", f"LLM 真实调用只占 {llm_pct:.1f}% ({llm_n}/{total}) — 多数是 fallback"))
+    else:
+        issues.append(("ok", f"LLM 真实调用 {llm_pct:.1f}% ({llm_n}/{total})"))
+    issues.append(("info", f"决策类型: {n_types} 种 (demand_prediction / supply_prediction)"))
+
+    # multiplier 范围 (LLM 真实决策应在 0.3-1.8 之间,supply 可到 2.0)
+    cur = con.execute(
+        "SELECT MIN(multiplier), MAX(multiplier), ROUND(AVG(multiplier), 3) "
+        "FROM llm_decisions WHERE source='llm'"
+    )
+    row = cur.fetchone() or (None, None, None)
+    if row[0] is None:
+        issues.append(("info", "无 LLM 真实决策可查"))
+    else:
+        issues.append(("info", f"LLM multiplier 范围: {row[0]:.2f} - {row[1]:.2f} (avg {row[2]})"))
+    return issues
+
+
 def check_match_coverage(con: sqlite3.Connection) -> List[Tuple[str, str]]:
     """match 覆盖：是否每个 supply / demand 都被服务过。"""
     issues: List[Tuple[str, str]] = []
@@ -239,6 +285,7 @@ SECTIONS: List[Tuple[str, Callable[[sqlite3.Connection], List[Tuple[str, str]]]]
     ("Match 覆盖",              check_match_coverage),
     ("物料分布",                check_material_distribution),
     ("Demand 需求变化",         check_demand_variation),
+    ("LLM 决策",                check_llm_decisions),
 ]
 
 TAG_ICON = {"fatal": "❌", "warn": "⚠️ ", "ok": "✅", "info": "ℹ️ "}

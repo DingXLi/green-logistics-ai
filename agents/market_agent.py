@@ -288,6 +288,7 @@ class MarketAgent:
                     "trend": str(p.get("trend", "stable"))[:16],
                     "confidence": round(float(p.get("confidence", 0.5)), 2),
                     "reason": str(p.get("reason", ""))[:200],
+                    "source": "llm",
                 })
             if not predictions:
                 raise ValueError("LLM returned no valid predictions")
@@ -312,6 +313,7 @@ class MarketAgent:
                         "trend": "stable",
                         "confidence": 0.4,
                         "reason": "fallback: LLM unavailable",
+                        "source": "fallback",
                     }
                     for dp in self.demand_points
                 ],
