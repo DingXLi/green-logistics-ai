@@ -157,11 +157,12 @@ def test_api_connection():
     try:
         from google.adk import Agent
         logger.success("✅ Google ADK 导入成功")
-        
+
         # 尝试创建简单 Agent（不实际调用）
+        from agents.llm_config import MODEL  # 中心化 model 名
         agent = Agent(
             name="test_agent",
-            model="gemini-2.0-flash",
+            model=MODEL,
             description="Test agent for debugging"
         )
         logger.success("✅ Agent 创建成功")

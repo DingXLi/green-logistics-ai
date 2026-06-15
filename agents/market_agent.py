@@ -15,6 +15,8 @@ from datetime import datetime
 import asyncio
 from loguru import logger
 
+from .llm_config import MODEL  # 中心化 model 名 (env > yaml > 默认)
+
 
 class MarketAgent:
     """
@@ -37,7 +39,7 @@ class MarketAgent:
         # 创建 ADK Agent
         self.agent = Agent(
             name="market_coordinator",
-            model="gemini-2.0-flash",
+            model=MODEL,
             description="Market agent for demand and price management",
             instruction=self._get_instruction(),
         )
