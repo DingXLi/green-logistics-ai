@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MapContainer } from './components/Map'
+import Dashboard from './components/Dashboard/Dashboard'
 import './App.css'
 
 const API_BASE = 'http://localhost:8000/api'
@@ -109,50 +110,7 @@ function App() {
             </section>
           </>
         ) : (
-          <>
-            <section className="card">
-              <h2>System Status</h2>
-              {status && (
-                <div className="stats-grid">
-                  <div className="stat">
-                    <div className="stat-value">{status.supply_points}</div>
-                    <div className="stat-label">Supply Points</div>
-                  </div>
-                  <div className="stat">
-                    <div className="stat-value">{status.fleet_status?.total_vehicles || 0}</div>
-                    <div className="stat-label">Total Vehicles</div>
-                  </div>
-                  <div className="stat">
-                    <div className="stat-value">{status.fleet_status?.available || 0}</div>
-                    <div className="stat-label">Available</div>
-                  </div>
-                  <div className="stat">
-                    <div className="stat-value">{status.demand_points || 0}</div>
-                    <div className="stat-label">Demand Points</div>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {fleet && (
-              <section className="card">
-                <h2>Fleet Status</h2>
-                <div className="fleet-info">
-                  <div className="progress-bar">
-                    <div 
-                      className="progress-fill"
-                      style={{ width: `${fleet.utilization_rate}%` }}
-                    />
-                  </div>
-                  <div className="fleet-stats">
-                    <span>Utilization: {fleet.utilization_rate.toFixed(1)}%</span>
-                    <span>En Route: {fleet.en_route}</span>
-                    <span>Available: {fleet.available}</span>
-                  </div>
-                </div>
-              </section>
-            )}
-          </>
+          <Dashboard />
         )}
 
         <section className="card">
