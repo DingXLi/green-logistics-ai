@@ -62,9 +62,11 @@ async def startup_event():
         n_vehicles=30,
         seed=42,
     )
+    # db_path 走环境变量 (HF Spaces 部署时设为 /data/simulation.db 用持久化卷)
+    db_path = os.environ.get("GL_DB_PATH", "data/simulation.db")
     coordinator = MultiAgentCoordinator(
         config=world_config,
-        db_path="data/simulation.db",
+        db_path=db_path,
     )
 
     # 初始化数据生成器（IoT/fleet 端点用）

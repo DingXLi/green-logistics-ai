@@ -1,3 +1,15 @@
+---
+title: Green Logistics AI
+emoji: ♻️
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: true
+license: mit
+short_description: Multi-agent AI for Swedish circular waste logistics
+---
+
 # ♻️ Multi-Agent AI System for Green Logistics Optimization
 # 多智能体 AI 系统 - 绿色物流优化
 
