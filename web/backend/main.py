@@ -278,7 +278,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         sup = supply_idx[sid]
         dem = demand_idx[did]
         pickup_locations.append({
-            "id": sid, "lat": sup.lat, "lon": sup.lon,
+            "id": sid, "lat": sup.location["lat"], "lon": sup.location["lon"],
             "tons": m.get("tons", 5.0),
         })
         delivery_locations.append({
