@@ -1,0 +1,67 @@
+# ============================================
+# Docker ignore — 不打进镜像的文件
+# ============================================
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境 (本机 venv 不能塞进镜像)
+venv/
+env/
+.venv/
+
+# 前端构建产物 + node_modules
+web/frontend/node_modules/
+web/frontend/dist/
+web/frontend/.vite/
+
+# 数据库 + 数据 (镜像里不带, 用 HF /data 持久化卷)
+data/*.db
+data/*.db.bak
+data_storage/
+*.sqlite
+*.sqlite3
+
+# 日志
+logs/
+*.log
+
+# 缓存 (运行时再生成)
+cache/
+.mypy_cache/
+.ruff_cache/
+
+# 环境 / 凭据
+.env
+.env.local
+.env.*.local
+secrets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 文档 + 大文件 (不影响运行)
+docs/
+*.pdf
+*.zip
+*.tar.gz
+.git/
+.github/
+tests/
+scripts/prebake_demo.sh.bak
+
+# Demo 启动脚本 (本机用, 镜像里不需要)
+start_demo.sh
