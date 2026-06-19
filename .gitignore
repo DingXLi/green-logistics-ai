@@ -84,3 +84,6 @@ synthetic/*.json
 # Config secrets
 config/secrets.yaml
 config/*.key
+
+# LLM response cache
+cache/
