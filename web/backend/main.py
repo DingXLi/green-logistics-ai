@@ -272,17 +272,17 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
 
     from optimization.vrp_solver import VRPSolver, Location, Vehicle
 
-    # 收集当前 supply / demand 状态
+    # 收集 supply offers — 用 daily_capacity * 0.8 重建 supply (跟 cycle 一致)
+    # 不读 current_stock: warmup / 上次 cycle 已把它消耗成 0, 读不出东西
+    # daily_capacity 是世界引导时定的, 跟陈旧 state 解耦
     supply_offers = []
     for agent_id, agent in coordinator.supply_agents.items():
-        stock = await agent.get_current_stock()
-        if stock["stock_tons"] > 0.5:
-            supply_offers.append({
-                "agent_id": agent_id,
-                "available_tons": stock["stock_tons"],
-                "material_type": stock["material_type"],
-                "location": stock["location"],
-            })
+        supply_offers.append({
+            "agent_id": agent_id,
+            "available_tons": round(agent.daily_capacity * 0.8, 2),
+            "material_type": agent.material_type,
+            "location": agent.location,
+        })
 
     demand_requests = []
     for dp in coordinator.market_agent.demand_points:
