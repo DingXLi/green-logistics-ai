@@ -378,7 +378,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
             capacity_tons=vd.get("max_capacity_tons", 20.0),
             start_location=depot,
             co2_rate=vd.get("co2_emission_rate", 0.85),
-            cost_per_km=2.6,
+            cost_per_km=vd.get("cost_per_km", 2.6),  # 读 world_builder 写入的 per-vehicle 值
         ))
 
     pareto = solver.solve_pareto(
