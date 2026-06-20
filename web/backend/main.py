@@ -78,6 +78,26 @@ async def startup_event():
         f"{len(coordinator.logistics_agent.vehicles)} vehicles"
     )
 
+    # 预热: 首次启动 DB 还没有 cycle 数据, 跑 1 个 cycle
+    # 让 Lovable 前端立刻能看到真实 KPI, 而不是 0 cycles
+    # 后续启动 (DB 已有数据) 跳过, 保持快速重启
+    try:
+        n_cycles = (coordinator.persistence.get_summary() or {}).get("n_cycles") or 0
+        if n_cycles == 0:
+            logger.info("DB 空, 预热 1 个优化 cycle (预计 5-15s)...")
+            result = await coordinator.run_optimization_cycle()
+            matches = result.get("matches", {}) or {}
+            opt_id = (result.get("optimization_id") or "?")[:8]
+            logger.info(
+                f"预热完成: {matches.get('total_matches', 0)} matches, "
+                f"cycle_id={opt_id}"
+            )
+        else:
+            logger.info(f"DB 已有 {n_cycles} cycles, 跳过预热")
+    except Exception as e:
+        # 预热失败不能阻止服务启动
+        logger.warning(f"启动预热失败 (服务继续运行): {e}")
+
 
 # ============================================
 # 数据模型
