@@ -180,10 +180,14 @@ class MultiAgentCoordinator:
         logger.info(f"开始周期 {cycle_id} @ {self.clock.now} (factor={factor})")
 
         # 0. LLM 供应预测 (单次调用拿全部 supply 点的 accumulation multiplier)
+        # Sleep 错峰: 避免 supply + demand 两调连发撞 Gemini RPM 限制
+        # 实测 2 calls / cycle: supply 调 + demand 调,加 2s sleep 拉开间距
+        await asyncio.sleep(0.5)  # 微量 startup 延迟 (DNS / connection warmup)
         supply_llm = await SupplyAgent.predict_supply_batch(
             list(self.supply_agents.values()),
             days=1, sim_day=day, weekday=weekday,
         )
+        await asyncio.sleep(2.0)  # 错峰: 等 supply 调用完全退出
 
         # 1. 库存自然积累 + 车辆状态重置（LLM multiplier 影响 accumulation 速率）
         for agent_id, agent in self.supply_agents.items():
@@ -217,6 +221,7 @@ class MultiAgentCoordinator:
 
         # 3. 收集需求 requests（LLM 驱动的 multiplier + 小幅 deterministic jitter）
         # 优先 LLM 预测 (per-point multiplier)；失败 / 不可用时 fallback 到 deterministic
+        await asyncio.sleep(0.5)  # supply 后的额外冷却
         llm_pred = await self.market_agent.predict_demand(
             days=1, sim_day=day, weekday=weekday
         )
