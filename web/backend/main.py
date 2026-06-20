@@ -169,20 +169,27 @@ async def debug_llm():
         "google_api_key_length": len(api_key),
         "model_config": cfg["model"],
         "max_retries": cfg["max_retries"],
-        "test_call": None,
+        "tests": {},
     }
-    # 试调一次,看是否真能用
-    if api_key:
+    if not api_key:
+        result["tests"] = {"basic": {"ok": False, "error": "GOOGLE_API_KEY not set"}}
+        return result
+    # 多场景测试
+    from agents.llm_caller import call_gemini, GeminiAPIError
+    tests = [
+        ("basic_5tok", "Reply with exactly OK", 5),
+        ("basic_20tok", "Reply with exactly OK", 20),
+        ("with_system", "Forecast: 1", 50),
+    ]
+    for name, prompt, max_tok in tests:
+        sys_instr = "You are a helpful assistant. Always respond with exactly what is asked." if name == "with_system" else None
         try:
-            from agents.llm_caller import call_gemini, GeminiAPIError
-            text = call_gemini("Reply with exactly OK", max_tokens=20)
-            result["test_call"] = {"ok": True, "response": text[:100]}
+            text = call_gemini(prompt, max_tokens=max_tok, system_instruction=sys_instr)
+            result["tests"][name] = {"ok": True, "response": text[:80], "len": len(text)}
         except GeminiAPIError as e:
-            result["test_call"] = {"ok": False, "error": str(e)[:200]}
+            result["tests"][name] = {"ok": False, "error": str(e)[:300]}
         except Exception as e:
-            result["test_call"] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
-    else:
-        result["test_call"] = {"ok": False, "error": "GOOGLE_API_KEY not set, skipping call"}
+            result["tests"][name] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:300]}"}
     return result
 
 
