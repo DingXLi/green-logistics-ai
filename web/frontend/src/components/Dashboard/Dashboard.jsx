@@ -20,7 +20,8 @@ import {
   ScatterChart, Scatter, BarChart, Bar, ZAxis
 } from 'recharts'
 
-const API_BASE = 'http://localhost:8000/api'
+// API base: Vite env var > localhost fallback
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
 
 // 颜色 (跟 App.css 一致)
 const COLORS = {
