@@ -179,7 +179,9 @@ async def debug_llm():
     tests = [
         ("basic_5tok", "Reply with exactly OK", 5),
         ("basic_20tok", "Reply with exactly OK", 20),
+        ("basic_2048tok", "Reply with exactly OK", 2048),
         ("with_system", "Forecast: 1", 50),
+        ("real_supply_prompt", "Forecast: multiplier 1.0, trend stable", 2048),
     ]
     for name, prompt, max_tok in tests:
         sys_instr = "You are a helpful assistant. Always respond with exactly what is asked." if name == "with_system" else None
