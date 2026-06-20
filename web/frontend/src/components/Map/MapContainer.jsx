@@ -15,7 +15,8 @@ import RouteLayer from './RouteLayer'
 import MapLegend from './MapLegend'
 import 'leaflet/dist/leaflet.css'
 
-const API_BASE = 'http://localhost:8000/api'
+// API base: Vite env var > localhost fallback
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
 
 // Sweden center coordinates
 const SWEDEN_CENTER = [62.173, 16.545]

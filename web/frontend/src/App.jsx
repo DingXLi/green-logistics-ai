@@ -3,7 +3,9 @@ import { MapContainer } from './components/Map'
 import Dashboard from './components/Dashboard/Dashboard'
 import './App.css'
 
-const API_BASE = 'http://localhost:8000/api'
+// API base: Vite env var > localhost fallback
+// VITE_API_BASE=https://lidingx-green-logistics.hf.space/api
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
 
 function App() {
   const [status, setStatus] = useState(null)
