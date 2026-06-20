@@ -158,6 +158,34 @@ async def health_check():
     }
 
 
+@app.get("/api/debug/llm")
+async def debug_llm():
+    """诊断 LLM 配置 (env var + model + 试一次调用)"""
+    from agents.llm_config import get_llm_config
+    api_key = os.environ.get("GOOGLE_API_KEY", "")
+    cfg = get_llm_config()
+    result = {
+        "google_api_key_set": bool(api_key),
+        "google_api_key_length": len(api_key),
+        "model_config": cfg["model"],
+        "max_retries": cfg["max_retries"],
+        "test_call": None,
+    }
+    # 试调一次,看是否真能用
+    if api_key:
+        try:
+            from agents.llm_caller import call_gemini, GeminiAPIError
+            text = call_gemini("Reply with exactly OK", max_tokens=20)
+            result["test_call"] = {"ok": True, "response": text[:100]}
+        except GeminiAPIError as e:
+            result["test_call"] = {"ok": False, "error": str(e)[:200]}
+        except Exception as e:
+            result["test_call"] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    else:
+        result["test_call"] = {"ok": False, "error": "GOOGLE_API_KEY not set, skipping call"}
+    return result
+
+
 @app.get("/api/status", response_model=Dict[str, Any])
 async def get_system_status():
     """获取系统状态"""
