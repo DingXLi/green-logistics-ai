@@ -216,7 +216,7 @@ class LogisticsAgent:
                 capacity_tons=vehicle["max_capacity_tons"],
                 start_location=depot,
                 co2_rate=vehicle["co2_emission_rate"],
-                cost_per_km=2.6
+                cost_per_km=vehicle.get("cost_per_km", 2.6)
             ))
         
         # 求解

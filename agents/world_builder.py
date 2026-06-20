@@ -147,11 +147,28 @@ class WorldBuilder:
         return demands
 
     def build_fleet(self) -> List[Dict[str, Any]]:
-        """构建车辆（位置在 Borås depot）"""
+        """构建车辆（位置在 Borås depot）
+
+        车辆异构性 (让 Pareto 路由有真实 trade-off):
+        - 10 辆 type_A: 便宜但污染重 (cost=1.8 SEK/km, co2=1.2 kg/km)  - 柴油重型车
+        - 15 辆 type_B: 平衡型         (cost=2.6 SEK/km, co2=0.85 kg/km) - 标准货车
+        - 5 辆 type_C: 贵但环保         (cost=4.0 SEK/km, co2=0.4 kg/km)  - 电动车
+        分布: cost_weight 高 -> 多用 A; co2_weight 高 -> 多用 C
+        """
+        # 按顺序分配 type 轮转
+        types = (["A"] * 10) + (["B"] * 15) + (["C"] * 5)
+        type_params = {
+            "A": {"cost_per_km": 1.8, "co2_emission_rate": 1.2},
+            "B": {"cost_per_km": 2.6, "co2_emission_rate": 0.85},
+            "C": {"cost_per_km": 4.0, "co2_emission_rate": 0.4},
+        }
         vehicles = []
         for i in range(self.config.n_vehicles):
+            t = types[i % len(types)]
+            p = type_params[t]
             vehicles.append({
                 "vehicle_id": f"VEH{i:03d}",
+                "vehicle_type": t,  # A/B/C
                 "status": "available",
                 "current_location": {
                     "lat": self.config.depot_location[0],
@@ -160,7 +177,8 @@ class WorldBuilder:
                 "current_load_tons": 0.0,
                 "max_capacity_tons": 20.0,
                 "fuel_level": 100.0,
-                "co2_emission_rate": 0.85,
+                "cost_per_km": p["cost_per_km"],
+                "co2_emission_rate": p["co2_emission_rate"],
                 "total_distance_km": 0.0,
                 "route_history": [],
             })
