@@ -501,7 +501,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         sup = supply_idx[sid]
         dem = demand_idx[did]
         pickup_locations.append({
-            "id": sid, "lat": sup.location["lat"], "lon": sup.location["lon"],
+            "id": sid, "lat": sup.lat, "lon": sup.lon,
             "tons": m.get("tons", 5.0),
         })
         delivery_locations.append({
@@ -542,7 +542,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
             capacity_tons=vd.get("max_capacity_tons", 20.0),
             start_location=depot,
             co2_rate=vd.get("co2_emission_rate", 0.85),
-            cost_per_km=vd.get("cost_per_km", 2.6),  # 读 world_builder 写入的 per-vehicle 值
+            cost_per_km=2.6,
         ))
 
     pareto = solver.solve_pareto(
