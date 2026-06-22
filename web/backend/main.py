@@ -74,9 +74,10 @@ _last_frontend_activity: float = 0.0
 # asyncio.Event: 闲置中的 scheduler 在等这个 signal 唤醒
 _wake_scheduler_event: asyncio.Event = asyncio.Event()
 # ID 检查的 path 前缀 (只把"前端"请求当作活动信号, 不计 health check / docs)
+# 只计 /api/* 业务端点 — /health, /docs, /openapi.json, / 都排除
+# (HF Spaces 每 30s 打 /health, 不排除的话 scheduler 永远进不了 idle)
 _FRONTEND_PATH_PREFIXES = (
-    "/api/",      # 业务 API
-    "/",          # 根路径 (前端打开会探一下)
+    "/api/",      # 业务 API (含 /api/scheduler/status, /api/optimize 等)
 )
 
 
