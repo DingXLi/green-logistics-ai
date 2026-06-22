@@ -18,10 +18,9 @@ ENV TZ=Europe/Stockholm \
     # cache 目录指向 /data (避免镜像层爆)
     EXTERNAL_SIGNALS_CACHE=/data/cache \
     OSM_CACHE=/data/osm_cache \
-    # 后台调度器: 30s 跑一次 cycle (Lovable 30s 轮询能拿到新数据)
-    # 用户委托时显式打开; 本地 dev 不会启动
-    # 智能闲置: 5 分钟 (300s) 无前端请求 → 不跑 cycle, 唤醒后立即跑一个
-    GL_SCHEDULER_ENABLED=true \
+    # 后台调度器: 默认关闭。纯按需模式 — 只在 Lovable 点 Run 按钮时才跑 cycle
+    # 如需恢复定时跑: 设 GL_SCHEDULER_ENABLED=true (可同时设 GL_SCHEDULER_IDLE_WINDOW 启用智能闲置)
+    GL_SCHEDULER_ENABLED=false \
     GL_SCHEDULER_INTERVAL=30 \
     GL_SCHEDULER_IDLE_WINDOW=300
 

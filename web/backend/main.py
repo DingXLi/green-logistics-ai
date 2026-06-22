@@ -527,26 +527,49 @@ async def get_supply_points():
     return points
 
 
+# Throttle: 防止用户连点 Run 按钮浪费 LLM 调用
+# 30s 内的重复请求 → 返回上一次的缓存结果
+_OPTIMIZE_CACHE_TTL_S = 30
+_optimize_cache: Dict[str, Any] = {}
+_optimize_cache_lock = asyncio.Lock()
+
+
 @app.post("/api/optimize", response_model=OptimizationResponse)
 async def run_optimization(request: OptimizationRequest = None):
-    """运行优化"""
+    """运行优化 (纯按需 — 只在 Lovable 点 Run 按钮时跑)
+    
+    Throttle: 30s 内重复调用 → 返回缓存的最近一次结果 (avoid wasting LLM quota)
+    如果没有 cache, 跑一次完整 cycle (25-30s)。
+    """
     if coordinator is None:
         raise HTTPException(status_code=503, detail="System not initialized")
 
-    if request and request.run_simulation:
-        # 运行模拟
-        results = await coordinator.simulate_day(days=request.simulation_days)
-        last_result = results[-1]
+    now = time.monotonic()
+    cached = _optimize_cache.get("last")
+    if cached and (now - cached.get("ts", 0)) < _OPTIMIZE_CACHE_TTL_S:
+        # 返缓存
+        logger.info(f"Run 按钮命中 throttle, 返缓存 ({int(now - cached['ts'])}s 前跑的)")
+        last_result = cached["result"]
+        cached_flag = True
     else:
-        # 单次优化
-        last_result = await coordinator.run_optimization_cycle()
+        # 跑新 cycle
+        if request and request.run_simulation:
+            results = await coordinator.simulate_day(days=request.simulation_days)
+            last_result = results[-1]
+        else:
+            last_result = await coordinator.run_optimization_cycle()
+        # 写 cache
+        async with _optimize_cache_lock:
+            _optimize_cache["last"] = {"ts": time.monotonic(), "result": last_result}
+        cached_flag = False
+        logger.info(f"Run 按钮触发新 cycle: {last_result.get('optimization_id')}")
 
     # 提取关键指标
     matches = last_result.get("matches", {})
     routes = last_result.get("route_optimization", {})
 
     return OptimizationResponse(
-        status="success",
+        status="success" if not cached_flag else "cached",
         optimization_id=last_result.get("optimization_id"),
         timestamp=last_result.get("timestamp"),
         matches_count=matches.get("total_matches", 0),
@@ -554,6 +577,40 @@ async def run_optimization(request: OptimizationRequest = None):
         total_cost_sek=routes.get("total_cost_sek", 0),
         total_co2_kg=routes.get("total_co2_kg", 0)
     )
+
+
+@app.get("/api/optimize/last")
+async def get_last_optimization():
+    """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'"""
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    if coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    
+    summary = coordinator.persistence.get_summary() or {}
+    recent = coordinator.persistence.get_recent_cycles(limit=1) or []
+    last_cycle = recent[0] if recent else {}
+    last_ts = last_cycle.get("wall_timestamp")
+    
+    age_seconds = None
+    if last_ts:
+        try:
+            # wall_timestamp 是 naive 本地时间 (Dockerfile 设了 TZ=Europe/Stockholm),
+            # 用 datetime.now() (naive local) 对比, 不要用 utcnow()
+            last_dt = datetime.fromisoformat(last_ts)
+            age_seconds = round((datetime.now() - last_dt).total_seconds(), 1)
+        except Exception:
+            pass
+    
+    return {
+        "last_cycle_id": last_cycle.get("cycle_id"),
+        "last_cycle_at": last_ts,
+        "age_seconds": age_seconds,
+        "total_cycles": summary.get("n_cycles", 0),
+        "total_tons": summary.get("total_tons", 0),
+        "total_cost_sek": summary.get("total_cost_sek", 0),
+        "total_co2_kg": summary.get("total_co2_kg", 0),
+    }
 
 
 # ============================================
