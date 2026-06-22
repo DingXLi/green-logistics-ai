@@ -754,7 +754,11 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
             cost_per_km=2.6,
         ))
 
-    pareto = solver.solve_pareto(
+    # OR-Tools solve_pareto 是 CPU 密集同步调用, 直接在 async 函数里会
+    # 阻塞 event loop 20-30s, 导致 /api/status / /api/fleet / /health 全排队
+    # 用 asyncio.to_thread 丢到线程池, 让 event loop 处理其他请求
+    pareto = await asyncio.to_thread(
+        solver.solve_pareto,
         n_points=n_points, time_limit_seconds=time_limit_seconds,
     )
 
