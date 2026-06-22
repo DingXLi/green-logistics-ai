@@ -20,8 +20,10 @@ ENV TZ=Europe/Stockholm \
     OSM_CACHE=/data/osm_cache \
     # 后台调度器: 30s 跑一次 cycle (Lovable 30s 轮询能拿到新数据)
     # 用户委托时显式打开; 本地 dev 不会启动
+    # 智能闲置: 5 分钟 (300s) 无前端请求 → 不跑 cycle, 唤醒后立即跑一个
     GL_SCHEDULER_ENABLED=true \
-    GL_SCHEDULER_INTERVAL=30
+    GL_SCHEDULER_INTERVAL=30 \
+    GL_SCHEDULER_IDLE_WINDOW=300
 
 WORKDIR /app
 

@@ -4,7 +4,7 @@ Green Logistics AI - Web Backend
 FastAPI 应用提供 REST API
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -14,6 +14,7 @@ import sys
 import os
 import random
 import asyncio
+import time
 from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
@@ -42,10 +43,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ============================================
+# 前端活动跟踪 middleware (智能调度用)
+# ============================================
+@app.middleware("http")
+async def frontend_activity_middleware(request: Request, call_next):
+    """
+    把"前端有请求"当作"有人在看 dashboard"的信号。
+    路径以 /api/ 或 / 开头的请求都计数 (排除 docs / openapi 之类)。
+    """
+    path = request.url.path
+    if path.startswith(_FRONTEND_PATH_PREFIXES):
+        _mark_frontend_activity(path)
+    response = await call_next(request)
+    return response
+
 # 全局状态
 coordinator: Optional[MultiAgentCoordinator] = None
 data_generator: Optional[SyntheticDataGenerator] = None
 scheduler: Optional["BackgroundScheduler"] = None
+
+# ============================================
+# 智能调度: 前端活动跟踪
+# ============================================
+# 最后一次前端请求的 monotonic 时间戳
+# 任何 /api/* 请求 (含 /api/optimize POST) 都会更新它
+# scheduler 用来判断"有人在看" → 活跃模式 vs 闲置模式
+_last_frontend_activity: float = 0.0
+# asyncio.Event: 闲置中的 scheduler 在等这个 signal 唤醒
+_wake_scheduler_event: asyncio.Event = asyncio.Event()
+# ID 检查的 path 前缀 (只把"前端"请求当作活动信号, 不计 health check / docs)
+_FRONTEND_PATH_PREFIXES = (
+    "/api/",      # 业务 API
+    "/",          # 根路径 (前端打开会探一下)
+)
+
+
+def _mark_frontend_activity(path: str = "") -> None:
+    """更新 last_frontend_activity + 唤醒闲置中的 scheduler。
+    在 middleware / 端点里调用。"""
+    global _last_frontend_activity
+    _last_frontend_activity = time.monotonic()
+    # 如果 scheduler 正在闲置, 唤醒它 (loop 会看到 last_activity 更新后切回 active 模式)
+    _wake_scheduler_event.set()
+
+
+def _seconds_since_frontend_activity() -> float:
+    """距离上次前端活动过了多少秒。scheduler 用来判断 idle。"""
+    if _last_frontend_activity == 0.0:
+        return float("inf")
+    return time.monotonic() - _last_frontend_activity
 
 
 # ============================================
@@ -59,11 +107,19 @@ class BackgroundScheduler:
     - 重叠保护: asyncio.Lock, 上一个 cycle 没跑完就跳过
     - 故障隔离: try/except 包住 cycle, LLM quota 错误不会搞死 scheduler
     - 可控间隔: GL_SCHEDULER_INTERVAL (秒, 默认 30)
+    - **智能闲置**: GL_SCHEDULER_IDLE_WINDOW (秒, 默认 300) 内无前端请求 → 不跑 cycle
+      等到 _wake_scheduler_event 被 set (前端再来) 才切回 active 模式
     """
 
-    def __init__(self, coord: MultiAgentCoordinator, interval_seconds: float = 30.0):
+    def __init__(
+        self,
+        coord: MultiAgentCoordinator,
+        interval_seconds: float = 30.0,
+        idle_window_seconds: float = 300.0,
+    ):
         self.coord = coord
         self.interval_seconds = interval_seconds
+        self.idle_window_seconds = idle_window_seconds
         self._task: Optional[asyncio.Task] = None
         self._lock = asyncio.Lock()
         self._stop_event = asyncio.Event()
@@ -77,6 +133,8 @@ class BackgroundScheduler:
         self.last_cycle_id: Optional[str] = None
         self.last_error: Optional[str] = None
         self.started_at: Optional[str] = None
+        self.is_idle: bool = False            # True = 当前在闲置模式, 不跑 cycle
+        self.idle_entered_at: Optional[str] = None  # 上次进入闲置的时间
 
     async def _run_cycle_safe(self) -> None:
         """单次 cycle: lock 保护 + try/except 隔离错误"""
@@ -108,26 +166,79 @@ class BackgroundScheduler:
                 self.running = False
 
     async def _loop(self) -> None:
-        """主循环: 跑 cycle → sleep (可中断) → 跑 cycle ..."""
+        """
+        主循环: 智能调度版本
+
+        Active 模式 (有前端活动):
+            跑 cycle → sleep interval → 跑 cycle → ...
+        Idle 模式 (idle_window 内无前端活动):
+            不跑 cycle, 等 wake_event 或 60s 周期检查
+            收到 wake_event → 切回 active, 立即跑一个 cycle
+
+        wake_event 逻辑: 任何前端请求触发 _mark_frontend_activity()
+        → 设置 wake_event → loop 看到 last_activity 变了 → 切回 active
+        """
         self.started_at = datetime.utcnow().isoformat() + "Z"
         logger.info(
-            f"Scheduler 后台循环启动, 间隔 {self.interval_seconds}s"
+            f"Scheduler 后台循环启动, 间隔 {self.interval_seconds}s, "
+            f"idle_window={self.idle_window_seconds}s"
         )
         # 第一次跑一个 cycle (不立即等满 interval)
+        # 初始化为 active 模式 (last_frontend_activity 是 startup 时设置的)
+        self.is_idle = False
+        self.idle_entered_at = None
         await self._run_cycle_safe()
         while not self._stop_event.is_set():
-            try:
-                # wait_for 让 stop_event 能在 shutdown 时打断 sleep
-                await asyncio.wait_for(
-                    self._stop_event.wait(),
-                    timeout=self.interval_seconds,
-                )
-                # 如果没超时, 说明 stop 被 set 了
-                break
-            except asyncio.TimeoutError:
-                # 正常超时 → 跑下一个 cycle
-                await self._run_cycle_safe()
+            idle_for = _seconds_since_frontend_activity()
+            if idle_for > self.idle_window_seconds:
+                # === Idle 模式 ===
+                if not self.is_idle:
+                    self.is_idle = True
+                    self.idle_entered_at = datetime.utcnow().isoformat() + "Z"
+                    logger.info(
+                        f"Scheduler 进入 idle 模式 "
+                        f"(已 {int(idle_for)}s 无前端活动, 阈值 {int(self.idle_window_seconds)}s)"
+                    )
+                # 等 wake_event 或 60s 超时
+                _wake_scheduler_event.clear()
+                try:
+                    await asyncio.wait_for(
+                        _wake_scheduler_event.wait(),
+                        timeout=60.0,
+                    )
+                    # wake 被 set → 检查 last_frontend_activity 是否真的更新
+                    new_idle_for = _seconds_since_frontend_activity()
+                    if new_idle_for < self.idle_window_seconds:
+                        self.is_idle = False
+                        self.idle_entered_at = None
+                        logger.info(
+                            f"Scheduler 唤醒 (前端活动 "
+                            f"{int(new_idle_for)}s 前)"
+                        )
+                        # 切回 active 后立刻跑一个 cycle
+                        await self._run_cycle_safe()
+                except asyncio.TimeoutError:
+                    # 60s 周期检查, 重新评估 idle 状态
+                    continue
+            else:
+                # === Active 模式 ===
+                if self.is_idle:
+                    # 不太可能走到这 (从 idle 出来是上面 wake 分支), 兜底
+                    self.is_idle = False
+                    self.idle_entered_at = None
+                try:
+                    # wait_for 让 stop_event 能在 shutdown 时打断 sleep
+                    await asyncio.wait_for(
+                        self._stop_event.wait(),
+                        timeout=self.interval_seconds,
+                    )
+                    # 如果没超时, 说明 stop 被 set 了
+                    break
+                except asyncio.TimeoutError:
+                    # 正常超时 → 跑下一个 cycle
+                    await self._run_cycle_safe()
         self.scheduler_active = False
+        self.is_idle = False
         logger.info("Scheduler 后台循环已退出")
 
     def start(self) -> None:
@@ -156,17 +267,22 @@ class BackgroundScheduler:
     def status(self) -> Dict[str, Any]:
         now = datetime.utcnow()
         next_in: Optional[float] = None
-        if self.last_cycle_at:
+        if self.last_cycle_at and not self.is_idle:
             try:
                 last = datetime.fromisoformat(self.last_cycle_at.rstrip("Z"))
                 elapsed = (now - last).total_seconds()
                 next_in = round(max(0.0, self.interval_seconds - elapsed), 1)
             except Exception:
                 next_in = None
+        idle_for = _seconds_since_frontend_activity()
         return {
             "enabled": True,
             "active": self.scheduler_active,
             "running_now": self.running,
+            "is_idle": self.is_idle,
+            "idle_window_seconds": self.idle_window_seconds,
+            "idle_for_seconds": round(idle_for, 1) if idle_for != float("inf") else None,
+            "idle_entered_at": self.idle_entered_at,
             "interval_seconds": self.interval_seconds,
             "cycle_count": self.cycle_count,
             "error_count": self.error_count,
@@ -234,18 +350,27 @@ async def startup_event():
     # 后台调度器 (Task A): opt-in via GL_SCHEDULER_ENABLED
     # 默认 false 保持现有 demo 行为; 用户委托时设为 true 让 Lovable
     # 30s 轮询能拿到新鲜数据
-    global scheduler
+    # 智能调度: 启勥时初始化 last_frontend_activity = now,
+    # 避免 scheduler 启动后立刻进入 idle
+    global scheduler, _last_frontend_activity
+    _last_frontend_activity = time.monotonic()
     scheduler_enabled = os.environ.get(
         "GL_SCHEDULER_ENABLED", "false"
     ).strip().lower() in ("1", "true", "yes", "on")
     scheduler_interval = float(os.environ.get("GL_SCHEDULER_INTERVAL", "30"))
+    scheduler_idle_window = float(
+        os.environ.get("GL_SCHEDULER_IDLE_WINDOW", "300")
+    )
     if scheduler_enabled:
         scheduler = BackgroundScheduler(
-            coordinator, interval_seconds=scheduler_interval,
+            coordinator,
+            interval_seconds=scheduler_interval,
+            idle_window_seconds=scheduler_idle_window,
         )
         scheduler.start()
         logger.info(
-            f"Scheduler 已启动 (interval={scheduler_interval}s)"
+            f"Scheduler 已启动 (interval={scheduler_interval}s, "
+            f"idle_window={scheduler_idle_window}s, smart_idle=True)"
         )
     else:
         logger.info(
@@ -687,17 +812,20 @@ async def get_scheduler_status():
     - enabled: GL_SCHEDULER_ENABLED 是否为 true
     - active: scheduler 循环是否在跑
     - running_now: 当前是否有 cycle 在执行
+    - is_idle: 是否在闲置模式 (smart_idle 开启后)
+    - idle_for_seconds: 距上次前端活动多少秒
     - cycle_count: scheduler 跑的 cycle 数 (不含 warmup)
     - error_count: 累计失败次数
     - last_cycle_at: 上次 cycle 完成时间 (UTC ISO8601)
     - last_cycle_id: 上次 cycle 的 ID
-    - next_cycle_in_seconds: 距下次 cycle 的倒计时
+    - next_cycle_in_seconds: 距下次 cycle 的倒计时 (idle 时为 null)
     """
     if scheduler is None:
         return {
             "enabled": False,
             "active": False,
             "running_now": False,
+            "is_idle": False,
             "reason": "GL_SCHEDULER_ENABLED is not set to true",
         }
     return scheduler.status()
