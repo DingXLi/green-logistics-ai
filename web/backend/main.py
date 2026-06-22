@@ -71,6 +71,7 @@ scheduler: Optional["BackgroundScheduler"] = None
 # 任何 /api/* 请求 (含 /api/optimize POST) 都会更新它
 # scheduler 用来判断"有人在看" → 活跃模式 vs 闲置模式
 _last_frontend_activity: float = 0.0
+_last_frontend_path: str = ""  # debug: 最后触发 activity 的 path
 # asyncio.Event: 闲置中的 scheduler 在等这个 signal 唤醒
 _wake_scheduler_event: asyncio.Event = asyncio.Event()
 # ID 检查的 path 前缀 (只把"前端"请求当作活动信号, 不计 health check / docs)
@@ -84,8 +85,9 @@ _FRONTEND_PATH_PREFIXES = (
 def _mark_frontend_activity(path: str = "") -> None:
     """更新 last_frontend_activity + 唤醒闲置中的 scheduler。
     在 middleware / 端点里调用。"""
-    global _last_frontend_activity
+    global _last_frontend_activity, _last_frontend_path
     _last_frontend_activity = time.monotonic()
+    _last_frontend_path = path
     # 如果 scheduler 正在闲置, 唤醒它 (loop 会看到 last_activity 更新后切回 active 模式)
     _wake_scheduler_event.set()
 
@@ -284,6 +286,7 @@ class BackgroundScheduler:
             "idle_window_seconds": self.idle_window_seconds,
             "idle_for_seconds": round(idle_for, 1) if idle_for != float("inf") else None,
             "idle_entered_at": self.idle_entered_at,
+            "last_frontend_path": _last_frontend_path,
             "interval_seconds": self.interval_seconds,
             "cycle_count": self.cycle_count,
             "error_count": self.error_count,
