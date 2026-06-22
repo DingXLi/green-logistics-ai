@@ -610,10 +610,15 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
     matches = matches_result.get("matches", [])
 
     if not matches:
-        raise HTTPException(
-            status_code=404,
-            detail="No matches available to build VRP problem",
-        )
+        # 没有 matches 也要返 200 + 空结构, 让 Lovable 前端不报错
+        return {
+            "n_points": 0,
+            "n_pickups": 0,
+            "n_deliveries": 0,
+            "n_vehicles": 0,
+            "pareto": [],
+            "reason": "No matches available to build VRP problem",
+        }
 
     # 取前 15 个匹配，避免 OR-Tools 超时
     matches = matches[:15]
@@ -635,7 +640,9 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         sup = supply_idx[sid]
         dem = demand_idx[did]
         pickup_locations.append({
-            "id": sid, "lat": sup.lat, "lon": sup.lon,
+            "id": sid,
+            "lat": sup.location["lat"],
+            "lon": sup.location["lon"],
             "tons": m.get("tons", 5.0),
         })
         delivery_locations.append({
@@ -644,10 +651,14 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         })
 
     if not pickup_locations:
-        raise HTTPException(
-            status_code=404,
-            detail="No usable supply/demand locations",
-        )
+        return {
+            "n_points": 0,
+            "n_pickups": 0,
+            "n_deliveries": 0,
+            "n_vehicles": 0,
+            "pareto": [],
+            "reason": "No usable supply/demand locations",
+        }
 
     # 配车辆（不超过 pickup 数）
     vehicles_data = [
@@ -655,7 +666,14 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         if v.get("status") == "available"
     ][:len(pickup_locations)]
     if not vehicles_data:
-        raise HTTPException(status_code=404, detail="No vehicles available")
+        return {
+            "n_points": 0,
+            "n_pickups": len(pickup_locations),
+            "n_deliveries": len(delivery_locations),
+            "n_vehicles": 0,
+            "pareto": [],
+            "reason": "No vehicles available",
+        }
 
     # 构建 solver 并扫描 Pareto
     solver = VRPSolver()
