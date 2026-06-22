@@ -13,6 +13,8 @@ from loguru import logger
 import sys
 import os
 import random
+import asyncio
+from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -43,6 +45,137 @@ app.add_middleware(
 # 全局状态
 coordinator: Optional[MultiAgentCoordinator] = None
 data_generator: Optional[SyntheticDataGenerator] = None
+scheduler: Optional["BackgroundScheduler"] = None
+
+
+# ============================================
+# 后台调度器 (Task A)
+# ============================================
+class BackgroundScheduler:
+    """
+    周期性跑 coordinator.run_optimization_cycle() 的后台任务
+
+    - Opt-in: GL_SCHEDULER_ENABLED=true 才启动
+    - 重叠保护: asyncio.Lock, 上一个 cycle 没跑完就跳过
+    - 故障隔离: try/except 包住 cycle, LLM quota 错误不会搞死 scheduler
+    - 可控间隔: GL_SCHEDULER_INTERVAL (秒, 默认 30)
+    """
+
+    def __init__(self, coord: MultiAgentCoordinator, interval_seconds: float = 30.0):
+        self.coord = coord
+        self.interval_seconds = interval_seconds
+        self._task: Optional[asyncio.Task] = None
+        self._lock = asyncio.Lock()
+        self._stop_event = asyncio.Event()
+
+        # 状态
+        self.scheduler_active: bool = False   # 调度循环是否在跑
+        self.running: bool = False            # 当前是否有 cycle 正在执行
+        self.cycle_count: int = 0             # scheduler 累计跑的 cycle 数 (不含 warmup)
+        self.error_count: int = 0
+        self.last_cycle_at: Optional[str] = None
+        self.last_cycle_id: Optional[str] = None
+        self.last_error: Optional[str] = None
+        self.started_at: Optional[str] = None
+
+    async def _run_cycle_safe(self) -> None:
+        """单次 cycle: lock 保护 + try/except 隔离错误"""
+        if self._lock.locked():
+            # 上一轮还没跑完, 跳过这一轮避免重叠
+            logger.debug("Scheduler: 上一 cycle 未完成, 跳过本次")
+            return
+        async with self._lock:
+            self.running = True
+            try:
+                result = await self.coord.run_optimization_cycle()
+                self.cycle_count += 1
+                self.last_cycle_at = datetime.utcnow().isoformat() + "Z"
+                self.last_cycle_id = result.get("optimization_id")
+                self.last_error = None
+                matches = (result.get("matches") or {}).get("total_matches", 0)
+                logger.info(
+                    f"Scheduler cycle #{self.cycle_count} 完成: "
+                    f"{self.last_cycle_id} ({matches} matches)"
+                )
+            except Exception as e:
+                self.error_count += 1
+                self.last_error = f"{type(e).__name__}: {str(e)[:200]}"
+                logger.exception(
+                    f"Scheduler cycle #{self.cycle_count + 1} 失败 "
+                    f"(已累计 {self.error_count} 次错误): {e}"
+                )
+            finally:
+                self.running = False
+
+    async def _loop(self) -> None:
+        """主循环: 跑 cycle → sleep (可中断) → 跑 cycle ..."""
+        self.started_at = datetime.utcnow().isoformat() + "Z"
+        logger.info(
+            f"Scheduler 后台循环启动, 间隔 {self.interval_seconds}s"
+        )
+        # 第一次跑一个 cycle (不立即等满 interval)
+        await self._run_cycle_safe()
+        while not self._stop_event.is_set():
+            try:
+                # wait_for 让 stop_event 能在 shutdown 时打断 sleep
+                await asyncio.wait_for(
+                    self._stop_event.wait(),
+                    timeout=self.interval_seconds,
+                )
+                # 如果没超时, 说明 stop 被 set 了
+                break
+            except asyncio.TimeoutError:
+                # 正常超时 → 跑下一个 cycle
+                await self._run_cycle_safe()
+        self.scheduler_active = False
+        logger.info("Scheduler 后台循环已退出")
+
+    def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            logger.warning("Scheduler 已在运行, 忽略重复 start()")
+            return
+        self._stop_event.clear()
+        self.scheduler_active = True
+        self._task = asyncio.create_task(self._loop(), name="gl-scheduler")
+        logger.info("Scheduler task 已创建")
+
+    async def stop(self) -> None:
+        self._stop_event.set()
+        if self._task is not None:
+            try:
+                await asyncio.wait_for(self._task, timeout=5.0)
+            except asyncio.TimeoutError:
+                self._task.cancel()
+                try:
+                    await self._task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            self._task = None
+        self.scheduler_active = False
+
+    def status(self) -> Dict[str, Any]:
+        now = datetime.utcnow()
+        next_in: Optional[float] = None
+        if self.last_cycle_at:
+            try:
+                last = datetime.fromisoformat(self.last_cycle_at.rstrip("Z"))
+                elapsed = (now - last).total_seconds()
+                next_in = round(max(0.0, self.interval_seconds - elapsed), 1)
+            except Exception:
+                next_in = None
+        return {
+            "enabled": True,
+            "active": self.scheduler_active,
+            "running_now": self.running,
+            "interval_seconds": self.interval_seconds,
+            "cycle_count": self.cycle_count,
+            "error_count": self.error_count,
+            "last_error": self.last_error,
+            "last_cycle_at": self.last_cycle_at,
+            "last_cycle_id": self.last_cycle_id,
+            "next_cycle_in_seconds": next_in,
+            "started_at": self.started_at,
+        }
 
 
 # ============================================
@@ -97,6 +230,37 @@ async def startup_event():
     except Exception as e:
         # 预热失败不能阻止服务启动
         logger.warning(f"启动预热失败 (服务继续运行): {e}")
+
+    # 后台调度器 (Task A): opt-in via GL_SCHEDULER_ENABLED
+    # 默认 false 保持现有 demo 行为; 用户委托时设为 true 让 Lovable
+    # 30s 轮询能拿到新鲜数据
+    global scheduler
+    scheduler_enabled = os.environ.get(
+        "GL_SCHEDULER_ENABLED", "false"
+    ).strip().lower() in ("1", "true", "yes", "on")
+    scheduler_interval = float(os.environ.get("GL_SCHEDULER_INTERVAL", "30"))
+    if scheduler_enabled:
+        scheduler = BackgroundScheduler(
+            coordinator, interval_seconds=scheduler_interval,
+        )
+        scheduler.start()
+        logger.info(
+            f"Scheduler 已启动 (interval={scheduler_interval}s)"
+        )
+    else:
+        logger.info(
+            "Scheduler 未启用 (设 GL_SCHEDULER_ENABLED=true 打开)"
+        )
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭时停掉 scheduler"""
+    global scheduler
+    if scheduler is not None:
+        logger.info("正在停止 Scheduler...")
+        await scheduler.stop()
+        logger.info("Scheduler 已停止")
 
 
 # ============================================
@@ -511,6 +675,32 @@ async def get_persistence_summary():
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     return coordinator.persistence.get_summary()
+
+
+# ============================================
+# V2 新增：调度器状态端点 (Task A)
+# ============================================
+@app.get("/api/scheduler/status")
+async def get_scheduler_status():
+    """
+    返回后台 scheduler 状态:
+    - enabled: GL_SCHEDULER_ENABLED 是否为 true
+    - active: scheduler 循环是否在跑
+    - running_now: 当前是否有 cycle 在执行
+    - cycle_count: scheduler 跑的 cycle 数 (不含 warmup)
+    - error_count: 累计失败次数
+    - last_cycle_at: 上次 cycle 完成时间 (UTC ISO8601)
+    - last_cycle_id: 上次 cycle 的 ID
+    - next_cycle_in_seconds: 距下次 cycle 的倒计时
+    """
+    if scheduler is None:
+        return {
+            "enabled": False,
+            "active": False,
+            "running_now": False,
+            "reason": "GL_SCHEDULER_ENABLED is not set to true",
+        }
+    return scheduler.status()
 
 
 # ============================================

@@ -17,7 +17,11 @@ ENV TZ=Europe/Stockholm \
     GL_DB_PATH=/data/simulation.db \
     # cache 目录指向 /data (避免镜像层爆)
     EXTERNAL_SIGNALS_CACHE=/data/cache \
-    OSM_CACHE=/data/osm_cache
+    OSM_CACHE=/data/osm_cache \
+    # 后台调度器: 30s 跑一次 cycle (Lovable 30s 轮询能拿到新数据)
+    # 用户委托时显式打开; 本地 dev 不会启动
+    GL_SCHEDULER_ENABLED=true \
+    GL_SCHEDULER_INTERVAL=30
 
 WORKDIR /app
 
