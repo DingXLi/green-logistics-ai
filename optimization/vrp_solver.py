@@ -208,15 +208,14 @@ class VRPSolver:
 
         demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
 
-        for v in range(num_vehicles):
-            capacity = int(self.vehicles[v].capacity_tons * 1000)
-            routing.AddDimensionWithVehicleCapacity(
-                demand_callback_index,
-                0,  # null capacity slack
-                [capacity] * num_vehicles,
-                True,  # start cumul to zero
-                "Capacity"
-            )
+        vehicle_capacities = [int(self.vehicles[v].capacity_tons * 1000) for v in range(num_vehicles)]
+        routing.AddDimensionWithVehicleCapacity(
+            demand_callback_index,
+            0,  # null capacity slack
+            vehicle_capacities,
+            True,  # start cumul to zero
+            "Capacity"
+        )
 
         # 设置搜索参数
         search_params = pywrapcp.DefaultRoutingSearchParameters()
