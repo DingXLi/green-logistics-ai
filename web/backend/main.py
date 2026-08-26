@@ -1266,6 +1266,17 @@ async def get_kpi_timeseries():
     return coordinator.persistence.get_kpi_timeseries()
 
 
+@app.get("/api/persistence/seasonal-timeseries")
+async def get_seasonal_timeseries():
+    """按月份聚合的 KPI + seasonal_factor (iter #4)。
+
+    供前端分析 "夏季 vs 冬季" 成本/CO2 差异。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_seasonal_timeseries()
+
+
 @app.get("/api/persistence/summary")
 async def get_persistence_summary():
     """全局统计汇总"""

@@ -285,6 +285,12 @@ class MultiAgentCoordinator:
             })
 
         # 4. 持久化：开始周期 + 写子数据
+        # 季节因子: 本 cycle 所有 supply 点的 seasonal_multiplier 平均 + 月份
+        seasonal_factor_avg = (
+            sum(s.get("seasonal_multiplier", 1.0) for s in supply_offers)
+            / max(len(supply_offers), 1)
+        )
+        sim_month = _seasonal_month(day)
         self.persistence.begin_cycle(
             cycle_id=cycle_id,
             sim_day=self.clock.now.day,
@@ -292,6 +298,8 @@ class MultiAgentCoordinator:
             activity_factor=factor,
             n_supply_offers=len(supply_offers),
             n_demand_requests=len(demand_requests),
+            seasonal_factor_avg=round(seasonal_factor_avg, 3),
+            seasonal_month=sim_month,
         )
         for sup in supply_offers:
             self.persistence.record_supply(cycle_id, sup)

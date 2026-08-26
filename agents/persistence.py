@@ -43,7 +43,12 @@ CREATE TABLE IF NOT EXISTS optimization_cycles (
     n_vehicles_available INTEGER DEFAULT 0,
     fleet_utilization_pct REAL DEFAULT 0,
     solver_status TEXT,
-    wall_duration_ms INTEGER
+    wall_duration_ms INTEGER,
+    -- iter #4: 季节扰动跟踪
+    -- seasonal_factor_avg = 该 cycle 所有 supply 点的 seasonal_multiplier 平均
+    -- seasonal_month = (sim_day // 30) % 12 + 1 (1-12)
+    seasonal_factor_avg REAL DEFAULT 1.0,
+    seasonal_month INTEGER DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_cycles_day ON optimization_cycles(sim_day);
@@ -169,6 +174,37 @@ class Persistence:
     def _init_schema(self) -> None:
         with self._conn() as conn:
             conn.executescript(SCHEMA_SQL)
+            # iter #4: 兼容旧 DB, 如 seasonal_factor_avg / seasonal_month 列缺失则 ALTER TABLE
+            self._migrate_add_seasonal_columns(conn)
+
+    def _migrate_add_seasonal_columns(self, conn) -> None:
+        """为旧 DB 加 seasonal_factor_avg + seasonal_month 列。
+
+        使用 PRAGMA table_info 检查存在性, 再决定是否 ALTER。
+        如果多 process 同时初始化, ALTER TABLE 可能会偶发报错 — 用 try 宽容。
+        """
+        existing = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(optimization_cycles)"
+            ).fetchall()
+        }
+        if "seasonal_factor_avg" not in existing:
+            try:
+                conn.execute(
+                    "ALTER TABLE optimization_cycles "
+                    "ADD COLUMN seasonal_factor_avg REAL DEFAULT 1.0"
+                )
+            except Exception:
+                pass
+        if "seasonal_month" not in existing:
+            try:
+                conn.execute(
+                    "ALTER TABLE optimization_cycles "
+                    "ADD COLUMN seasonal_month INTEGER DEFAULT 1"
+                )
+            except Exception:
+                pass
 
     # ------------------------------------------------------------
     # 周期级 KPI
@@ -182,16 +218,26 @@ class Persistence:
         activity_factor: float,
         n_supply_offers: int = 0,
         n_demand_requests: int = 0,
+        seasonal_factor_avg: float = 1.0,
+        seasonal_month: int = 1,
     ) -> None:
-        """开始一个新周期（先写一行 cycle 记录）"""
+        """开始一个新周期（先写一行 cycle 记录）
+
+        Args:
+            seasonal_factor_avg: 本 cycle 所有 supply 点的 seasonal_multiplier
+                                  平均值 (e.g. 1.4 if summer peak)
+            seasonal_month: 1-12 对应该 cycle 的月份
+        """
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO optimization_cycles
                    (cycle_id, sim_day, sim_hour, activity_factor,
-                    wall_timestamp, n_supply_offers, n_demand_requests)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    wall_timestamp, n_supply_offers, n_demand_requests,
+                    seasonal_factor_avg, seasonal_month)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (cycle_id, sim_day, sim_hour, activity_factor,
-                 datetime.now().isoformat(), n_supply_offers, n_demand_requests)
+                 datetime.now().isoformat(), n_supply_offers, n_demand_requests,
+                 seasonal_factor_avg, seasonal_month)
             )
 
     def commit_cycle(
@@ -470,6 +516,46 @@ class Persistence:
                    ORDER BY sim_day ASC"""
             ).fetchall()
             return [dict(r) for r in rows]
+
+    def get_seasonal_timeseries(self) -> List[Dict[str, Any]]:
+        """按月份聚合的 KPI + seasonal_factor (iter #4)
+
+        返回:
+            month (1-12) → {month, month_name, n_cycles, total_tons,
+                            total_cost_sek, total_co2_kg, avg_seasonal_factor,
+                            avg_cost_sek_per_cycle, avg_co2_per_cycle}
+
+        供前端分析 "夏季 vs 冬季” cost/CO2 差异。
+        """
+        month_names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ]
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT seasonal_month,
+                          COUNT(*) as n_cycles,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_cost_sek) as total_cost_sek,
+                          SUM(total_co2_kg) as total_co2_kg,
+                          AVG(seasonal_factor_avg) as avg_seasonal_factor
+                   FROM optimization_cycles
+                   WHERE seasonal_month BETWEEN 1 AND 12
+                   GROUP BY seasonal_month
+                   ORDER BY seasonal_month ASC"""
+            ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            month = d["seasonal_month"]
+            n = max(1, d.get("n_cycles", 0))
+            d["month"] = month
+            d["month_name"] = month_names[month - 1]
+            d["avg_cost_sek_per_cycle"] = round(d.get("total_cost_sek", 0) / n, 2)
+            d["avg_co2_per_cycle"] = round(d.get("total_co2_kg", 0) / n, 2)
+            d["avg_seasonal_factor"] = round(d.get("avg_seasonal_factor", 1.0), 3)
+            out.append(d)
+        return out
 
     def get_summary(self) -> Dict[str, Any]:
         """全局统计 summary (含 LLM 决策统计)"""
