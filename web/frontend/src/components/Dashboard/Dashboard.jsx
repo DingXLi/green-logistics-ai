@@ -22,6 +22,7 @@ import {
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
 import { SeasonalHeatmap } from './SeasonalHeatmap'
+import { SeasonalComparison } from './SeasonalComparison'
 import { CarbonScenarios } from './CarbonScenarios'
 import { FacilitiesList } from './FacilitiesList'
 
@@ -322,6 +323,8 @@ export default function Dashboard() {
               ? (Math.floor((wsMessage.data.sim_day - 1) / 30) % 12 + 1)
               : null
           } />
+
+          <SeasonalComparison />
 
           <CarbonScenarios />
         </>
