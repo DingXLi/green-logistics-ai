@@ -14,17 +14,21 @@
  *   - Pareto 前沿散点图（cost vs CO2 tradeoff）
  *   - 仿真控制（开始新一轮 / 自动刷新）
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ZAxis
 } from 'recharts'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
-import { SeasonalHeatmap } from './SeasonalHeatmap'
-import { SeasonalComparison } from './SeasonalComparison'
-import { CarbonScenarios } from './CarbonScenarios'
-import { FacilitiesList } from './FacilitiesList'
+
+// iter #5: code-splitting — lazy load 重型 tab 组件
+// SeasonalHeatmap / SeasonalComparison / CarbonScenarios / FacilitiesList 都是
+// recharts-heavy 或有大量 fetch logic, 改成 lazy + Suspense 拆分成独立 chunk
+const SeasonalHeatmap = lazy(() => import('./SeasonalHeatmap').then(m => ({ default: m.SeasonalHeatmap })))
+const SeasonalComparison = lazy(() => import('./SeasonalComparison').then(m => ({ default: m.SeasonalComparison })))
+const CarbonScenarios = lazy(() => import('./CarbonScenarios').then(m => ({ default: m.CarbonScenarios })))
+const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ default: m.FacilitiesList })))
 
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
@@ -316,7 +320,7 @@ export default function Dashboard() {
       )}
 
       {activeTab === 'scenarios' && (
-        <>
+        <Suspense fallback={<div className="empty">Loading scenarios…</div>}>
           <SeasonalHeatmap currentMonth={
             // 从 WS 推送的最新 cycle 拿到 sim_day
             wsMessage?.type === 'cycle_update' && wsMessage?.data?.sim_day
@@ -327,11 +331,13 @@ export default function Dashboard() {
           <SeasonalComparison />
 
           <CarbonScenarios />
-        </>
+        </Suspense>
       )}
 
       {activeTab === 'network' && (
-        <FacilitiesList />
+        <Suspense fallback={<div className="empty">Loading network…</div>}>
+          <FacilitiesList />
+        </Suspense>
       )}
     </div>
   )
