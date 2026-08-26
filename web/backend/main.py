@@ -785,6 +785,170 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
     }
 
 
+@app.get("/api/optimize/carbon-scenarios")
+async def get_carbon_scenarios(
+    carbon_prices: Optional[str] = None,
+    time_limit_seconds: int = 3,
+):
+    """
+    碳税情景分析：跑多个碳价下的 Pareto 前沿。
+
+    默认场景（基于现实）：
+    - 0.0 SEK/kg = 无碳税
+    - 1.5 SEK/kg ≈ EU ETS 当前水平（~100 EUR/t）
+    - 3.0 SEK/kg ≈ 2030 中间预测
+    - 5.0 SEK/kg ≈ 激进碳税情景
+
+    Query param: carbon_prices = "0,1.5,3,5" (逗号分隔)
+    """
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    # 解析碳价列表
+    if carbon_prices:
+        try:
+            prices = [float(p) for p in carbon_prices.split(",") if p]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="carbon_prices must be comma-separated numbers")
+        if not (1 <= len(prices) <= 8):
+            raise HTTPException(status_code=400, detail="carbon_prices count must be in [1, 8]")
+    else:
+        # 默认 4 个场景
+        prices = [0.0, 1.5, 3.0, 5.0]
+
+    # 复用 /api/optimize/pareto 的世界构建逻辑
+    from optimization.vrp_solver import VRPSolver, Location, Vehicle
+
+    supply_offers = []
+    for agent_id, agent in coordinator.supply_agents.items():
+        supply_offers.append({
+            "agent_id": agent_id,
+            "available_tons": round(agent.daily_capacity * 0.8, 2),
+            "material_type": agent.material_type,
+            "location": agent.location,
+        })
+    demand_requests = []
+    for dp in coordinator.market_agent.demand_points:
+        demand_requests.append({
+            "id": dp["id"],
+            "name": dp["name"],
+            "demand_tons": dp["current_demand_tons"],
+            "preferred_materials": dp["preferred_materials"],
+            "location": dp["location"],
+            "material_type": dp.get("material_type"),
+        })
+    matches_result = await coordinator.market_agent.match_supply_demand(
+        supply_offers=supply_offers,
+        demand_requests=demand_requests,
+    )
+    matches = matches_result.get("matches", [])[:15]
+    if not matches:
+        return {
+            "scenarios": [],
+            "reason": "No matches available to build VRP problem",
+        }
+
+    depot_loc = coordinator.logistics_agent.depot_location
+    depot = Location(id="DEPOT", lat=depot_loc["lat"], lon=depot_loc["lon"], type="depot")
+    supply_idx = {a.agent_id: a for a in coordinator.supply_agents.values()}
+    demand_idx = {d["id"]: d for d in coordinator.market_agent.demand_points}
+
+    pickup_locations = []
+    delivery_locations = []
+    for m in matches:
+        sid = m.get("supply_id")
+        did = m.get("demand_id")
+        if sid not in supply_idx or did not in demand_idx:
+            continue
+        sup = supply_idx[sid]
+        dem = demand_idx[did]
+        pickup_locations.append({
+            "id": sid, "lat": sup.location["lat"], "lon": sup.location["lon"],
+            "tons": m.get("tons", 5.0),
+        })
+        delivery_locations.append({
+            "id": did, "lat": dem["location"]["lat"], "lon": dem["location"]["lon"],
+            "tons": m.get("tons", 5.0),
+        })
+    if not pickup_locations:
+        return {"scenarios": [], "reason": "No usable supply/demand locations"}
+
+    vehicles_data = [
+        v for v in coordinator.logistics_agent.vehicles
+        if v.get("status") == "available"
+    ][:len(pickup_locations)]
+    if not vehicles_data:
+        return {"scenarios": [], "reason": "No vehicles available"}
+
+    def _build_solver() -> VRPSolver:
+        solver = VRPSolver()
+        solver.add_location(depot)
+        for loc in pickup_locations:
+            solver.add_location(Location(
+                id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+                demand_tons=loc["tons"], type="pickup",
+            ))
+        for loc in delivery_locations:
+            solver.add_location(Location(
+                id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+                demand_tons=-loc["tons"], type="delivery",
+            ))
+        for vd in vehicles_data:
+            solver.add_vehicle(Vehicle(
+                id=vd["vehicle_id"],
+                capacity_tons=vd.get("capacity_tons", 20.0),
+                start_location=depot,
+                co2_rate=vd.get("co2_emission_rate", 0.85),
+                cost_per_km=2.6,
+            ))
+        return solver
+
+    async def _solve_scenario(price: float) -> Dict[str, Any]:
+        solver = _build_solver()
+        # 4 个 Pareto 点代表 4 种 cost/co2 权衡
+        pareto = await asyncio.to_thread(
+            solver.solve_pareto,
+            n_points=4,
+            time_limit_seconds=time_limit_seconds,
+            co2_price=price,
+        )
+        # 从 pareto 里取 cost-optimal (weight=1,0) 和 co2-optimal (weight=0,1)
+        cost_opt = next((p for p in pareto if abs(p["cost_weight"] - 1.0) < 1e-6), None)
+        co2_opt = next((p for p in pareto if abs(p["co2_weight"] - 1.0) < 1e-6), None)
+        return {
+            "carbon_price_sek_per_kg": price,
+            "cost_optimal": {
+                "cost_sek": cost_opt["cost_sek"] if cost_opt else None,
+                "co2_kg": cost_opt["co2_kg"] if cost_opt else None,
+                "n_routes": len(cost_opt["routes"]) if cost_opt else 0,
+            } if cost_opt else None,
+            "co2_optimal": {
+                "cost_sek": co2_opt["cost_sek"] if co2_opt else None,
+                "co2_kg": co2_opt["co2_kg"] if co2_opt else None,
+                "n_routes": len(co2_opt["routes"]) if co2_opt else 0,
+            } if co2_opt else None,
+            "pareto": [
+                {
+                    "cost_weight": p["cost_weight"],
+                    "co2_weight": p["co2_weight"],
+                    "cost_sek": p["cost_sek"],
+                    "co2_kg": p["co2_kg"],
+                    "total_objective": p["total_objective"],
+                }
+                for p in pareto
+            ],
+        }
+
+    scenarios = await asyncio.gather(*[_solve_scenario(p) for p in prices])
+
+    return {
+        "n_pickups": len(pickup_locations),
+        "n_deliveries": len(delivery_locations),
+        "n_vehicles": len(vehicles_data),
+        "scenarios": scenarios,
+    }
+
+
 @app.get("/api/iot-telemetry/{vehicle_id}")
 async def get_iot_telemetry(vehicle_id: str, hours: int = 4):
     """获取车辆 IoT 遥测数据"""
