@@ -46,7 +46,7 @@ class LogisticsAgent:
                 "status": "available",  # available, en_route, loading, unloading
                 "current_location": self.depot_location.copy(),
                 "current_load_tons": 0.0,
-                "max_capacity_tons": 20.0,
+                "capacity_tons": 20.0,
                 "fuel_level": 100.0,  # percentage
                 "co2_emission_rate": 0.85,  # kg CO2 per km
                 "total_distance_km": 0.0,
@@ -213,7 +213,7 @@ class LogisticsAgent:
         for i, vehicle in enumerate(available_vehicles[:len(pickup_locations)]):
             solver.add_vehicle(Vehicle(
                 id=vehicle["vehicle_id"],
-                capacity_tons=vehicle["max_capacity_tons"],
+                capacity_tons=vehicle["capacity_tons"],
                 start_location=depot,
                 co2_rate=vehicle["co2_emission_rate"],
                 cost_per_km=vehicle.get("cost_per_km", 2.6)

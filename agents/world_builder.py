@@ -175,7 +175,7 @@ class WorldBuilder:
                     "lon": self.config.depot_location[1],
                 },
                 "current_load_tons": 0.0,
-                "max_capacity_tons": 20.0,
+                "capacity_tons": 20.0,
                 "fuel_level": 100.0,
                 "cost_per_km": p["cost_per_km"],
                 "co2_emission_rate": p["co2_emission_rate"],
