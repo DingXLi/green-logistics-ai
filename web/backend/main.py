@@ -4,10 +4,10 @@ Green Logistics AI - Web Backend
 FastAPI 应用提供 REST API
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from loguru import logger
 import sys
@@ -15,6 +15,7 @@ import os
 import random
 import asyncio
 import time
+import json
 from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
@@ -103,6 +104,97 @@ def _seconds_since_frontend_activity() -> float:
 
 
 # ============================================
+# WebSocket 广播 (cycle_update 推送)
+# ============================================
+class WebSocketBroadcaster:
+    """
+    管理所有连接的 WebSocket client，广播 cycle_update。
+
+    - 每个 client 独立 asyncio 队列 (阻塞消费 send) — 一个 client
+      慢不会拖累其他 client
+    - broadcast() 是 fire-and-forget (asyncio.gather return_exceptions=True)
+      发送失败会被下一轮 try/except 接住，不影响业务逻辑
+    - Connected client 列表是动态的 (心跳 / 断开会自动清理)
+    """
+
+    def __init__(self) -> None:
+        self._clients: Set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket) -> None:
+        await ws.accept()
+        async with self._lock:
+            self._clients.add(ws)
+        logger.info(f"WS client connected: {id(ws)} (total={len(self._clients)})")
+
+    async def disconnect(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.discard(ws)
+        logger.info(f"WS client disconnected: {id(ws)} (total={len(self._clients)})")
+
+    async def broadcast(self, payload: Dict[str, Any]) -> None:
+        """广播 JSON 给所有 client。失败不抛出（一个 client 坏不拖累整体）。"""
+        if not self._clients:
+            return
+        msg = json.dumps(payload, default=str)
+        # snapshot + gather 避免 disconnect 时的 race
+        async with self._lock:
+            targets = list(self._clients)
+        results = await asyncio.gather(
+            *[self._safe_send(ws, msg) for ws in targets],
+            return_exceptions=True,
+        )
+        # 清理断开的 client
+        dead: List[WebSocket] = []
+        for ws, res in zip(targets, results):
+            if isinstance(res, Exception):
+                dead.append(ws)
+        if dead:
+            async with self._lock:
+                for ws in dead:
+                    self._clients.discard(ws)
+                if dead:
+                    logger.info(f"WS cleaned {len(dead)} dead client(s)")
+
+    @staticmethod
+    async def _safe_send(ws: WebSocket, msg: str) -> None:
+        try:
+            await ws.send_text(msg)
+        except (WebSocketDisconnect, RuntimeError) as e:
+            raise RuntimeError(f"send failed: {e}") from e
+
+    def stats(self) -> Dict[str, Any]:
+        return {"connected_clients": len(self._clients)}
+
+
+ws_broadcaster = WebSocketBroadcaster()
+
+
+async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
+    """Coordinator 跑完 cycle 后调用，广播给所有 WS client。"""
+    payload = {
+        "type": "cycle_update",
+        "timestamp": datetime.now().isoformat(),
+        "data": {
+            "cycle_id": cycle_result.get("cycle_id"),
+            "n_supply_offers": cycle_result.get("n_supply_offers"),
+            "n_demand_requests": cycle_result.get("n_demand_requests"),
+            "n_matches": cycle_result.get("n_matches"),
+            "total_tons": cycle_result.get("total_tons"),
+            "total_cost_sek": cycle_result.get("total_cost_sek"),
+            "total_co2_kg": cycle_result.get("total_co2_kg"),
+            "total_distance_km": cycle_result.get("total_distance_km"),
+            "sim_day": cycle_result.get("sim_day"),
+            "sim_hour": cycle_result.get("sim_hour"),
+        },
+    }
+    try:
+        await ws_broadcaster.broadcast(payload)
+    except Exception as e:
+        logger.warning(f"WS broadcast cycle_update failed: {e}")
+
+
+# ============================================
 # 后台调度器 (Task A)
 # ============================================
 class BackgroundScheduler:
@@ -161,6 +253,11 @@ class BackgroundScheduler:
                     f"Scheduler cycle #{self.cycle_count} 完成: "
                     f"{self.last_cycle_id} ({matches} matches)"
                 )
+                # WebSocket 广播: cycle 完成推给所有 dashboard
+                try:
+                    await _broadcast_cycle_update(result)
+                except Exception as e:
+                    logger.warning(f"WS broadcast 在 scheduler cycle 失败: {e}")
             except Exception as e:
                 self.error_count += 1
                 self.last_error = f"{type(e).__name__}: {str(e)[:200]}"
@@ -454,6 +551,60 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.websocket("/ws/cycle-updates")
+async def ws_cycle_updates(ws: WebSocket):
+    """
+    WebSocket 推送。每个 coordinator cycle 完成后广播 cycle_update JSON。
+
+    客户端连接后保持心跳 (server 主动 ping 10s 间隔)。
+    断连 / 异常都会被清理。
+    """
+    await ws_broadcaster.connect(ws)
+    try:
+        # 连接建立后立即推送一条 hello + 当前状态
+        await ws.send_text(json.dumps({
+            "type": "hello",
+            "timestamp": datetime.now().isoformat(),
+            "data": {
+                "scheduler_stats": ws_broadcaster.stats(),
+                "recent_cycle_count": (
+                    (coordinator.persistence.get_summary() or {}).get("n_cycles", 0)
+                    if coordinator else 0
+                ),
+            },
+        }))
+        while True:
+            # server 主动 ping + 读 client 发来的 ping/pong (心跳)
+            try:
+                # wait_for 10s: 10s 内 client 发任何东西就读一下
+                # 不发的话只是不 ping client — 不丢连接
+                msg = await asyncio.wait_for(ws.receive_text(), timeout=10.0)
+                # echo back (调试用)
+                if msg == "ping":
+                    await ws.send_text("pong")
+            except asyncio.TimeoutError:
+                # server 主动 ping 保持连接活跃
+                try:
+                    await ws.send_text(json.dumps({
+                        "type": "keepalive",
+                        "timestamp": datetime.now().isoformat(),
+                    }))
+                except RuntimeError:
+                    break
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning(f"WS handler error: {e}")
+    finally:
+        await ws_broadcaster.disconnect(ws)
+
+
+@app.get("/api/ws/stats")
+async def ws_stats():
+    """WebSocket 连接统计 (调试用)。"""
+    return ws_broadcaster.stats()
 
 
 @app.get("/api/debug/llm")
