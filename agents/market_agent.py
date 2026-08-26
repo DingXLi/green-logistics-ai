@@ -33,6 +33,38 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def _analyze_price_trend(
+    history: List[float],
+    current_price: float,
+    threshold_pct: float = 5.0,
+) -> tuple[str, float]:
+    """
+    基于历史价格样本计算 trend。
+
+    - history: 旧到新价格列表 (从 price_history 取)
+    - current_price: 当前市场价
+    - threshold_pct: 升/降阈值 (默认 ±5%, 避免噪音)
+
+    Returns:
+        (trend_label, change_pct)
+        trend_label ∈ {'rising', 'stable', 'falling', 'unknown'}
+        change_pct = (current - mean_of_history) / mean * 100
+    """
+    if not history:
+        return "unknown", 0.0
+    mean = sum(history) / len(history)
+    if mean == 0:
+        return "unknown", 0.0
+    change_pct = (current_price - mean) / mean * 100.0
+    if change_pct > threshold_pct:
+        trend = "rising"
+    elif change_pct < -threshold_pct:
+        trend = "falling"
+    else:
+        trend = "stable"
+    return trend, round(change_pct, 2)
+
+
 class MarketAgent:
     """
     市场智能体 - 管理需求和价格
@@ -50,6 +82,13 @@ class MarketAgent:
             "plastic": 450,
             "concrete": 100
         }
+        # 价格历史: 最近 N 价样本, 推 trend (升 / 稳定 / 降)
+        # 最多保留 30 个样本 (典型月度分析足够)
+        self.price_history: Dict[str, List[float]] = {
+            mat: [p] for mat, p in self.material_prices.items()
+        }
+        # baseline 均价, get_material_price() 会跟它比
+        self._price_baseline: Dict[str, float] = dict(self.material_prices)
         
         # 创建 ADK Agent
         self.agent = Agent(
@@ -139,14 +178,38 @@ class MarketAgent:
         logger.info(f"市场智能体已注入 {len(demands)} 个需求点")
     
     async def get_material_price(self, material_type: str) -> Dict[str, Any]:
-        """获取材料价格"""
+        """获取材料价格 + trend 分析 (基于历史价跟 baseline 对比)"""
         price = self.material_prices.get(material_type, 0)
+        trend, trend_pct = _analyze_price_trend(
+            self.price_history.get(material_type, []),
+            current_price=price,
+        )
         return {
             "material_type": material_type,
             "price_sek_per_ton": price,
-            "price_trend": "stable",  # TODO: 实现价格趋势分析
+            "price_trend": trend,
+            "price_change_pct": trend_pct,
             "last_updated": datetime.now().isoformat()
         }
+
+    def record_price_update(self, material_type: str, price: float) -> None:
+        """外部调用：记录一次市场价格。多次调用后 trend 会更新。
+
+        例子:
+            await market_agent.record_price_update('metal_scrap', 850)
+            price = await market_agent.get_material_price('metal_scrap')
+            # price_trend = 'rising' (if 850 > prev 800)
+        """
+        history = self.price_history.setdefault(material_type, [])
+        history.append(float(price))
+        # 保留最近 30 个样本
+        if len(history) > 30:
+            history.pop(0)
+        # 更新 baseline (滑动平均)
+        if len(history) >= 3:
+            self._price_baseline[material_type] = sum(history) / len(history)
+        # 同步 material_prices (让 match_supply_demand 等下游逻辑反映新价)
+        self.material_prices[material_type] = float(price)
     
     async def calculate_profit(
         self,

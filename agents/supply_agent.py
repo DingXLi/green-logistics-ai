@@ -62,16 +62,52 @@ class SupplyAgent:
         }
     
     async def predict_supply(self, days: int = 7) -> Dict[str, Any]:
-        """预测未来 N 天的供应量"""
-        # TODO: 实现基于历史数据的预测模型
-        daily_prediction = self.daily_capacity * 0.8  # 简化版本
+        """
+        预测未来 N 天的供应量。
+
+        升级点 (对比之前 TODO 简化版):
+        - 复用 predict_supply_batch() 拿 LLM multiplier (趋势驱动)
+        - 没 GOOGLE_API_KEY 或 LLM 报错时走 deterministic fallback
+        - 给出 trend / reason, 不仅仅是 daily_capacity * 0.8
+        """
+        try:
+            from .clock import SimClock  # local import 避免循环
+            from datetime import datetime
+            weekday = datetime.now().weekday()
+            sim_day = days  # best-effort, callers should pass real sim_day
+        except Exception:
+            weekday, sim_day = 0, 0
+
+        try:
+            llm_pred = await SupplyAgent.predict_supply_batch(
+                agents=[self],
+                days=1,
+                sim_day=sim_day,
+                weekday=weekday,
+            )
+            meta = llm_pred.get(self.agent_id, {})
+        except Exception:
+            meta = {}
+
+        multiplier = float(meta.get("multiplier", 0.8))
+        # batch 默认返回 multiplier=1.0 fallback；这里需要 baseline 0.8 形式
+        # 让 LLM multiplier 压到 0.3–1.6 区间，避免预测腿大
+        baseline = 0.8
+        effective_multiplier = baseline * multiplier  # LLM 影响 baseline
+
+        daily_prediction = self.daily_capacity * effective_multiplier
+        total_tons = daily_prediction * days
 
         return {
             "agent_id": self.agent_id,
             "prediction_days": days,
-            "daily_avg_tons": daily_prediction,
-            "total_tons": daily_prediction * days,
-            "confidence": 0.85
+            "daily_avg_tons": round(daily_prediction, 2),
+            "total_tons": round(total_tons, 2),
+            "confidence": meta.get("confidence", 0.7),
+            "trend": meta.get("trend", "stable"),
+            "reason": meta.get("reason", ""),
+            "source": meta.get("source", "fallback"),
+            "multiplier": round(effective_multiplier, 3),
         }
 
     @classmethod

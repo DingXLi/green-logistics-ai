@@ -23,24 +23,32 @@ class TestSupplyAgent:
         """测试获取当前库存"""
         agent = SupplyAgent("TEST001", {"lat": 57.7089, "lon": 14.1618})
         agent.current_stock = 10.0
-        
+
         stock = await agent.get_current_stock()
-        
+
         assert stock["agent_id"] == "TEST001"
         assert stock["stock_tons"] == 10.0
         assert "location" in stock
 
     @pytest.mark.asyncio
     async def test_predict_supply(self):
-        """测试供应预测"""
+        """测试供应预测 (含 LLM fallback + trend field)"""
         agent = SupplyAgent("TEST001", {"lat": 57.7089, "lon": 14.1618})
         agent.daily_capacity = 20.0
-        
+
         prediction = await agent.predict_supply(days=7)
-        
+
         assert prediction["prediction_days"] == 7
         assert "total_tons" in prediction
         assert "confidence" in prediction
+        # 新增字段
+        assert "trend" in prediction
+        assert "source" in prediction
+        assert "multiplier" in prediction
+        # fallback (无 GOOGLE_API_KEY) 时 source = 'fallback', trend = 'stable'
+        assert prediction["trend"] in ("stable", "rising", "falling")
+        assert prediction["source"] in ("fallback", "llm")
+        assert prediction["multiplier"] > 0
 
     @pytest.mark.asyncio
     async def test_request_collection(self):
@@ -242,6 +250,52 @@ class TestMarketAgent:
         ]
         res = await agent.match_supply_demand(offers, demands)
         assert res["total_matches"] == 0
+
+    @pytest.mark.asyncio
+    async def test_price_trend_history_based(self):
+        """get_material_price 返回 trend 应基于历史价格样本"""
+        agent = MarketAgent()
+        # 初始价 = 800 (metal_scrap default), history 只有 1 样本
+        p = await agent.get_material_price("metal_scrap")
+        assert p["price_sek_per_ton"] == 800
+        # 只有 1 个样本 → trend = stable (default)
+        assert p["price_trend"] in ("stable", "unknown")
+
+        # 3 次上升 → baseline 上调
+        for new_price in [810, 830, 870]:
+            agent.record_price_update("metal_scrap", new_price)
+        p = await agent.get_material_price("metal_scrap")
+        # 870 vs avg ≈ 827 → +5.2% → rising
+        assert p["price_trend"] == "rising"
+        assert p["price_change_pct"] > 0
+
+        # 3 次下降 → falling
+        for new_price in [700, 650, 600]:
+            agent.record_price_update("metal_scrap", new_price)
+        p = await agent.get_material_price("metal_scrap")
+        # 600 vs avg ≈ 720 → -16.7% → falling
+        assert p["price_trend"] == "falling"
+        assert p["price_change_pct"] < -5
+
+    @pytest.mark.asyncio
+    async def test_price_trend_stable_within_threshold(self):
+        """小波动 (±5%) 应该被识别为 stable"""
+        agent = MarketAgent()
+        # 3 次轻微波动 (baseline 800, ±2%)
+        for new_price in [800, 810, 805]:
+            agent.record_price_update("metal_scrap", new_price)
+        p = await agent.get_material_price("metal_scrap")
+        assert p["price_trend"] == "stable"
+
+    @pytest.mark.asyncio
+    async def test_price_history_cap_at_30_samples(self):
+        """history 最多 30 个样本, 超出 FIFO"""
+        agent = MarketAgent()
+        for i in range(35):
+            agent.record_price_update("wood_waste", 200 + i)
+        assert len(agent.price_history["wood_waste"]) == 30
+        # 最后 5 个样本应该是 [230, 231, 232, 233, 234]
+        assert agent.price_history["wood_waste"][-1] == 234
 
 
 class TestLogisticsAgent:
