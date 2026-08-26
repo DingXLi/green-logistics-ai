@@ -1220,10 +1220,10 @@ async def get_fleet_snapshot():
     """获取车队实时快照"""
     if data_generator is None:
         raise HTTPException(status_code=503, detail="Data generator not initialized")
-    
+
     vehicle_ids = [f"VEH{i:03d}" for i in range(10)]
     snapshot = data_generator.generate_fleet_snapshot(vehicle_ids)
-    
+
     # 转换为前端期望的格式
     vehicles = []
     for v in snapshot:
@@ -1239,36 +1239,10 @@ async def get_fleet_snapshot():
             "heading": random.uniform(0, 360),
             "last_update": v["last_update"]
         })
-    
+
     return {
         "timestamp": datetime.now().isoformat(),
         "vehicles": vehicles
-    }
-
-
-@app.get("/api/sample-data/supply/{location_id}")
-async def get_sample_supply_data(location_id: str, days: int = 1):
-    """获取示例供应数据"""
-    if data_generator is None:
-        raise HTTPException(status_code=503, detail="Data generator not initialized")
-    
-    from datetime import timedelta
-    all_data = []
-    
-    for day in range(days):
-        date = datetime.now() + timedelta(days=day)
-        data = data_generator.generate_daily_supply(
-            location_id=location_id,
-            date=date,
-            intervals_per_day=24
-        )
-        all_data.extend(data)
-    
-    return {
-        "location_id": location_id,
-        "days": days,
-        "data_points": len(all_data),
-        "data": all_data
     }
 
 

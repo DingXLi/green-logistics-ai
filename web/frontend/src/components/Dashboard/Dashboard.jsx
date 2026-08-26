@@ -178,6 +178,7 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('overview')  // 'overview' | 'scenarios' | 'network'
 
   const fetchAll = useCallback(async () => {
     try {
@@ -263,39 +264,72 @@ export default function Dashboard() {
 
       <KPISummary data={summary} />
 
-      <SeasonalHeatmap currentMonth={
-        // 从 WS 推送的最新 cycle 拿到 sim_day
-        wsMessage?.type === 'cycle_update' && wsMessage?.data?.sim_day
-          ? (Math.floor((wsMessage.data.sim_day - 1) / 30) % 12 + 1)
-          : null
-      } />
+      {/* Tab 切换器 */}
+      <div className="dashboard-tabs">
+        <button
+          className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          📈 Overview & Pareto
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'scenarios' ? 'active' : ''}`}
+          onClick={() => setActiveTab('scenarios')}
+        >
+          🌦️ Seasonal & Carbon
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`}
+          onClick={() => setActiveTab('network')}
+        >
+          🏭 Network
+        </button>
+      </div>
 
-      <CarbonScenarios />
+      {/* Tab 内容 */}
+      {activeTab === 'overview' && (
+        <>
+          <KPITimeseries data={timeseries} />
 
-      <FacilitiesList />
-
-      <KPITimeseries data={timeseries} />
-
-      <div className="chart-row">
-        <ParetoChart data={pareto} />
-        <div className="chart-card control-card">
-          <h3>🎮 Simulation Control</h3>
-          <SimulationControl onRun={runCycle} lastResult={lastRun} running={running} />
-          <div className="info-list">
-            <div className="info-item">
-              <span className="info-label">Data source:</span>{' '}
-              <code>data/month_simulation.db</code>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Backend:</span>{' '}
-              <code>http://localhost:8000/docs</code>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Refresh interval:</span> 10s
+          <div className="chart-row">
+            <ParetoChart data={pareto} />
+            <div className="chart-card control-card">
+              <h3>🎮 Simulation Control</h3>
+              <SimulationControl onRun={runCycle} lastResult={lastRun} running={running} />
+              <div className="info-list">
+                <div className="info-item">
+                  <span className="info-label">Data source:</span>{' '}
+                  <code>data/month_simulation.db</code>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Backend:</span>{' '}
+                  <code>http://localhost:8000/docs</code>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Refresh interval:</span> 10s
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
+
+      {activeTab === 'scenarios' && (
+        <>
+          <SeasonalHeatmap currentMonth={
+            // 从 WS 推送的最新 cycle 拿到 sim_day
+            wsMessage?.type === 'cycle_update' && wsMessage?.data?.sim_day
+              ? (Math.floor((wsMessage.data.sim_day - 1) / 30) % 12 + 1)
+              : null
+          } />
+
+          <CarbonScenarios />
+        </>
+      )}
+
+      {activeTab === 'network' && (
+        <FacilitiesList />
+      )}
     </div>
   )
 }
