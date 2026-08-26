@@ -67,3 +67,38 @@ def test_facilities_include_operator_and_source():
             assert "operator" in f
             assert "source" in f
             assert f["operator"] != ""
+
+
+def test_facilities_default_includes_distance_to_depot():
+    """默认 response 应含 distance_to_depot_km + depot 字段"""
+    from web.backend.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/facilities")
+        data = r.json()
+        assert "depot" in data
+        assert data["depot"]["city"] == "Borås"
+        for f in data["facilities"]:
+            assert "distance_to_depot_km" in f
+            # Borås 设施应接近 0 km
+            if f["city"] == "Borås":
+                assert f["distance_to_depot_km"] < 5.0
+            # Göteborg 应 ~ 70-150 km (直线 ~130km)
+            elif f["city"] == "Göteborg":
+                assert 100 < f["distance_to_depot_km"] < 200
+            # Stockholm 应 ~ 290 km (直线)
+            elif f["city"] == "Stockholm":
+                assert 250 < f["distance_to_depot_km"] < 400
+
+
+def test_facilities_disable_distance():
+    """?include_distance_to_depot=false 应该不返回距离"""
+    from web.backend.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/facilities?include_distance_to_depot=false")
+        data = r.json()
+        for f in data["facilities"]:
+            assert "distance_to_depot_km" not in f
+        # depot 字段也应该是 None
+        assert data.get("depot") is None

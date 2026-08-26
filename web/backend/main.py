@@ -754,12 +754,23 @@ async def run_optimization(request: OptimizationRequest = None):
 
 
 @app.get("/api/facilities")
-async def get_facilities(city: Optional[str] = None, facility_type: Optional[str] = None):
+async def get_facilities(
+    city: Optional[str] = None,
+    facility_type: Optional[str] = None,
+    include_distance_to_depot: bool = True,
+):  # 接受 'true' / 'false' 字符串
+    include_distance_to_depot = str(include_distance_to_depot).lower() not in ("false", "0", "no")
     """
     返回真实瑞典废料处理设施 (Renova / Ragn-Sells / Stena / Swerock / Suez / Sysav 等)。
 
     数据源: data/real_sweden_facilities (手工整理的 13 个公司公开设施坐标)
-    Query: city / facility_type (可选过滤)
+    Query:
+        city: 可选过滤 (Borås / Göteborg / Stockholm)
+        facility_type: 可选过滤 (recycling_center, metal_recovery, ...)
+        include_distance_to_depot: bool = True (添加 distance_to_depot_km haversine)
+
+    响应 includes:
+        - facilities[i].distance_to_depot_km: 该设施到 Borås depot 的 haversine 距离 (km)
     """
     from data.real_sweden_facilities import (
         ALL_FACILITIES,
@@ -770,16 +781,29 @@ async def get_facilities(city: Optional[str] = None, facility_type: Optional[str
     )
 
     if city:
-        facilities = get_facilities_by_city(city)
+        facilities = [dict(f) for f in get_facilities_by_city(city)]
     elif facility_type:
-        facilities = get_facilities_by_type(facility_type)
+        facilities = [dict(f) for f in get_facilities_by_type(facility_type)]
     else:
-        facilities = list(ALL_FACILITIES)
+        # 复制防止 mutate module-level ALL_FACILITIES
+        facilities = [dict(f) for f in ALL_FACILITIES]
+
+    # 加 distance_to_depot_km (haversine 到 Borås depot)
+    if include_distance_to_depot:
+        from agents.world_builder import CITY_CENTERS
+        from agents.market_agent import _haversine_km
+        depot_lat, depot_lon = CITY_CENTERS["Borås"]
+        for f in facilities:
+            f["distance_to_depot_km"] = round(
+                _haversine_km(f["lat"], f["lon"], depot_lat, depot_lon),
+                2,
+            )
 
     return {
         "total": len(facilities),
         "total_available": get_facility_count(),
         "facility_type_counts": FACILITY_TYPE_COUNTS,
+        "depot": {"city": "Borås", "lat": depot_lat, "lon": depot_lon} if include_distance_to_depot else None,
         "facilities": facilities,
     }
 
