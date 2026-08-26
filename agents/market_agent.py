@@ -13,9 +13,24 @@ from google.adk import tools
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
+import math
 from loguru import logger
 
 from .llm_config import MODEL  # 中心化 model 名 (env > yaml > 默认)
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """两点间的 Haversine 距离 (km)"""
+    R = 6371.0  # 地球半径 (km)
+    lat1_rad, lat2_rad = math.radians(lat1), math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
 class MarketAgent:
@@ -157,49 +172,149 @@ class MarketAgent:
     async def match_supply_demand(
         self,
         supply_offers: List[Dict[str, Any]],
-        demand_requests: List[Dict[str, Any]]
+        demand_requests: List[Dict[str, Any]],
+        cost_per_km_sek: float = 2.6,
+        co2_per_km_kg: float = 0.85,
+        co2_price_sek_per_kg: float = 1.5,
+        max_vehicle_tons: float = 20.0,
+        min_match_tons: float = 0.5,
     ) -> Dict[str, Any]:
         """
-        匹配供需
-        
-        TODO: 实现优化算法考虑：
-        - 运输距离
-        - 材料类型匹配
-        - 价格优化
-        - 碳排放最小化
+        供需匹配 - 多目标优化版（profit-aware greedy assignment）
+
+        升级点（对比 basic_matching）：
+        1. Haversine 距离计算 — 真实考虑运输成本/碳排放
+        2. Profit-aware 排序 — profit_per_ton_km 越高越优先
+        3. Greedy 1-to-1 — 每个 supply/demand 最多被用一次（避免重复锁库存）
+        4. Profit 计算包含：revenue - transport_cost - co2_cost
+
+        Args:
+            supply_offers: 每个含 agent_id / material_type / available_tons / location
+            demand_requests: 每个含 id / preferred_materials / demand_tons / location
+            cost_per_km_sek: 车辆运输成本 (默认 2.6 SEK/km)
+            co2_per_km_kg: 排放率 (默认 0.85 kg CO2/km)
+            co2_price_sek_per_kg: 碳价 (默认 1.5 SEK/kg, 近似 EU ETS)
+            max_vehicle_tons: 单车容量上限（避免 OR-Tools 不可解）
+            min_match_tons: 最小匹配量（过滤碎屑以减少 solver 节点）
+
+        Returns:
+            {total_matches, total_tons, matches[], optimization_status}
+            matches[] 每项含 supply_id / demand_id / material_type / tons /
+                       distance_km / transport_cost_sek / co2_cost_sek /
+                       revenue_sek / estimated_profit_sek / profit_per_ton_km
         """
-        matches = []
-        
-        for supply in supply_offers:
-            for demand in demand_requests:
-                # 检查材料类型是否匹配
-                if supply.get("material_type") in demand.get("preferred_materials", []):
-                    # Cap at typical vehicle capacity (20t) so VRP 不超过单车上限
-                    # 多出来的需求可以由后续供应或下一天补上
-                    MAX_VEHICLE_TONS = 20.0
-                    # 跳过碎屑 match（< 0.5t），减少 OR-Tools 的节点压力，
-                    # 让 solver 更集中于“真正的业务量”，避免 no_solution。
-                    MIN_MATCH_TONS = 0.5
-                    match_tons = min(
-                        supply.get("available_tons", 0),
-                        demand.get("demand_tons", demand.get("current_demand_tons", 0)),
-                        MAX_VEHICLE_TONS,
-                    )
-                    if match_tons >= MIN_MATCH_TONS:
-                        matches.append({
-                            "supply_id": supply["agent_id"],
-                            "demand_id": demand["id"],
-                            "material_type": supply["material_type"],
-                            "tons": match_tons,
-                            "distance_km": 0,  # TODO: 计算实际距离
-                            "estimated_profit_sek": match_tons * self.material_prices.get(supply["material_type"], 0) * 0.3
-                        })
-        
+        MAX_VEHICLE_TONS = max_vehicle_tons
+        MIN_MATCH_TONS = min_match_tons
+
+        # Step 1: 生成所有可行的 (s, d) 候选 pair
+        candidates: List[Dict[str, Any]] = []
+        for s_idx, supply in enumerate(supply_offers):
+            sup_loc = supply.get("location") or {}
+            sup_lat = sup_loc.get("lat")
+            sup_lon = sup_loc.get("lon")
+            if sup_lat is None or sup_lon is None:
+                continue
+            sup_mat = supply.get("material_type")
+            sup_avail = supply.get("available_tons", 0)
+            if sup_avail < MIN_MATCH_TONS:
+                continue
+            price_per_ton = self.material_prices.get(sup_mat, 0)
+
+            for d_idx, demand in enumerate(demand_requests):
+                preferred = demand.get("preferred_materials") or []
+                if sup_mat not in preferred:
+                    continue
+                dem_loc = demand.get("location") or {}
+                dem_lat = dem_loc.get("lat")
+                dem_lon = dem_loc.get("lon")
+                if dem_lat is None or dem_lon is None:
+                    continue
+
+                # Haversine 距离 (km)
+                dist_km = _haversine_km(sup_lat, sup_lon, dem_lat, dem_lon)
+
+                demand_tons = demand.get(
+                    "demand_tons",
+                    demand.get("current_demand_tons", 0),
+                )
+                if demand_tons < MIN_MATCH_TONS:
+                    continue
+
+                # match tons = min(supply_avail, demand, single vehicle cap)
+                tons = min(sup_avail, demand_tons, MAX_VEHICLE_TONS)
+                if tons < MIN_MATCH_TONS:
+                    continue
+
+                # 成本拆解
+                transport_cost = tons * dist_km * cost_per_km_sek
+                co2_kg = tons * dist_km * co2_per_km_kg
+                co2_cost = co2_kg * co2_price_sek_per_kg
+                revenue = tons * price_per_ton
+                profit = revenue - transport_cost - co2_cost
+                # 越高越优先（profit / (tons × km)）
+                profit_intensity = profit / max(tons * dist_km, 0.01)
+
+                candidates.append({
+                    "supply_id": supply["agent_id"],
+                    "demand_id": demand["id"],
+                    "material_type": sup_mat,
+                    "tons": round(tons, 2),
+                    "distance_km": round(dist_km, 2),
+                    "transport_cost_sek": round(transport_cost, 2),
+                    "co2_kg": round(co2_kg, 2),
+                    "co2_cost_sek": round(co2_cost, 2),
+                    "revenue_sek": round(revenue, 2),
+                    "estimated_profit_sek": round(profit, 2),
+                    "profit_per_ton_km": round(profit_intensity, 4),
+                    "_s_idx": s_idx,
+                    "_d_idx": d_idx,
+                })
+
+        # Step 2: 按 profit_per_ton_km 降序排序
+        candidates.sort(key=lambda c: c["profit_per_ton_km"], reverse=True)
+
+        # Step 3: Greedy assignment — 每个 supply / demand 最多被选中一次
+        used_supply: set = set()
+        used_demand: set = set()
+        matches: List[Dict[str, Any]] = []
+        for c in candidates:
+            if c["supply_id"] in used_supply or c["demand_id"] in used_demand:
+                continue
+            used_supply.add(c["supply_id"])
+            used_demand.add(c["demand_id"])
+            # 去掉内部 index 字段
+            match = {k: v for k, v in c.items() if not k.startswith("_")}
+            matches.append(match)
+
+        # Step 4: 统计与状态
+        total_tons = sum(m["tons"] for m in matches)
+        total_distance = sum(m["distance_km"] * m["tons"] for m in matches)
+        total_profit = sum(m["estimated_profit_sek"] for m in matches)
+        total_co2 = sum(m["co2_kg"] for m in matches)
+        # 状态判断：按 profit 阈值和 match 数量
+        if not matches:
+            status = "no_matches"
+        elif total_profit > 0 and len(matches) >= max(1, len(supply_offers) // 2):
+            status = "optimized"
+        elif total_profit > 0:
+            status = "partial_optimized"
+        else:
+            status = "loss_making"
+
+        logger.info(
+            f"供需匹配: {len(matches)} matches / {total_tons:.1f}t / "
+            f"{total_distance:.1f}t·km / profit={total_profit:.0f} SEK / "
+            f"co2={total_co2:.1f}kg / status={status}"
+        )
+
         return {
             "total_matches": len(matches),
-            "total_tons": sum(m["tons"] for m in matches),
+            "total_tons": round(total_tons, 2),
+            "total_distance_ton_km": round(total_distance, 2),
+            "total_profit_sek": round(total_profit, 2),
+            "total_co2_kg": round(total_co2, 2),
             "matches": matches,
-            "optimization_status": "basic_matching"  # TODO: 升级为优化算法
+            "optimization_status": status,
         }
     
     async def predict_demand(

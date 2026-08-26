@@ -85,17 +85,163 @@ class TestMarketAgent:
     async def test_calculate_profit(self):
         """测试利润计算"""
         agent = MarketAgent()
-        
+
         profit = await agent.calculate_profit(
             material_type="mixed_waste",
             tons=10.0,
             transport_cost_sek=500,
             co2_cost_sek=100
         )
-        
+
         assert "revenue_sek" in profit
         assert "profit_sek" in profit
         assert profit["revenue_sek"] > profit["total_cost_sek"]
+
+    @pytest.mark.asyncio
+    async def test_match_supply_demand_distance_and_profit(self):
+        """新匹配算法：计算距离、按 profit 排序、greedy 1-to-1"""
+        agent = MarketAgent()
+        offers = [
+            {
+                "agent_id": "S_BORAS",
+                "material_type": "concrete",
+                "available_tons": 15.0,
+                "location": {"lat": 57.7089, "lon": 14.1618},
+            },
+            {
+                "agent_id": "S_NEAR",
+                "material_type": "wood_waste",
+                "available_tons": 8.0,
+                "location": {"lat": 57.78, "lon": 14.20},
+            },
+        ]
+        demands = [
+            {
+                "id": "D_FAR",
+                "preferred_materials": ["concrete"],
+                "demand_tons": 18.0,
+                "location": {"lat": 57.71, "lon": 12.0},  # ~128 km from Borås
+            },
+            {
+                "id": "D_NEAR",
+                "preferred_materials": ["wood_waste"],
+                "demand_tons": 12.0,
+                "location": {"lat": 58.0, "lon": 13.5},  # ~50 km
+            },
+            {
+                "id": "D_CONCRETE_NEAR",
+                "preferred_materials": ["concrete"],
+                "demand_tons": 5.0,
+                "location": {"lat": 57.5, "lon": 13.0},  # ~73 km
+            },
+        ]
+
+        res = await agent.match_supply_demand(offers, demands)
+
+        # 验证结构
+        assert "matches" in res
+        assert "total_profit_sek" in res
+        assert "total_co2_kg" in res
+        assert "total_distance_ton_km" in res
+        assert res["optimization_status"] in (
+            "no_matches", "loss_making", "partial_optimized", "optimized"
+        )
+
+        # 验证距离被计算 (不再硬编码 0)
+        for m in res["matches"]:
+            assert "distance_km" in m
+            assert m["distance_km"] > 0
+            assert "transport_cost_sek" in m
+            assert "co2_kg" in m
+            assert "co2_cost_sek" in m
+            assert "revenue_sek" in m
+            assert "estimated_profit_sek" in m
+            assert "profit_per_ton_km" in m
+
+        # 验证 greedy 1-to-1 (没有 supply_id / demand_id 重复)
+        supply_ids = [m["supply_id"] for m in res["matches"]]
+        demand_ids = [m["demand_id"] for m in res["matches"]]
+        assert len(supply_ids) == len(set(supply_ids))
+        assert len(demand_ids) == len(len(set(demand_ids))) if False else True
+        assert len(demand_ids) == len(set(demand_ids))
+
+        # 验证 profit 排序 (降序)
+        profits = [m["profit_per_ton_km"] for m in res["matches"]]
+        assert profits == sorted(profits, reverse=True)
+
+        # 验证：wood_waste (近 demand) 应该被选上 (profit > 0)
+        wood_match = next(
+            (m for m in res["matches"] if m["material_type"] == "wood_waste"),
+            None,
+        )
+        assert wood_match is not None
+        assert wood_match["distance_km"] < 100
+
+    @pytest.mark.asyncio
+    async def test_match_supply_demand_respects_min_match_tons(self):
+        """低于 min_match_tons 的碎屑 demand 应该被跳过"""
+        agent = MarketAgent()
+        offers = [
+            {
+                "agent_id": "S1",
+                "material_type": "concrete",
+                "available_tons": 5.0,
+                "location": {"lat": 57.7, "lon": 14.1},
+            },
+        ]
+        demands = [
+            {
+                "id": "D_TINY",
+                "preferred_materials": ["concrete"],
+                "demand_tons": 0.1,  # < 0.5 MIN_MATCH_TONS
+                "location": {"lat": 57.71, "lon": 14.16},
+            },
+        ]
+        res = await agent.match_supply_demand(offers, demands)
+        assert res["total_matches"] == 0
+        assert res["optimization_status"] == "no_matches"
+
+    @pytest.mark.asyncio
+    async def test_match_supply_demand_no_location_skips(self):
+        """没有 location 的 supply/demand 应该被跳过（不 crash）"""
+        agent = MarketAgent()
+        offers = [
+            {"agent_id": "S_NOLOC", "material_type": "concrete", "available_tons": 5.0},  # no location
+        ]
+        demands = [
+            {
+                "id": "D_OK",
+                "preferred_materials": ["concrete"],
+                "demand_tons": 3.0,
+                "location": {"lat": 57.7, "lon": 14.1},
+            },
+        ]
+        res = await agent.match_supply_demand(offers, demands)
+        assert res["total_matches"] == 0
+        assert res["optimization_status"] == "no_matches"
+
+    @pytest.mark.asyncio
+    async def test_match_supply_demand_material_mismatch(self):
+        """材料类型不匹配应该被过滤"""
+        agent = MarketAgent()
+        offers = [
+            {
+                "agent_id": "S1",
+                "material_type": "metal_scrap",
+                "available_tons": 10.0,
+                "location": {"lat": 57.7, "lon": 14.1},
+            },
+        ]
+        demands = [
+            {
+                "id": "D1",
+                "preferred_materials": ["wood_waste"],  # 不匹配
+                "demand_tons": 5.0,
+                "location": {"lat": 57.71, "lon": 14.16},
+            },
+        ]
+        res = await agent.match_supply_demand(offers, demands)
+        assert res["total_matches"] == 0
 
 
 class TestLogisticsAgent:
