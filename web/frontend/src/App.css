@@ -957,3 +957,14 @@ body {
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* ============================================
+   Facility distance badge
+   ============================================ */
+.distance-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}

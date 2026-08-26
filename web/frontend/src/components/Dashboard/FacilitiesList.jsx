@@ -126,6 +126,11 @@ export function FacilitiesList() {
             <div className="facility-card-meta">
               <span>📍 {f.lat.toFixed(4)}, {f.lon.toFixed(4)}</span>
               <span>⚖️ {f.processing_capacity_tons_per_day} t/day</span>
+              {f.distance_to_depot_km != null && (
+                <span className="distance-badge">
+                  🚛 {f.distance_to_depot_km} km to depot
+                </span>
+              )}
             </div>
             <div className="facility-card-materials">
               {f.preferred_materials.map(m => (
