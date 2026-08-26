@@ -761,3 +761,130 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ============================================
+   Facilities List (Real Swedish Facilities)
+   ============================================ */
+.facility-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.facility-filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.facility-filters select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.clear-filters-btn {
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.clear-filters-btn:hover {
+  background: #e2e8f0;
+}
+
+.facilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.facility-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.facility-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.facility-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.facility-card-header strong {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.city-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+}
+
+.city-badge.city-boras { background: #3b82f6; }
+.city-badge.city-goteborg { background: #10b981; }
+.city-badge.city-stockholm { background: #f59e0b; }
+
+.facility-card-type {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.facility-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.facility-card-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.material-chip {
+  padding: 2px 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.facility-card-operator {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+}
