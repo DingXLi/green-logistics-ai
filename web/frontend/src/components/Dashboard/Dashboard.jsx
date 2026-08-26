@@ -22,6 +22,7 @@ import {
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
 import { SeasonalHeatmap } from './SeasonalHeatmap'
+import { CarbonScenarios } from './CarbonScenarios'
 
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
@@ -267,6 +268,8 @@ export default function Dashboard() {
           ? (Math.floor((wsMessage.data.sim_day - 1) / 30) % 12 + 1)
           : null
       } />
+
+      <CarbonScenarios />
 
       <KPITimeseries data={timeseries} />
 

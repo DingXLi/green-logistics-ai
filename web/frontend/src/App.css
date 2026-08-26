@@ -696,3 +696,68 @@ body {
   width: 24px;
   height: 100%;
 }
+
+/* ============================================
+   Carbon Scenarios table + bar chart
+   ============================================ */
+.scenarios-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.scenarios-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.scenarios-table th,
+.scenarios-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.scenarios-table thead th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.scenarios-table td.positive {
+  color: #16a34a;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.scenarios-table td.negative {
+  color: #dc2626;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.refresh-btn {
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.refresh-btn:hover {
+  background: #e2e8f0;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
