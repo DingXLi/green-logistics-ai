@@ -57,6 +57,10 @@ class WorldConfig:
     demand_jitter: float = 0.1
     # depot 位置（Borås 中心）
     depot_location: Tuple[float, float] = CITY_CENTERS["Borås"]
+    # 使用真实瑞典设施 (Avfall Sverige + OSM) 作为 demand points
+    # True = 优先用 data/real_sweden_facilities.py, 不够再用虚构设施凑
+    # False = 跟之前一样全用 DEMAND_FACILITIES
+    use_real_facilities: bool = True
 
 
 class WorldBuilder:
@@ -113,12 +117,35 @@ class WorldBuilder:
         - id, name, location, preferred_materials
         - required_tons（当前需求）
         - priority, deadline
+
+        优先使用真实瑞典设施 (data/real_sweden_facilities) — 13 个手工整理的
+        Renova / Ragn-Sells / Stena / Swerock / Suez / Sysav / 等设施。
+        不够用才补虚构 DEMAND_FACILITIES。
         """
         demands = []
-        # 取前 n_demand_points 个工厂模板
-        facility_templates = DEMAND_FACILITIES[: self.config.n_demand_points]
+        # 优先: 真实设施
+        templates: List[Dict[str, Any]] = []
+        real_meta: Dict[str, Dict[str, Any]] = {}
+        if self.config.use_real_facilities:
+            try:
+                from data.real_sweden_facilities import (
+                    ALL_FACILITIES as REAL_FACILITIES,
+                    get_facility_count,
+                )
+                # 按使用顺序循环取真实设施
+                for i in range(self.config.n_demand_points):
+                    f = REAL_FACILITIES[i % get_facility_count()]
+                    templates.append(f)
+                    real_meta[f["id"]] = f
+            except ImportError:
+                templates = []
 
-        for template in facility_templates:
+        # 不够: 补虚构 DEMAND_FACILITIES (保持向后兼容)
+        if len(templates) < self.config.n_demand_points:
+            extra_needed = self.config.n_demand_points - len(templates)
+            templates.extend(DEMAND_FACILITIES[:extra_needed])
+
+        for template in templates:
             base_lat, base_lon = CITY_CENTERS[template["city"]]
             lat = base_lat + random.uniform(-self.config.demand_jitter, self.config.demand_jitter)
             lon = base_lon + random.uniform(-self.config.demand_jitter, self.config.demand_jitter)
@@ -127,6 +154,16 @@ class WorldBuilder:
             reading = self.data_gen.generate_demand_reading(template["id"])
             # 选该 facility 的第一个 preferred material 作为主要 material
             primary_material = template["preferred_materials"][0]
+            is_real = template["id"] in real_meta
+
+            # 真实设施: base_demand_tons 用 processing_capacity × jitter, 更接近“真实产能”
+            # 虚构设施: 用原 reading.required_tons (随机生成的)
+            if is_real:
+                real_f = real_meta[template["id"]]
+                capacity = real_f.get("processing_capacity_tons_per_day", 100)
+                base_demand = round(capacity * random.uniform(0.4, 0.8), 2)
+            else:
+                base_demand = reading.required_tons
 
             demands.append({
                 "id": template["id"],
@@ -137,12 +174,16 @@ class WorldBuilder:
                 # base_demand_tons 是该 facility 的“理论日需求”上限，per-cycle 真实 demand_tons
                 # 会由 Coordinator 在每周期用 weekday × noise × per-id jitter 扰动后写入
                 # current_demand_tons。这样可以让 KPI 真正随时间变化。
-                "base_demand_tons": reading.required_tons,
-                "current_demand_tons": reading.required_tons,
-                "daily_capacity_tons": round(reading.required_tons * 1.5, 2),
+                "base_demand_tons": base_demand,
+                "current_demand_tons": base_demand,
+                "daily_capacity_tons": round(base_demand * 1.5, 2),
                 "priority": reading.priority,
                 "deadline": reading.deadline,
                 "city": template["city"],
+                # 标记数据源 (真实 vs 虚构) — 前端 / API 可以显示
+                "data_source": "real_sweden_facilities" if is_real else "synthetic",
+                "facility_type": template.get("facility_type", "synthetic"),
+                "operator": template.get("operator", ""),
             })
         return demands
 
