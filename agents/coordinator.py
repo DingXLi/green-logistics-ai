@@ -35,6 +35,9 @@ from .logistics_agent import LogisticsAgent
 from .clock import SimClock
 from .persistence import Persistence
 from .world_builder import WorldBuilder, WorldConfig
+from data.seasonal_adjuster import get_supply_multiplier as _get_supply_seasonal
+from data.seasonal_adjuster import get_demand_multiplier as _get_demand_seasonal
+from data.seasonal_adjuster import sim_day_to_month as _seasonal_month
 
 
 class MultiAgentCoordinator:
@@ -192,16 +195,24 @@ class MultiAgentCoordinator:
         # 1. 库存自然积累 + 车辆状态重置（LLM multiplier 影响 accumulation 速率）
         for agent_id, agent in self.supply_agents.items():
             llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
-            agent.accumulate_stock(factor=factor, llm_multiplier=llm_m)
+            # 季节因子: 不同 material 不同月度 pattern (建筑夏高冬低, 金属平稳)
+            seasonal_m = _get_supply_seasonal(agent.material_type, day)
+            agent.accumulate_stock(
+                factor=factor,
+                llm_multiplier=llm_m,
+                seasonal_multiplier=seasonal_m,
+            )
         self.logistics_agent.reset_vehicles_for_new_cycle()
 
-        # 2. 收集供应 offers (使用 LLM multiplier 调整 predicted_tons)
+        # 2. 收集供应 offers (LLM multiplier + seasonal_factor 调整 predicted_tons)
         supply_offers = []
         for agent_id, agent in self.supply_agents.items():
             stock = await agent.get_current_stock()
-            base_pred = agent.daily_capacity * 0.8 * 1  # 原本 = daily_cap * 0.8 * days
+            base_pred = agent.daily_capacity * 0.8 * 1
             llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
-            predicted_tons = round(base_pred * llm_m, 2)
+            seasonal_m = _get_supply_seasonal(agent.material_type, day)
+            # LLM + seasonal 三者叠加：predicted_tons 受三个因素同时影响
+            predicted_tons = round(base_pred * llm_m * seasonal_m, 2)
             sup_meta = supply_llm.get(agent_id, {})
             supply_offers.append({
                 "agent_id": agent_id,
@@ -217,6 +228,9 @@ class MultiAgentCoordinator:
                 "llm_confidence": sup_meta.get("confidence"),
                 "llm_reason": sup_meta.get("reason"),
                 "llm_source": sup_meta.get("source", "unknown"),
+                # Seasonal 决策可追溯
+                "seasonal_multiplier": round(seasonal_m, 3),
+                "sim_month": _seasonal_month(day),
             })
 
         # 3. 收集需求 requests（LLM 驱动的 multiplier + 小幅 deterministic jitter）
@@ -243,7 +257,10 @@ class MultiAgentCoordinator:
             base = dp.get("base_demand_tons") or dp.get("current_demand_tons", 0)
             jitter = self._per_demand_jitter(dp["id"], day)
             llm_m = llm_mults.get(dp["id"], cycle_mult)  # LLM 缺某 id 时用 deterministic
-            perturbed = round(base * llm_m * jitter, 2)
+            # Seasonal: demand 同样随月份波动
+            dp_material = dp.get("material_type") or (dp.get("preferred_materials") or ["mixed_waste"])[0]
+            seasonal_m = _get_demand_seasonal(dp_material, day)
+            perturbed = round(base * llm_m * jitter * seasonal_m, 2)
             # 同步 in-memory 状态供 dashboard / 下游使用
             for live_dp in self.market_agent.demand_points:
                 if live_dp.get("id") == dp["id"]:

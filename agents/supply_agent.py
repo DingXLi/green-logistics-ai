@@ -281,16 +281,25 @@ class SupplyAgent:
         if quality_score is not None:
             self.quality_score = quality_score
 
-    def accumulate_stock(self, factor: float = 1.0, llm_multiplier: float = 1.0) -> None:
+    def accumulate_stock(
+        self,
+        factor: float = 1.0,
+        llm_multiplier: float = 1.0,
+        seasonal_multiplier: float = 1.0,
+    ) -> None:
         """每个 cycle 调用：模拟一天自然积累库存。
 
         Args:
             factor: SimClock.activity_factor (昼夜 0.5/1.5x)
             llm_multiplier: LLM 预测的 multiplier (默认 1.0 = 无影响),
                             由 SupplyAgent.predict_supply_batch 给出
+            seasonal_multiplier: 月度季节因子 (默认 1.0 = 无影响),
+                                 建筑夏高冬低 (1.4 ↔ 0.4)
         """
         self.current_stock = round(
-            self.current_stock + self.daily_capacity * 0.5 * factor * llm_multiplier, 2
+            self.current_stock
+            + self.daily_capacity * 0.5 * factor * llm_multiplier * seasonal_multiplier,
+            2,
         )
 
     def consume_shipped(self, shipped_tons: float, hard_cap_tons: float = 30.0) -> None:
