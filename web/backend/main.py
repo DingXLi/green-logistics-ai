@@ -730,6 +730,47 @@ async def run_optimization(request: OptimizationRequest = None):
     )
 
 
+@app.get("/api/seasonal-factors")
+async def get_seasonal_factors(sim_day: Optional[int] = None):
+    """
+    返回 Swedish 月度废料季节因子 (Avfall Sverige 2023, 图 4.2)。
+
+    Query:
+        sim_day: 可选, 0-indexed simulation day。不传则返回全年 12 个月表。
+                  传则额外返回当前 sim_day 对应的 month + factor。
+
+    Response:
+        {
+            "current_sim_day": int | None,
+            "current_month": int | None,
+            "factors_by_month": {1: {mat: f}, 2: {...}, ..., 12: {...}},
+            "current_factors": {mat: f} | None
+        }
+    """
+    from data.seasonal_adjuster import (
+        get_all_factors,
+        sim_day_to_month,
+    )
+
+    factors_by_month = {m: get_all_factors(m) for m in range(1, 13)}
+    current_month = None
+    current_factors = None
+    if sim_day is not None:
+        try:
+            sim_day_int = int(sim_day)
+            current_month = sim_day_to_month(sim_day_int)
+            current_factors = get_all_factors(current_month)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="sim_day must be integer")
+
+    return {
+        "current_sim_day": sim_day,
+        "current_month": current_month,
+        "factors_by_month": factors_by_month,
+        "current_factors": current_factors,
+    }
+
+
 @app.get("/api/optimize/last")
 async def get_last_optimization():
     """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'"""
