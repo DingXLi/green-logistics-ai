@@ -619,3 +619,80 @@ body {
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* ============================================
+   Seasonal Heatmap
+   ============================================ */
+.seasonal-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.seasonal-heatmap table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.seasonal-heatmap th,
+.seasonal-heatmap td {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.seasonal-heatmap th {
+  background: #f8fafc;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.seasonal-heatmap .material-label {
+  text-align: left;
+  padding-left: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.seasonal-heatmap .factor-cell {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.seasonal-heatmap .factor-cell.hover {
+  transform: scale(1.05);
+  outline: 2px solid #1e293b;
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+.seasonal-heatmap .current-month {
+  background: #fef9c3 !important;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.seasonal-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.seasonal-legend .legend-bar {
+  display: inline-flex;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.seasonal-legend .legend-bar span {
+  width: 24px;
+  height: 100%;
+}

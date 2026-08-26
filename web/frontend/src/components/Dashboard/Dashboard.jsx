@@ -21,6 +21,7 @@ import {
 } from 'recharts'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
+import { SeasonalHeatmap } from './SeasonalHeatmap'
 
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
@@ -259,6 +260,13 @@ export default function Dashboard() {
       <LiveCycleIndicator message={wsMessage} connected={wsConnected} />
 
       <KPISummary data={summary} />
+
+      <SeasonalHeatmap currentMonth={
+        // 从 WS 推送的最新 cycle 拿到 sim_day
+        wsMessage?.type === 'cycle_update' && wsMessage?.data?.sim_day
+          ? (Math.floor((wsMessage.data.sim_day - 1) / 30) % 12 + 1)
+          : null
+      } />
 
       <KPITimeseries data={timeseries} />
 
