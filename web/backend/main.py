@@ -546,10 +546,33 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """健康检查"""
+    """
+    Health check + environment metadata.
+
+    Returns:
+        - status: "healthy" / "degraded"
+        - timestamp: ISO 8601 UTC
+        - environment: "production" / "development" (推断自 HF Space env vars)
+        - data_mode: "real" (默认) — 表示 demand 使用真实瑞典设施
+        - features: enabled feature flags
+
+    Note: 这是 production mode endpoint, 不含 demo / sample data 路径。
+    """
+    is_hf_space = bool(os.environ.get("SPACE_ID"))  # HuggingFace Spaces env
+    is_production = is_hf_space or os.environ.get("ENVIRONMENT") == "production"
+    features = {
+        "websocket_enabled": True,
+        "carbon_scenarios": True,
+        "seasonal_factors": True,
+        "real_sweden_facilities": True,
+        "scheduler_enabled": bool(os.environ.get("GL_SCHEDULER_ENABLED")),
+    }
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "environment": "production" if is_production else "development",
+        "data_mode": "real",  # production mode 只用真实数据
+        "features": features,
     }
 
 
