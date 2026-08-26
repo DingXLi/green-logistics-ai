@@ -19,6 +19,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ZAxis
 } from 'recharts'
+import { useWebSocket } from '../../hooks/useWebSocket'
+import { LiveCycleIndicator } from './LiveCycleIndicator'
 
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
@@ -198,6 +200,18 @@ export default function Dashboard() {
     }
   }, [])
 
+  // WebSocket: 实时接收 cycle_update → 主动刷新数据
+  const handleWsMessage = useCallback((msg) => {
+    if (msg?.type === 'cycle_update') {
+      // 后端告知有新的 cycle 完成, 主动重新拉数据
+      fetchAll()
+    }
+  }, [fetchAll])
+  const { lastMessage: wsMessage, connected: wsConnected } = useWebSocket(
+    '/ws/cycle-updates',
+    { onMessage: handleWsMessage }
+  )
+
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
@@ -241,6 +255,8 @@ export default function Dashboard() {
       </div>
 
       {error && <div className="error-banner">⚠️ {error}</div>}
+
+      <LiveCycleIndicator message={wsMessage} connected={wsConnected} />
 
       <KPISummary data={summary} />
 
