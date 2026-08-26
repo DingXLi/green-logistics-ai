@@ -730,6 +730,37 @@ async def run_optimization(request: OptimizationRequest = None):
     )
 
 
+@app.get("/api/facilities")
+async def get_facilities(city: Optional[str] = None, facility_type: Optional[str] = None):
+    """
+    返回真实瑞典废料处理设施 (Renova / Ragn-Sells / Stena / Swerock / Suez / Sysav 等)。
+
+    数据源: data/real_sweden_facilities (手工整理的 13 个公司公开设施坐标)
+    Query: city / facility_type (可选过滤)
+    """
+    from data.real_sweden_facilities import (
+        ALL_FACILITIES,
+        FACILITY_TYPE_COUNTS,
+        get_facilities_by_city,
+        get_facilities_by_type,
+        get_facility_count,
+    )
+
+    if city:
+        facilities = get_facilities_by_city(city)
+    elif facility_type:
+        facilities = get_facilities_by_type(facility_type)
+    else:
+        facilities = list(ALL_FACILITIES)
+
+    return {
+        "total": len(facilities),
+        "total_available": get_facility_count(),
+        "facility_type_counts": FACILITY_TYPE_COUNTS,
+        "facilities": facilities,
+    }
+
+
 @app.get("/api/seasonal-factors")
 async def get_seasonal_factors(sim_day: Optional[int] = None):
     """
