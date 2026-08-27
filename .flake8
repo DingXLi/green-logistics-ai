@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 127
+max-complexity = 10
+exclude =
+    venv/
+    .git/
+    data/__pycache__/
+    agents/__pycache__/
+    optimization/__pycache__/
+    synthetic/__pycache__/
+    web/backend/__pycache__/
+    tests/__pycache__/
+    build/
+    dist/
+    node_modules/
+extend-ignore =
+    E203,
+    W503,

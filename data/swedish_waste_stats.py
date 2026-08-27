@@ -152,9 +152,7 @@ def get_baseline_demand_tons_per_day(
 
     # iter #6: industry 校正 — 不同城市/不同 material 有不同倍数
     # 1. 城市自身 per_capita_waste_kg vs national per_capita_kg
-    national_per_capita = base["per_capita_kg"]  # kg/人/年 (本 material)
     city_per_capita = city_p["per_capita_waste_kg"]  # kg/人/年 (全部废料)
-    # 用 city per_capita / national per_capita 作为校正因子
     # (city_per_capita 包含所有 material, 用 national average ≈ 350 kg 作为基准)
     NATIONAL_AVG_PER_CAPITA = 350  # kg/人/年, 所有 material 加权平均
     per_capita_correction = city_per_capita / NATIONAL_AVG_PER_CAPITA

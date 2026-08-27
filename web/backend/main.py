@@ -487,7 +487,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时停掉 scheduler"""
-    global scheduler
+    global scheduler  # noqa: F824 (声明全局, 虽然只读)
     if scheduler is not None:
         logger.info("正在停止 Scheduler...")
         await scheduler.stop()
