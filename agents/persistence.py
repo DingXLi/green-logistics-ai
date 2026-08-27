@@ -582,3 +582,82 @@ class Persistence:
             except Exception:
                 base["llm_decisions"] = {}
             return base
+
+    def get_efficiency_metrics(self) -> Dict[str, Any]:
+        """
+        效率指标 (iter #7) — 从 optimization_cycles 聚合 cost/CO2/util 的 "per ton" 比率。
+
+        用于:
+        - Dashboard 顶部 KPI (cost per ton SEK / co2 per ton kg / avg fleet util)
+        - 长期趋势分析
+        - ROI 报告 (每吨废料省多少 SEK / 减排多少 CO2)
+
+        返回:
+            n_cycles, total_tons, total_cost_sek, total_co2_kg
+            cost_per_ton_sek, co2_per_ton_kg, avg_fleet_util_pct
+            min_sim_day, max_sim_day, cycles_with_matches
+            avg_tons_per_cycle, avg_cost_per_cycle, avg_co2_per_cycle
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) as n_cycles,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_cost_sek) as total_cost_sek,
+                          SUM(total_co2_kg) as total_co2_kg,
+                          AVG(fleet_utilization_pct) as avg_fleet_util_pct,
+                          MIN(sim_day) as min_sim_day,
+                          MAX(sim_day) as max_sim_day,
+                          SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as cycles_with_matches,
+                          AVG(total_tons) as avg_tons_per_cycle,
+                          AVG(total_cost_sek) as avg_cost_per_cycle,
+                          AVG(total_co2_kg) as avg_co2_per_cycle
+                   FROM optimization_cycles"""
+            ).fetchone()
+
+            result = dict(row) if row else {}
+            # SQLite SUM/AVG 返回 None 在空表上 → 设为 0.0
+            for k in ("total_tons", "total_cost_sek", "total_co2_kg",
+                      "avg_tons_per_cycle", "avg_cost_per_cycle", "avg_co2_per_cycle"):
+                if result.get(k) is None:
+                    result[k] = 0.0
+
+        # 防御性 defaults
+        for k, v in {
+            "n_cycles": 0,
+            "total_tons": 0.0,
+            "total_cost_sek": 0.0,
+            "total_co2_kg": 0.0,
+            "avg_fleet_util_pct": None,
+            "min_sim_day": None,
+            "max_sim_day": None,
+            "cycles_with_matches": 0,
+            "avg_tons_per_cycle": None,
+            "avg_cost_per_cycle": None,
+            "avg_co2_per_cycle": None,
+        }.items():
+            result.setdefault(k, v)
+
+        # 衍生指标: cost/co2 per ton (避免除零)
+        tons = result["total_tons"] or 0.0
+        result["cost_per_ton_sek"] = (
+            round(result["total_cost_sek"] / tons, 2) if tons > 0 else None
+        )
+        result["co2_per_ton_kg"] = (
+            round(result["total_co2_kg"] / tons, 2) if tons > 0 else None
+        )
+
+        # round 浮点数便于前端展示
+        for k in ("total_tons", "total_cost_sek", "total_co2_kg",
+                  "avg_tons_per_cycle", "avg_cost_per_cycle", "avg_co2_per_cycle"):
+            if result.get(k) is not None:
+                result[k] = round(result[k], 2)
+        if result.get("avg_fleet_util_pct") is not None:
+            result["avg_fleet_util_pct"] = round(result["avg_fleet_util_pct"], 2)
+
+        # match_rate: 有 match 的 cycle 占总 cycle 的比例
+        n = result["n_cycles"] or 0
+        result["match_rate_pct"] = (
+            round(100.0 * result["cycles_with_matches"] / n, 1) if n > 0 else None
+        )
+
+        return result

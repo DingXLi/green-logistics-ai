@@ -1314,6 +1314,29 @@ async def get_persistence_summary():
     return coordinator.persistence.get_summary()
 
 
+@app.get("/api/persistence/efficiency-metrics")
+async def get_persistence_efficiency_metrics():
+    """
+    效率指标 (iter #7) — 从 optimization_cycles 聚合的 "per ton" 比率。
+
+    用途:
+    - Dashboard 顶部 KPI (cost/CO2 per ton)
+    - 长期 ROI 报告
+    - Trend tracking (每月 per-ton 比率变化)
+
+    返回:
+    - n_cycles, total_tons, total_cost_sek, total_co2_kg
+    - cost_per_ton_sek, co2_per_ton_kg (核心指标)
+    - avg_fleet_util_pct, match_rate_pct (效率指标)
+    - avg_tons_per_cycle, avg_cost_per_cycle, avg_co2_per_cycle
+    - min_sim_day, max_sim_day (时间范围)
+    - cycles_with_matches (有 match 的 cycle 数)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_efficiency_metrics()
+
+
 # ============================================
 # V2 新增：调度器状态端点 (Task A)
 # ============================================
