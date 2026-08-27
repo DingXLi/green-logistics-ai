@@ -127,3 +127,68 @@ class TestGetBaseline:
         lo10, hi10 = get_realistic_range("concrete", "Borås", 6, jitter_pct=0.1)
         # 50% jitter 的 range 应比 10% 大
         assert (hi50 - lo50) > (hi10 - lo10)
+
+
+class TestMaterialsAPI:
+    """iter #9 — /api/materials endpoint"""
+
+    def test_endpoint_returns_known_materials(self):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+        client = TestClient(backend_main.app)
+        r = client.get("/api/materials")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["n_materials"] >= 6
+        materials = {m["material"] for m in data["materials"]}
+        assert "concrete" in materials
+        assert "metal_scrap" in materials
+        assert "wood_waste" in materials
+        assert "plastic" in materials
+        assert "paper_cardboard" in materials
+        assert "mixed_waste" in materials
+
+    def test_each_material_has_required_fields(self):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+        client = TestClient(backend_main.app)
+        r = client.get("/api/materials")
+        data = r.json()
+        for m in data["materials"]:
+            assert "material" in m
+            assert "total_kt_per_year" in m
+            assert "per_capita_kg" in m
+            assert "source" in m
+            assert "seasonal_factor_min" in m
+            assert "seasonal_factor_max" in m
+            assert "seasonal_pattern" in m
+
+    def test_seasonal_pattern_classification(self):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+        client = TestClient(backend_main.app)
+        r = client.get("/api/materials")
+        data = r.json()
+        for m in data["materials"]:
+            # pattern 应该是合法值
+            assert m["seasonal_pattern"] in ("summer_peak", "stable", "winter_peak", "unknown"), \
+                f"bad pattern for {m['material']}: {m['seasonal_pattern']}"
+            # concrete 应该是 summer_peak
+            if m["material"] == "concrete":
+                assert m["seasonal_pattern"] == "summer_peak"
+            # metal_scrap 应该是 stable
+            if m["material"] == "metal_scrap":
+                assert m["seasonal_pattern"] == "stable"
+
+    def test_seasonal_factor_range_valid(self):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+        client = TestClient(backend_main.app)
+        r = client.get("/api/materials")
+        data = r.json()
+        for m in data["materials"]:
+            assert m["seasonal_factor_min"] is not None
+            assert m["seasonal_factor_max"] is not None
+            assert m["seasonal_factor_min"] <= m["seasonal_factor_max"]
+            assert 0.3 <= m["seasonal_factor_min"] <= 1.5
+            assert 0.5 <= m["seasonal_factor_max"] <= 2.0

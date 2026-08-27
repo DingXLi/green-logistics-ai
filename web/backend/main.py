@@ -1444,6 +1444,60 @@ async def get_monthly_efficiency_trend():
     return coordinator.persistence.get_monthly_efficiency_trend()
 
 
+@app.get("/api/materials")
+async def get_materials():
+    """
+    Materials 元数据 (iter #9) — 返回 system 支持的所有废料 material 类型。
+
+    包含:
+    - material name (concrete, metal_scrap, wood_waste, mixed_waste, plastic, paper_cardboard)
+    - total_kt_per_year (Sweden 全国年废料产量)
+    - per_capita_kg (人均年废料)
+    - source (数据来源: SCB / Avfall Sverige / Eurostat)
+    - seasonal_factor_min, max, peak_month (季节因子范围)
+    - seasonal_pattern: 'summer_peak' / 'stable' / 'winter_peak' (自动分类)
+
+    用途: Dashboard 显示 system 支持哪些 material + 数据来源.
+    """
+    from data.swedish_waste_stats import SWEDEN_WASTE_BASELINES, SEASONAL_FACTORS
+
+    result = []
+    for material, baseline in SWEDEN_WASTE_BASELINES.items():
+        factors = SEASONAL_FACTORS.get(material, {})
+        if factors:
+            fmin = min(factors.values())
+            fmax = max(factors.values())
+            peak_month = max(factors, key=factors.get)
+            # 自动分类 pattern
+            if fmax > 1.2 and peak_month in (5, 6, 7, 8, 9):
+                pattern = "summer_peak"  # 建筑废料型
+            elif fmax > 1.05 and peak_month in (11, 12, 1, 2):
+                pattern = "winter_peak"
+            else:
+                pattern = "stable"
+        else:
+            fmin = fmax = None
+            peak_month = None
+            pattern = "unknown"
+
+        result.append({
+            "material": material,
+            "total_kt_per_year": baseline.get("total_kt_per_year"),
+            "per_capita_kg": baseline.get("per_capita_kg"),
+            "source": baseline.get("source"),
+            "seasonal_factor_min": fmin,
+            "seasonal_factor_max": fmax,
+            "seasonal_peak_month": peak_month,
+            "seasonal_pattern": pattern,
+        })
+
+    return {
+        "n_materials": len(result),
+        "materials": result,
+        "data_source": "data/swedish_waste_stats.py (SCB + Avfall Sverige + Eurostat)",
+    }
+
+
 # ============================================
 # V2 新增：调度器状态端点 (Task A)
 # ============================================
