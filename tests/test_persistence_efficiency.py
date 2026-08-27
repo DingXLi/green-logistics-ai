@@ -386,3 +386,87 @@ class TestMonthlyEfficiencyIntegration:
         winter = next(r for r in result if r["seasonal_month"] == 1)
         assert summer["cost_per_ton_sek"] == 4.0  # 400/100
         assert winter["cost_per_ton_sek"] == 6.0  # 600/100
+
+
+class TestFleetTimeseries:
+    """iter #9 — get_fleet_timeseries + /api/persistence/fleet-timeseries"""
+
+    def test_empty_db_returns_empty_list(self, temp_db):
+        p = Persistence(temp_db)
+        result = p.get_fleet_timeseries()
+        assert result == []
+
+    def test_single_day(self, temp_db):
+        _make_cycle(
+            temp_db, sim_day=5, total_tons=100.0, total_cost_sek=500.0,
+            total_co2_kg=200.0, n_matches=4, fleet_util_pct=75.0,
+        )
+        p = Persistence(temp_db)
+        result = p.get_fleet_timeseries()
+        assert len(result) == 1
+        r = result[0]
+        assert r["sim_day"] == 5
+        assert r["n_matches"] == 4
+        assert r["total_tons"] == 100.0
+        assert r["fleet_utilization_pct"] == 75.0
+
+    def test_multiple_days_sorted_ascending(self, temp_db):
+        _make_cycle(temp_db, sim_day=10, n_matches=3, total_tons=80.0, fleet_util_pct=60.0)
+        _make_cycle(temp_db, sim_day=5, n_matches=2, total_tons=50.0, fleet_util_pct=40.0)
+        _make_cycle(temp_db, sim_day=15, n_matches=5, total_tons=150.0, fleet_util_pct=80.0)
+
+        p = Persistence(temp_db)
+        result = p.get_fleet_timeseries()
+        assert [r["sim_day"] for r in result] == [5, 10, 15]
+        # n_matches 应是每个 sim_day 的聚合
+        assert [r["n_matches"] for r in result] == [2, 3, 5]
+
+    def test_returns_required_fields(self, temp_db):
+        _make_cycle(temp_db, sim_day=1, n_matches=2, total_tons=10.0)
+        p = Persistence(temp_db)
+        result = p.get_fleet_timeseries()
+        r = result[0]
+        for field in ("sim_day", "n_vehicles_used", "n_vehicles_available",
+                      "fleet_utilization_pct", "total_distance_km",
+                      "n_matches", "total_tons"):
+            assert field in r, f"missing field: {field}"
+
+    def test_endpoint_returns_200(self, temp_db):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+
+        _make_cycle(temp_db, sim_day=1, n_matches=1, total_tons=10.0, fleet_util_pct=50.0)
+
+        orig_coord = backend_main.coordinator
+        try:
+            class FakeCoord:
+                pass
+            fake = FakeCoord()
+            fake.persistence = Persistence(temp_db)
+            backend_main.coordinator = fake
+
+            client = TestClient(backend_main.app)
+            r = client.get("/api/persistence/fleet-timeseries")
+            assert r.status_code == 200
+            data = r.json()
+            assert isinstance(data, list)
+            assert len(data) == 1
+            assert data[0]["fleet_utilization_pct"] == 50.0
+        finally:
+            backend_main.coordinator = orig_coord
+
+    def test_endpoint_503_no_persistence(self):
+        from fastapi.testclient import TestClient
+        from web.backend import main as backend_main
+
+        orig_coord = backend_main.coordinator
+        try:
+            class FakeCoord:
+                persistence = None
+            backend_main.coordinator = FakeCoord()
+
+            client = TestClient(backend_main.app)
+            r = client.get("/api/persistence/fleet-timeseries")
+            assert r.status_code == 503
+        finally:
+            backend_main.coordinator = orig_coord

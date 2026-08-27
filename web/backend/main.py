@@ -1368,6 +1368,22 @@ async def get_kpi_timeseries():
     return coordinator.persistence.get_kpi_timeseries()
 
 
+@app.get("/api/persistence/fleet-timeseries")
+async def get_fleet_timeseries():
+    """
+    Fleet 时间序列 (iter #9) — 按 sim_day 聚合 fleet 指标。
+
+    返回: sim_day → {sim_day, n_vehicles_used, n_vehicles_available,
+                     fleet_utilization_pct, total_distance_km,
+                     n_matches, total_tons}
+
+    用途: Dashboard fleet trend 图, 分析调度模式。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_fleet_timeseries()
+
+
 @app.get("/api/persistence/seasonal-timeseries")
 async def get_seasonal_timeseries():
     """按月份聚合的 KPI + seasonal_factor (iter #4)。

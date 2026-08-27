@@ -517,6 +517,51 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_fleet_timeseries(self) -> List[Dict[str, Any]]:
+        """
+        Fleet 时间序列 (iter #9) — 按 sim_day 聚合 fleet 指标。
+
+        返回:
+            sim_day → {sim_day, n_vehicles_used, n_vehicles_available,
+                       fleet_utilization_pct, total_distance_km,
+                       n_matches, total_tons}
+
+        用途:
+        - Dashboard fleet trend 图 (utilization 趋势 / 车队使用率)
+        - 分析调度模式 (高峰/低谷 sim_day)
+        - 长期车队 ROI (util 与 cost 关系)
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT sim_day,
+                          SUM(n_vehicles_used) as n_vehicles_used,
+                          SUM(n_vehicles_available) as n_vehicles_available,
+                          AVG(fleet_utilization_pct) as fleet_utilization_pct,
+                          SUM(total_distance_km) as total_distance_km,
+                          SUM(n_matches) as n_matches,
+                          SUM(total_tons) as total_tons
+                   FROM optimization_cycles
+                   GROUP BY sim_day
+                   ORDER BY sim_day ASC"""
+            ).fetchall()
+
+        result = []
+        for row in rows:
+            r = dict(row)
+            # round 数字
+            if r.get("fleet_utilization_pct") is not None:
+                r["fleet_utilization_pct"] = round(r["fleet_utilization_pct"], 2)
+            if r.get("total_distance_km") is not None:
+                r["total_distance_km"] = round(r["total_distance_km"], 2)
+            # 防御性 defaults
+            r.setdefault("n_vehicles_used", 0)
+            r.setdefault("n_vehicles_available", 0)
+            r.setdefault("total_distance_km", 0.0)
+            r.setdefault("n_matches", 0)
+            r.setdefault("total_tons", 0.0)
+            result.append(r)
+        return result
+
     def get_seasonal_timeseries(self) -> List[Dict[str, Any]]:
         """按月份聚合的 KPI + seasonal_factor (iter #4)
 
