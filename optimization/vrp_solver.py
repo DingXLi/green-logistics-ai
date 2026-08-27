@@ -393,6 +393,11 @@ class VRPSolver:
                 })
 
         logger.info(f"Pareto 前沿计算完成：{len(pareto)} 个点")
+        # 把 distance_source 从最后一个 snap 传回 self (用于 API response)
+        # snap._distance_source 在第一个 _ensure_distance_matrix 调用后被设置,
+        # 如果 caller 直接读 self.distance_source 会得到 None (因为 self 未调用过)
+        if pareto and pareto[0].get("distance_source") not in (None, "unknown"):
+            self._distance_source = pareto[0]["distance_source"]
         return pareto
     
     def _extract_solution(

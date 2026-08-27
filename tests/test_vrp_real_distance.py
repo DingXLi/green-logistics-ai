@@ -163,6 +163,26 @@ class TestSolveDistanceSource:
         for p in pareto:
             assert "distance_source" in p
 
+    def test_solve_pareto_propagates_distance_source_to_self(
+        self, borås_depot, borås_pickup_delivery, one_vehicle,
+    ):
+        """iter #7 bug fix: solve_pareto 后 self.distance_source 应被设置 (caller 可读)。
+
+        之前 self.distance_source 仍是 None 因为 solve_pareto 用 _snapshot() 创建
+        独立 solver, distance_source 只在 snap 上被设。
+        """
+        pickup, delivery = borås_pickup_delivery
+        s = VRPSolver(use_real_roads=False)
+        s.add_location(borås_depot)
+        s.add_location(pickup)
+        s.add_location(delivery)
+        s.add_vehicle(one_vehicle)
+
+        assert s.distance_source is None
+        s.solve_pareto(n_points=3, time_limit_seconds=3)
+        # 调用后 self.distance_source 应被设置 (从 pareto[0] 复制)
+        assert s.distance_source == "haversine"
+
 
 # ============================================================
 # _snapshot 复制新参数
