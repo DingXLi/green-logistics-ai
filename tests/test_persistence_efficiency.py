@@ -346,3 +346,43 @@ class TestMonthlyEfficiencyTrendAPI:
             assert r.status_code == 503
         finally:
             backend_main.coordinator = orig_coord
+
+
+class TestMonthlyEfficiencyIntegration:
+    """iter #9 — 验证 monthly-efficiency-trend 与前端集成兼容"""
+
+    def test_returns_array_consumable_by_recharts(self, temp_db):
+        """返回 schema 必须兼容 Recharts (array of dict with numeric fields)"""
+        _make_cycle(temp_db, sim_day=180, total_tons=200.0, total_cost_sek=1000.0,
+                    total_co2_kg=400.0, n_matches=5, seasonal_month=6,
+                    seasonal_factor_avg=1.4)
+
+        p = Persistence(temp_db)
+        result = p.get_monthly_efficiency_trend()
+        assert isinstance(result, list)
+        assert len(result) >= 1
+        r = result[0]
+        # Recharts 需要数字字段
+        assert isinstance(r["seasonal_month"], int)
+        assert isinstance(r["n_cycles"], int)
+        assert isinstance(r["cost_per_ton_sek"], (int, float))
+        assert isinstance(r["co2_per_ton_kg"], (int, float))
+
+    def test_summer_vs_winter_differentiation(self, temp_db):
+        """Summer months (6,7,8) 应出现在结果中; winter (12,1,2) 也应支持"""
+        _make_cycle(temp_db, sim_day=180, total_tons=100.0, total_cost_sek=400.0,
+                    total_co2_kg=200.0, seasonal_month=7, n_matches=5)
+        _make_cycle(temp_db, sim_day=10, total_tons=100.0, total_cost_sek=600.0,
+                    total_co2_kg=300.0, seasonal_month=1, n_matches=5)
+
+        p = Persistence(temp_db)
+        result = p.get_monthly_efficiency_trend()
+        # 验证两个月份都有
+        months = [r["seasonal_month"] for r in result]
+        assert 7 in months  # summer
+        assert 1 in months  # winter
+        # Summer cost_per_ton 应 < winter (summer supply 多 → cost 低)
+        summer = next(r for r in result if r["seasonal_month"] == 7)
+        winter = next(r for r in result if r["seasonal_month"] == 1)
+        assert summer["cost_per_ton_sek"] == 4.0  # 400/100
+        assert winter["cost_per_ton_sek"] == 6.0  # 600/100
