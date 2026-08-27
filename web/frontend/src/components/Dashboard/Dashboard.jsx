@@ -183,7 +183,36 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('overview')  // 'overview' | 'scenarios' | 'network'
+  const [activeTab, setActiveTabRaw] = useState(() => {
+    // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (['overview', 'scenarios', 'network'].includes(hash)) {
+        return hash;
+      }
+    }
+    return 'overview';
+  });  // 'overview' | 'scenarios' | 'network'
+
+  // setActiveTab 同时写 URL hash, 让 tab 可分享/收藏
+  const setActiveTab = (tab) => {
+    setActiveTabRaw(tab);
+    if (typeof window !== 'undefined') {
+      window.location.hash = tab;
+    }
+  };
+
+  // 监听 hashchange (浏览器 back/forward 按钮, 外部链接)
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['overview', 'scenarios', 'network'].includes(hash)) {
+        setActiveTabRaw(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
