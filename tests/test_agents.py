@@ -843,3 +843,48 @@ class TestLogisticsAgentUseRealRoads:
         )
         # 空输入会进入 fallback 路径或返回 no_routes
         assert "status" in result or "routes" in result
+
+
+class TestOptimizeRequestFields:
+    """iter #8 — OptimizationRequest 应该接受 use_real_roads + region"""
+
+    def test_request_default_use_real_roads_true(self):
+        from web.backend.main import OptimizationRequest
+        req = OptimizationRequest()
+        assert req.use_real_roads is True
+        assert req.region is None
+
+    def test_request_accepts_use_real_roads_false(self):
+        from web.backend.main import OptimizationRequest
+        req = OptimizationRequest(use_real_roads=False)
+        assert req.use_real_roads is False
+
+    def test_request_accepts_custom_region(self):
+        from web.backend.main import OptimizationRequest
+        req = OptimizationRequest(region="Göteborg, Sweden")
+        assert req.region == "Göteborg, Sweden"
+
+    def test_response_default_distance_source_none(self):
+        from web.backend.main import OptimizationResponse
+        resp = OptimizationResponse(
+            status="success",
+            timestamp="2026-08-27T10:00:00",
+            matches_count=3,
+            total_tons=10.0,
+            total_cost_sek=500.0,
+            total_co2_kg=200.0,
+        )
+        assert resp.distance_source is None
+
+    def test_response_with_distance_source(self):
+        from web.backend.main import OptimizationResponse
+        resp = OptimizationResponse(
+            status="success",
+            timestamp="2026-08-27T10:00:00",
+            matches_count=3,
+            total_tons=10.0,
+            total_cost_sek=500.0,
+            total_co2_kg=200.0,
+            distance_source="osm",
+        )
+        assert resp.distance_source == "osm"

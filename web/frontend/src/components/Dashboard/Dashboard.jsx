@@ -196,6 +196,8 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
   // iter #7: 记录最近一次 /optimize/pareto 响应的 distance_source, 顶部提示
   const [paretoMeta, setParetoMeta] = useState({ distance_source: null, use_real_roads: true })
+  // iter #8: 用户可控制 use_real_roads (toggle) — 重置后 refetch pareto
+  const [useRealRoads, setUseRealRoads] = useState(true)
   // iter #7: 从 WS 推送拿 efficiency summary (cost/CO2 per ton)
   const [wsEfficiency, setWsEfficiency] = useState(null)
   const [activeTab, setActiveTabRaw] = useState(() => {
@@ -255,7 +257,7 @@ export default function Dashboard() {
       console.error('Dashboard fetch failed:', e)
       setError(e.message)
     }
-  }, [])
+  }, [useRealRoads])
 
   // WebSocket: 实时接收 cycle_update → 主动刷新数据
   const handleWsMessage = useCallback((msg) => {
@@ -323,6 +325,15 @@ export default function Dashboard() {
               {wsEfficiency.co2_per_ton_kg != null ? `${wsEfficiency.co2_per_ton_kg.toFixed(2)} kgCO₂/t` : '—'}
             </span>
           )}
+          {/* iter #8: 用户可控制 use_real_roads (toggle) */}
+          <label className="roads-toggle" title="Use OSM real road distances (off = Haversine only, faster but less accurate)">
+            <input
+              type="checkbox"
+              checked={useRealRoads}
+              onChange={e => setUseRealRoads(e.target.checked)}
+            />
+            🛣️ Real Roads
+          </label>
           <label className="auto-refresh">
             <input
               type="checkbox"
