@@ -31,6 +31,7 @@ const CarbonScenarios = lazy(() => import('./CarbonScenarios').then(m => ({ defa
 const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ default: m.FacilitiesList })))
 const MonthlyEfficiencyChart = lazy(() => import('./MonthlyEfficiencyChart').then(m => ({ default: m.MonthlyEfficiencyChart })))
 const FleetUtilizationChart = lazy(() => import('./FleetUtilizationChart').then(m => ({ default: m.FleetUtilizationChart })))
+const MaterialsOverview = lazy(() => import('./MaterialsOverview').then(m => ({ default: m.MaterialsOverview })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -421,6 +422,11 @@ export default function Dashboard() {
           {/* iter #9: Fleet utilization trend chart */}
           <Suspense fallback={<LoadingSpinner label="Loading fleet chart…" />}>
             <FleetUtilizationChart />
+          </Suspense>
+
+          {/* iter #10: Materials overview grid */}
+          <Suspense fallback={<LoadingSpinner label="Loading materials…" />}>
+            <MaterialsOverview />
           </Suspense>
         </>
       )}
