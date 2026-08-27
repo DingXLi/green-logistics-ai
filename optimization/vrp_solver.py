@@ -51,15 +51,29 @@ class Vehicle:
 class VRPSolver:
     """
     VRP 求解器
-    
-    使用 OR-Tools 的约束求解器
+
+    使用 OR-Tools 的约束求解器。
+
+    距离矩阵策略 (iter #7 升级):
+    - 默认 use_real_roads=True → OSM 真实路网 via real_distance.build_distance_matrix
+    - 失败/超时/无网络 → 自动 fallback Haversine, 不会抛异常
+    - _distance_source 记录实际使用的 source ("osm" / "haversine" / "preset")
     """
-    
-    def __init__(self):
+
+    def __init__(
+        self,
+        use_real_roads: bool = True,
+        region: str = "Borås, Sweden",
+        distance_timeout_s: int = 30,
+    ):
         self.locations: List[Location] = []
         self.vehicles: List[Vehicle] = []
         self.distance_matrix: np.ndarray = None
         self.cost_matrix: np.ndarray = None
+        self.use_real_roads = use_real_roads
+        self.region = region
+        self.distance_timeout_s = distance_timeout_s
+        self._distance_source: Optional[str] = None  # "osm" / "haversine" / "preset"
     
     def add_location(self, location: Location):
         """添加位置节点"""
@@ -81,13 +95,13 @@ class VRPSolver:
     
     def _calculate_distance_matrix_haversine(self) -> np.ndarray:
         """
-        使用 Haversine 公式计算距离矩阵
-        
-        TODO: 替换为实际道路距离（使用 OSM）
+        使用 Haversine 公式计算距离矩阵 (iter #7: 现作为 fallback, 默认走 OSM)。
+
+        详见 _ensure_distance_matrix()。
         """
         n = len(self.locations)
         matrix = np.zeros((n, n))
-        
+
         for i in range(n):
             for j in range(n):
                 if i != j:
@@ -95,8 +109,61 @@ class VRPSolver:
                         self.locations[i].lat, self.locations[i].lon,
                         self.locations[j].lat, self.locations[j].lon
                     )
-        
+
         return matrix
+
+    def _calculate_distance_matrix_real(self) -> np.ndarray:
+        """
+        使用 OSM 真实路网算距离矩阵 (via optimization.real_distance)。
+
+        失败/超时 → 自动 fallback Haversine, _distance_source 标记。
+        """
+        from optimization.real_distance import build_distance_matrix
+
+        locs = [(loc.lat, loc.lon) for loc in self.locations]
+        if len(locs) < 2:
+            self._distance_source = "trivial"
+            return np.zeros((len(locs), len(locs)))
+
+        try:
+            matrix, source = build_distance_matrix(
+                locs,
+                region=self.region,
+                timeout_s=self.distance_timeout_s,
+                prefer_real_roads=True,
+            )
+            self._distance_source = source
+            logger.info(
+                f"VRPSolver 距离矩阵: source={source} region={self.region!r} "
+                f"n={len(locs)} timeout={self.distance_timeout_s}s"
+            )
+            return matrix
+        except Exception as e:
+            logger.warning(
+                f"VRPSolver OSM 距离失败 ({e}) → fallback Haversine"
+            )
+            self._distance_source = "haversine"
+            return self._calculate_distance_matrix_haversine()
+
+    def _ensure_distance_matrix(self) -> None:
+        """
+        如果 distance_matrix 未设置,根据 use_real_roads 选择 real OSM 或 Haversine。
+        优先级: caller-set matrix > OSM > Haversine。
+        """
+        if self.distance_matrix is not None:
+            self._distance_source = "preset"
+            return
+
+        if self.use_real_roads:
+            self.distance_matrix = self._calculate_distance_matrix_real()
+        else:
+            self.distance_matrix = self._calculate_distance_matrix_haversine()
+            self._distance_source = "haversine"
+
+    @property
+    def distance_source(self) -> Optional[str]:
+        """暴露 _distance_source (caller 可读)."""
+        return self._distance_source
     
     @staticmethod
     def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -148,7 +215,7 @@ class VRPSolver:
             )
 
         if self.distance_matrix is None:
-            self.distance_matrix = self._calculate_distance_matrix_haversine()
+            self._ensure_distance_matrix()
 
         n = len(self.locations)
         num_vehicles = len(self.vehicles)
@@ -262,6 +329,10 @@ class VRPSolver:
             if self.cost_matrix is not None
             else None
         )
+        new_solver.use_real_roads = self.use_real_roads
+        new_solver.region = self.region
+        new_solver.distance_timeout_s = self.distance_timeout_s
+        new_solver._distance_source = self._distance_source
         return new_solver
 
     def solve_pareto(
@@ -302,6 +373,7 @@ class VRPSolver:
                     "total_distance_km": result["total_distance_km"],
                     "routes": result["routes"],
                     "status": result["status"],
+                    "distance_source": result.get("distance_source", "unknown"),
                 })
             else:
                 logger.warning(
@@ -317,6 +389,7 @@ class VRPSolver:
                     "total_distance_km": None,
                     "routes": [],
                     "status": result.get("status", "unknown"),
+                    "distance_source": result.get("distance_source", "unknown"),
                 })
 
         logger.info(f"Pareto 前沿计算完成：{len(pareto)} 个点")
@@ -421,6 +494,8 @@ class VRPSolver:
             "cost_weight": cost_weight,
             "co2_weight": co2_weight,
             "co2_price_sek_per_kg": co2_price,
+            "distance_source": self._distance_source or "unknown",
+            "use_real_roads": self.use_real_roads,
         }
     
     def _solve_fallback(
@@ -437,7 +512,7 @@ class VRPSolver:
         logger.warning("使用回退求解器（最近邻启发式）")
 
         if self.distance_matrix is None:
-            self.distance_matrix = self._calculate_distance_matrix_haversine()
+            self._ensure_distance_matrix()
 
         routes = []
         total_distance = 0.0
@@ -515,6 +590,8 @@ class VRPSolver:
             "cost_weight": cost_weight,
             "co2_weight": co2_weight,
             "co2_price_sek_per_kg": co2_price,
+            "distance_source": self._distance_source or "unknown",
+            "use_real_roads": self.use_real_roads,
         }
 
 
