@@ -892,12 +892,19 @@ async def get_last_optimization():
 # V3: Pareto 前沿端点
 # ============================================
 @app.get("/api/optimize/pareto")
-async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
+async def get_pareto_front(
+    n_points: int = 10,
+    time_limit_seconds: int = 5,
+    use_real_roads: bool = True,
+    region: Optional[str] = None,
+):
     """
     返回多目标 (cost vs CO2) Pareto 前沿
 
     - n_points: 扫描权重点数 (2..20)
     - time_limit_seconds: 每个点的 OR-Tools 时限
+    - use_real_roads: bool = True (iter #7, OSM 真实路网 vs Haversine)
+    - region: OSM 地区名 (default: coordinator 推断 / 'Borås, Sweden')
 
     用 coordinator 当前世界的 supply/demand/vehicle 状态构建 VRPSolver。
     """
@@ -1008,7 +1015,10 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         }
 
     # 构建 solver 并扫描 Pareto
-    solver = VRPSolver()
+    solver_kwargs = {"use_real_roads": use_real_roads}
+    if region:
+        solver_kwargs["region"] = region
+    solver = VRPSolver(**solver_kwargs)
     solver.add_location(depot)
     for loc in pickup_locations:
         solver.add_location(Location(
@@ -1049,6 +1059,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
             "total_distance_km": p["total_distance_km"],
             "n_routes": len(p["routes"]),
             "status": p["status"],
+            "distance_source": p.get("distance_source", "unknown"),
         })
 
     return {
@@ -1057,6 +1068,8 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
         "n_deliveries": len(delivery_locations),
         "n_vehicles": len(vehicles_data),
         "pareto": summary,
+        "distance_source": solver.distance_source,
+        "use_real_roads": solver.use_real_roads,
     }
 
 
@@ -1064,6 +1077,7 @@ async def get_pareto_front(n_points: int = 10, time_limit_seconds: int = 5):
 async def get_carbon_scenarios(
     carbon_prices: Optional[str] = None,
     time_limit_seconds: int = 3,
+    use_real_roads: bool = True,
 ):
     """
     碳税情景分析：跑多个碳价下的 Pareto 前沿。
@@ -1156,7 +1170,7 @@ async def get_carbon_scenarios(
         return {"scenarios": [], "reason": "No vehicles available"}
 
     def _build_solver() -> VRPSolver:
-        solver = VRPSolver()
+        solver = VRPSolver(use_real_roads=use_real_roads)
         solver.add_location(depot)
         for loc in pickup_locations:
             solver.add_location(Location(
@@ -1221,6 +1235,7 @@ async def get_carbon_scenarios(
         "n_deliveries": len(delivery_locations),
         "n_vehicles": len(vehicles_data),
         "scenarios": scenarios,
+        "use_real_roads": use_real_roads,
     }
 
 
