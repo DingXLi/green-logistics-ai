@@ -196,6 +196,8 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
   // iter #7: 记录最近一次 /optimize/pareto 响应的 distance_source, 顶部提示
   const [paretoMeta, setParetoMeta] = useState({ distance_source: null, use_real_roads: true })
+  // iter #7: 从 WS 推送拿 efficiency summary (cost/CO2 per ton)
+  const [wsEfficiency, setWsEfficiency] = useState(null)
   const [activeTab, setActiveTabRaw] = useState(() => {
     // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
     if (typeof window !== 'undefined') {
@@ -260,6 +262,10 @@ export default function Dashboard() {
     if (msg?.type === 'cycle_update') {
       // 后端告知有新的 cycle 完成, 主动重新拉数据
       fetchAll()
+      // iter #7: 直接用 WS 推送的 efficiency summary, 不需要额外 fetch
+      if (msg.data?.efficiency) {
+        setWsEfficiency(msg.data.efficiency)
+      }
     }
   }, [fetchAll])
   const { lastMessage: wsMessage, connected: wsConnected } = useWebSocket(
@@ -307,6 +313,14 @@ export default function Dashboard() {
               title={`VRP uses ${paretoMeta.use_real_roads ? 'real OSM roads (fallback to Haversine on error)' : 'Haversine only'}`}
             >
               🛣️ {paretoMeta.distance_source === 'osm' ? 'OSM' : paretoMeta.distance_source === 'haversine' ? 'Haversine' : paretoMeta.distance_source}
+            </span>
+          )}
+          {/* iter #7: WS 推送的运行 efficiency (cost/CO2 per ton) */}
+          {wsEfficiency && wsEfficiency.n_cycles > 0 && (
+            <span className="ws-efficiency-badge" title="Live efficiency from WebSocket (auto-updated)">
+              📊 {wsEfficiency.cost_per_ton_sek != null ? `${wsEfficiency.cost_per_ton_sek.toFixed(1)} SEK/t` : '—'}
+              {' · '}
+              {wsEfficiency.co2_per_ton_kg != null ? `${wsEfficiency.co2_per_ton_kg.toFixed(2)} kgCO₂/t` : '—'}
             </span>
           )}
           <label className="auto-refresh">

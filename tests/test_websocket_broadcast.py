@@ -136,3 +136,116 @@ def test_websocket_endpoint_stats_increases_on_connect():
         time.sleep(0.5)
         after = client.get("/api/ws/stats").json()["connected_clients"]
         assert after == before
+
+def test_broadcast_cycle_update_includes_efficiency_field():
+    """iter #7: _broadcast_cycle_update 应附带 efficiency summary (cost/co2 per ton)。
+
+    前端 Dashboard 顶部可以直接读 wsMessage.data.efficiency 显示运行 KPI,
+    不需要额外 fetch /api/persistence/efficiency-metrics。
+    """
+    from web.backend.main import ws_broadcaster, _broadcast_cycle_update
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.sent = []
+            self.accepted = False
+
+        async def accept(self):
+            self.accepted = True
+
+        async def send_text(self, msg):
+            import json as _json
+            self.sent.append(_json.loads(msg))
+
+    async def run_test():
+        ws = FakeWebSocket()
+        await ws_broadcaster.connect(ws)
+
+        # 模拟 coordinator persistence (有 1 cycle)
+        from web.backend import main as backend_main
+
+        orig_coord = backend_main.coordinator
+        try:
+            class _FakePersistence:
+                def get_efficiency_metrics(self):
+                    return {
+                        "n_cycles": 1,
+                        "total_tons": 100.0,
+                        "total_cost_sek": 500.0,
+                        "total_co2_kg": 200.0,
+                        "cost_per_ton_sek": 5.0,
+                        "co2_per_ton_kg": 2.0,
+                        "avg_fleet_util_pct": 70.0,
+                        "match_rate_pct": 100.0,
+                    }
+            class FakeCoord:
+                pass
+            fake_coord = FakeCoord()
+            fake_coord.persistence = _FakePersistence()
+            backend_main.coordinator = fake_coord
+
+            await _broadcast_cycle_update({
+                "cycle_id": "test-1",
+                "n_supply_offers": 5,
+                "n_demand_requests": 5,
+                "n_matches": 3,
+                "total_tons": 100.0,
+                "total_cost_sek": 500.0,
+                "total_co2_kg": 200.0,
+                "sim_day": 5,
+            })
+
+            assert len(ws.sent) == 1
+            payload = ws.sent[0]
+            assert payload["type"] == "cycle_update"
+            data = payload["data"]
+            assert "efficiency" in data
+            eff = data["efficiency"]
+            assert eff["n_cycles"] == 1
+            assert eff["cost_per_ton_sek"] == 5.0
+            assert eff["co2_per_ton_kg"] == 2.0
+            assert eff["avg_fleet_util_pct"] == 70.0
+            assert eff["match_rate_pct"] == 100.0
+        finally:
+            backend_main.coordinator = orig_coord
+            await ws_broadcaster.disconnect(ws)
+
+    asyncio.run(run_test())
+
+
+def test_broadcast_cycle_update_efficiency_field_empty_when_no_persistence():
+    """无 coordinator persistence → efficiency 字段为空 dict (不抛异常)。"""
+    from web.backend.main import ws_broadcaster, _broadcast_cycle_update
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.sent = []
+        async def accept(self):
+            pass
+        async def send_text(self, msg):
+            import json as _json
+            self.sent.append(_json.loads(msg))
+
+    async def run_test():
+        ws = FakeWebSocket()
+        await ws_broadcaster.connect(ws)
+
+        from web.backend import main as backend_main
+        orig_coord = backend_main.coordinator
+        try:
+            backend_main.coordinator = None  # 没 coordinator
+
+            await _broadcast_cycle_update({
+                "cycle_id": "test-1",
+                "n_matches": 0,
+                "sim_day": 1,
+            })
+
+            assert len(ws.sent) == 1
+            payload = ws.sent[0]
+            assert payload["data"]["efficiency"] == {}
+        finally:
+            backend_main.coordinator = orig_coord
+            await ws_broadcaster.disconnect(ws)
+
+    asyncio.run(run_test())

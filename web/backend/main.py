@@ -172,6 +172,23 @@ ws_broadcaster = WebSocketBroadcaster()
 
 async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
     """Coordinator 跑完 cycle 后调用，广播给所有 WS client。"""
+    # iter #7: 附带 running efficiency summary (cost/CO2 per ton),
+    # 前端可以不用额外 fetch 就直接显示在 Dashboard 顶部
+    eff_summary: Dict[str, Any] = {}
+    try:
+        if coordinator is not None and coordinator.persistence is not None:
+            eff = coordinator.persistence.get_efficiency_metrics()
+            # 只传关键字段,减小 payload
+            eff_summary = {
+                "n_cycles": eff.get("n_cycles", 0),
+                "cost_per_ton_sek": eff.get("cost_per_ton_sek"),
+                "co2_per_ton_kg": eff.get("co2_per_ton_kg"),
+                "avg_fleet_util_pct": eff.get("avg_fleet_util_pct"),
+                "match_rate_pct": eff.get("match_rate_pct"),
+            }
+    except Exception as e:
+        logger.debug(f"WS broadcast efficiency summary failed (ignore): {e}")
+
     payload = {
         "type": "cycle_update",
         "timestamp": datetime.now().isoformat(),
@@ -186,6 +203,7 @@ async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
             "total_distance_km": cycle_result.get("total_distance_km"),
             "sim_day": cycle_result.get("sim_day"),
             "sim_hour": cycle_result.get("sim_hour"),
+            "efficiency": eff_summary,
         },
     }
     try:
