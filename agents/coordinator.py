@@ -84,6 +84,9 @@ class MultiAgentCoordinator:
             },
         }
 
+        # iter #8: cache 最近一次 cycle result (供 /api/optimize/last 读 distance_source)
+        self._last_cycle_result: Optional[Dict[str, Any]] = None
+
         if auto_init_world:
             self._bootstrap_world()
 
@@ -159,7 +162,11 @@ class MultiAgentCoordinator:
     # 单周期优化（核心循环）
     # ------------------------------------------------------------
 
-    async def run_optimization_cycle(self) -> Dict[str, Any]:
+    async def run_optimization_cycle(
+        self,
+        use_real_roads: bool = True,
+        region: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         运行一次完整的优化周期（= 1 sim-day）。
 
@@ -171,6 +178,10 @@ class MultiAgentCoordinator:
         4. 匹配供需
         5. 优化物流路径
         6. 更新车辆状态 + 落盘
+
+        iter #8 新参数:
+        - use_real_roads: bool = True (VRP 走 OSM 真实路网 vs Haversine)
+        - region: OSM 地区名 (None = 从 depot_location 反推)
         """
         t_start = time.time()
 
@@ -342,6 +353,8 @@ class MultiAgentCoordinator:
             route_optimization = await self.logistics_agent.optimize_routes(
                 pickup_locations=pickup_locations,
                 delivery_locations=delivery_locations,
+                use_real_roads=use_real_roads,
+                region=region,
             )
             # 落盘 routes
             for route in route_optimization.get("routes", []):
@@ -393,6 +406,10 @@ class MultiAgentCoordinator:
             "kpi": kpi,
             "system_status": self.system_status,
             "wall_duration_ms": wall_ms,
+            # iter #8: route_optimization 的 distance_source / use_real_roads
+            # 提取出来, 供 API endpoint (/api/optimize, /api/optimize/last) 直接返回
+            "distance_source": route_optimization.get("distance_source", "unknown")
+                if isinstance(route_optimization, dict) else "unknown",
         }
 
         logger.info(
@@ -400,6 +417,8 @@ class MultiAgentCoordinator:
             f"cost={kpi['total_cost_sek']:.0f} SEK co2={kpi['total_co2_kg']:.1f}kg "
             f"({wall_ms}ms)"
         )
+        # iter #8: cache this result (供 /api/optimize/last 读 distance_source)
+        self._last_cycle_result = result
         return result
 
     # ------------------------------------------------------------

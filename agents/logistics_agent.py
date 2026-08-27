@@ -191,16 +191,32 @@ class LogisticsAgent:
     async def optimize_routes(
         self,
         pickup_locations: List[Dict[str, Any]],
-        delivery_locations: List[Dict[str, Any]]
+        delivery_locations: List[Dict[str, Any]],
+        use_real_roads: bool = True,
+        region: Optional[str] = None,
+        distance_timeout_s: int = 30,
     ) -> Dict[str, Any]:
         """
         优化多车辆路径
-        
-        集成 OR-Tools VRP 求解器
+
+        集成 OR-Tools VRP 求解器。
+
+        iter #8:
+        - use_real_roads: bool = True (走 OSM 真实路网, 失败 fallback Haversine)
+        - region: OSM 区域名 (默认从 depot_location 反推)
+        - distance_timeout_s: OSM 下载超时
+
+        返回结果额外携带:
+        - distance_source: "osm" / "haversine" / "preset" / "trivial"
+        - use_real_roads: caller 传入的标志 (用于前端显示)
         """
         from optimization.vrp_solver import VRPSolver, Location, Vehicle
-        
-        solver = VRPSolver()
+
+        solver_kwargs = {"use_real_roads": use_real_roads}
+        if region:
+            solver_kwargs["region"] = region
+        solver_kwargs["distance_timeout_s"] = distance_timeout_s
+        solver = VRPSolver(**solver_kwargs)
         
         # 添加 depot 作为起点
         depot = Location(

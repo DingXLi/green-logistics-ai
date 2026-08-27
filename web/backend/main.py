@@ -519,6 +519,9 @@ class OptimizationRequest(BaseModel):
     """优化请求"""
     run_simulation: bool = False
     simulation_days: int = 1
+    # iter #8: caller 可控制 VRP 距离 (OSM vs Haversine)
+    use_real_roads: bool = True
+    region: Optional[str] = None
 
 
 class OptimizationResponse(BaseModel):
@@ -530,6 +533,8 @@ class OptimizationResponse(BaseModel):
     total_tons: float
     total_cost_sek: float
     total_co2_kg: float
+    # iter #8: 距离 source 反馈给前端
+    distance_source: Optional[str] = None
 
 
 class FleetStatusResponse(BaseModel):
@@ -754,7 +759,13 @@ async def run_optimization(request: OptimizationRequest = None):
             results = await coordinator.simulate_day(days=request.simulation_days)
             last_result = results[-1]
         else:
-            last_result = await coordinator.run_optimization_cycle()
+            # iter #8: 传递 use_real_roads + region 到 coordinator
+            use_real_roads = request.use_real_roads if request else True
+            region = request.region if request else None
+            last_result = await coordinator.run_optimization_cycle(
+                use_real_roads=use_real_roads,
+                region=region,
+            )
         # 写 cache
         async with _optimize_cache_lock:
             _optimize_cache["last"] = {"ts": time.monotonic(), "result": last_result}
@@ -772,7 +783,8 @@ async def run_optimization(request: OptimizationRequest = None):
         matches_count=matches.get("total_matches", 0),
         total_tons=matches.get("total_tons", 0),
         total_cost_sek=routes.get("total_cost_sek", 0),
-        total_co2_kg=routes.get("total_co2_kg", 0)
+        total_co2_kg=routes.get("total_co2_kg", 0),
+        distance_source=last_result.get("distance_source"),
     )
 
 
@@ -879,12 +891,12 @@ async def get_last_optimization():
         raise HTTPException(status_code=503, detail="System not initialized")
     if coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    
+
     summary = coordinator.persistence.get_summary() or {}
     recent = coordinator.persistence.get_recent_cycles(limit=1) or []
     last_cycle = recent[0] if recent else {}
     last_ts = last_cycle.get("wall_timestamp")
-    
+
     age_seconds = None
     if last_ts:
         try:
@@ -894,7 +906,14 @@ async def get_last_optimization():
             age_seconds = round((datetime.now() - last_dt).total_seconds(), 1)
         except Exception:
             pass
-    
+
+    # iter #8: distance_source 从 coordinator 上次 cycle 拿 (in-memory cache)
+    distance_source = "unknown"
+    if hasattr(coordinator, "_last_cycle_result") and coordinator._last_cycle_result:
+        distance_source = coordinator._last_cycle_result.get("distance_source", "unknown")
+    elif hasattr(coordinator, "last_distance_source"):
+        distance_source = coordinator.last_distance_source
+
     return {
         "last_cycle_id": last_cycle.get("cycle_id"),
         "last_cycle_at": last_ts,
@@ -903,6 +922,7 @@ async def get_last_optimization():
         "total_tons": summary.get("total_tons", 0),
         "total_cost_sek": summary.get("total_cost_sek", 0),
         "total_co2_kg": summary.get("total_co2_kg", 0),
+        "distance_source": distance_source,
     }
 
 

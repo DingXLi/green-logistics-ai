@@ -782,3 +782,64 @@ class TestOSMRoadNetwork:
         assert D[0, 1] > 0
         assert D[0, 2] > 0
         assert D[1, 2] > 0
+
+
+class TestLogisticsAgentUseRealRoads:
+    """iter #8 — optimize_routes 接受 use_real_roads / region 参数"""
+
+    @pytest.mark.asyncio
+    async def test_optimize_routes_accepts_use_real_roads_false(self):
+        """use_real_roads=False → solve 仍跑通, 返回 distance_source=haversine"""
+        from optimization.vrp_solver import VRPSolver
+        agent = LogisticsAgent(fleet_size=2)
+        # 替换 depot (Borås)
+        agent.depot_location = {"lat": 57.7089, "lon": 14.1618}
+
+        pickup = [{"id": "P1", "lat": 57.7300, "lon": 14.1900, "tons": 3.0}]
+        delivery = [{"id": "D1", "lat": 57.6700, "lon": 14.1000, "tons": 3.0}]
+
+        result = await agent.optimize_routes(
+            pickup_locations=pickup,
+            delivery_locations=delivery,
+            use_real_roads=False,  # 强制 Haversine, 避免网络
+        )
+
+        # 应该返回 status + distance_source
+        assert result["status"] in ("optimal", "heuristic", "fallback_nearest_neighbor")
+        assert result.get("distance_source") == "haversine"
+        assert result.get("use_real_roads") is False
+
+    @pytest.mark.asyncio
+    async def test_optimize_routes_accepts_use_real_roads_true(self):
+        """use_real_roads=True → distance_source 应该是 osm 或 haversine (网络决定)"""
+        agent = LogisticsAgent(fleet_size=2)
+        agent.depot_location = {"lat": 57.7089, "lon": 14.1618}
+
+        pickup = [{"id": "P1", "lat": 57.7300, "lon": 14.1900, "tons": 3.0}]
+        delivery = [{"id": "D1", "lat": 57.6700, "lon": 14.1000, "tons": 3.0}]
+
+        result = await agent.optimize_routes(
+            pickup_locations=pickup,
+            delivery_locations=delivery,
+            use_real_roads=True,
+            region="Borås, Sweden",
+            distance_timeout_s=10,
+        )
+
+        assert result["status"] in ("optimal", "heuristic", "fallback_nearest_neighbor")
+        assert result.get("distance_source") in ("osm", "haversine")
+        assert result.get("use_real_roads") is True
+
+    @pytest.mark.asyncio
+    async def test_optimize_routes_empty_inputs(self):
+        """空 pickup/delivery → 不抛异常"""
+        agent = LogisticsAgent(fleet_size=2)
+        agent.depot_location = {"lat": 57.7089, "lon": 14.1618}
+
+        result = await agent.optimize_routes(
+            pickup_locations=[],
+            delivery_locations=[],
+            use_real_roads=False,
+        )
+        # 空输入会进入 fallback 路径或返回 no_routes
+        assert "status" in result or "routes" in result
