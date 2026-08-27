@@ -122,10 +122,16 @@ def get_baseline_demand_tons_per_day(
     """
     返回一个 material 在 city 的真实合理 daily baseline (吨/天)。
 
-    公式: total_kt_per_year / 365 × per_capita_factor × seasonal_factor
-    其中 per_capita_factor 是按城市人口 × 该城市 per_capita 比例
+    iter #6 升级: 接入 CITY_DEMAND_PROFILES 真实 industry 校正:
+      - per_capita_waste_kg: 城市人均废料 (用于 household-driven material)
+      - construction_share_pct: 城市建筑占比 (用于 concrete/wood_waste boost)
+      - industry_focus: 工业重点 (用于 metal_scrap boost if port/industrial)
 
-    用作 SyntheticDataGenerator 的中心估计,random.uniform 在 ±20% 内浮动。
+    公式 (iter #6 之前 vs 之后):
+      Before: Sweden_total / 365 × (city_pop / sweden_pop) × seasonal
+      After:  baseline_tons × city_share × seasonal × industry_multiplier
+
+    用作 SyntheticDataGenerator 的中心估计, random.uniform 在 ±20% 内浮动。
     """
     if material not in SWEDEN_WASTE_BASELINES:
         raise KeyError(f"Unknown material: {material}. Known: {list(SWEDEN_WASTE_BASELINES.keys())}")
@@ -141,7 +147,36 @@ def get_baseline_demand_tons_per_day(
     # Sweden total / 365 (t/day) × (city population / Sweden population) × seasonal
     sweden_pop = 10_500_000  # 2023
     city_share = city_p["population"] / sweden_pop
-    daily_baseline = (base["total_kt_per_year"] * 1000 / 365) * city_share * seasonal
+    national_daily = base["total_kt_per_year"] * 1000 / 365  # t/day 全国
+    city_daily_raw = national_daily * city_share
+
+    # iter #6: industry 校正 — 不同城市/不同 material 有不同倍数
+    # 1. 城市自身 per_capita_waste_kg vs national per_capita_kg
+    national_per_capita = base["per_capita_kg"]  # kg/人/年 (本 material)
+    city_per_capita = city_p["per_capita_waste_kg"]  # kg/人/年 (全部废料)
+    # 用 city per_capita / national per_capita 作为校正因子
+    # (city_per_capita 包含所有 material, 用 national average ≈ 350 kg 作为基准)
+    NATIONAL_AVG_PER_CAPITA = 350  # kg/人/年, 所有 material 加权平均
+    per_capita_correction = city_per_capita / NATIONAL_AVG_PER_CAPITA
+
+    # 2. construction-heavy material (concrete/wood_waste) 在 construction_share 高的城市 boost
+    CONSTRUCTION_MATERIALS = {"concrete", "wood_waste"}
+    if material in CONSTRUCTION_MATERIALS:
+        # Borås construction_share=35 → boost ≈ 1.0 + (35-30)/100 = 1.05
+        # Stockholm construction_share=25 → boost ≈ 1.0 + (25-30)/100 = 0.95
+        construction_boost = 1.0 + (city_p["construction_share_pct"] - 30) / 100.0
+    else:
+        construction_boost = 1.0
+
+    # 3. port/industrial 城市 (Göteborg) 对 metal_scrap 略有 boost
+    if material == "metal_scrap" and "port" in city_p.get("industry_focus", "").lower():
+        industry_boost = 1.15  # Göteborg 港口 metal_scrap 多
+    else:
+        industry_boost = 1.0
+
+    industry_multiplier = per_capita_correction * construction_boost * industry_boost
+
+    daily_baseline = city_daily_raw * seasonal * industry_multiplier
     return round(daily_baseline, 2)
 
 
