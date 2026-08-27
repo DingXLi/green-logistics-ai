@@ -30,6 +30,9 @@ const SeasonalComparison = lazy(() => import('./SeasonalComparison').then(m => (
 const CarbonScenarios = lazy(() => import('./CarbonScenarios').then(m => ({ default: m.CarbonScenarios })))
 const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ default: m.FacilitiesList })))
 
+// iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
+import { LoadingSpinner } from '../common/LoadingSpinner'
+
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
 
@@ -76,7 +79,11 @@ function KPISummary({ data }) {
 
 function KPITimeseries({ data }) {
   if (!data || data.length === 0) {
-    return <div className="empty">No time-series data yet. Run simulation first.</div>
+    return (
+      <div className="empty">
+        <LoadingSpinner size="md" label="No time-series data yet. Run simulation first." />
+      </div>
+    )
   }
   // 把 sim_day 格式化
   const formatted = data.map(d => ({
@@ -124,7 +131,11 @@ function KPITimeseries({ data }) {
 
 function ParetoChart({ data }) {
   if (!data || data.length === 0) {
-    return <div className="empty">No Pareto data available.</div>
+    return (
+      <div className="empty">
+        <LoadingSpinner size="md" label="No Pareto data available." />
+      </div>
+    )
   }
   // 适配后端字段: {cost_weight, co2_weight, cost_sek, co2_kg, total_objective}
   // 映射到 Recharts 期望的 {cost, co2, alpha}
@@ -349,7 +360,7 @@ export default function Dashboard() {
       )}
 
       {activeTab === 'scenarios' && (
-        <Suspense fallback={<div className="empty">Loading scenarios…</div>}>
+        <Suspense fallback={<LoadingSpinner label="Loading scenarios…" />}>
           <SeasonalHeatmap currentMonth={
             // 从 WS 推送的最新 cycle 拿到 sim_day
             wsMessage?.type === 'cycle_update' && wsMessage?.data?.sim_day
@@ -364,7 +375,7 @@ export default function Dashboard() {
       )}
 
       {activeTab === 'network' && (
-        <Suspense fallback={<div className="empty">Loading network…</div>}>
+        <Suspense fallback={<LoadingSpinner label="Loading network…" />}>
           <FacilitiesList />
         </Suspense>
       )}

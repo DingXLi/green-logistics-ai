@@ -968,3 +968,16 @@ body {
   border-radius: 3px;
   font-weight: 600;
 }
+
+/* ============================================
+   LoadingSpinner (iter #7)
+   ============================================ */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner .spinner-ring {
+  display: inline-block;
+  box-sizing: border-box;
+}

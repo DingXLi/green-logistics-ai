@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapContainer } from './components/Map'
 import Dashboard from './components/Dashboard/Dashboard'
+import { LoadingSpinner } from './components/common/LoadingSpinner'
 import './App.css'
 
 // API base: Vite env var > localhost fallback
@@ -56,7 +57,7 @@ function App() {
   }
 
   if (loading) {
-    return <div className="loading">Loading...</div>
+    return <LoadingSpinner size="lg" label="Loading fleet status…" />
   }
 
   return (
