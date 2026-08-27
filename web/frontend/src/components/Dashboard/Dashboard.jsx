@@ -29,6 +29,7 @@ const SeasonalHeatmap = lazy(() => import('./SeasonalHeatmap').then(m => ({ defa
 const SeasonalComparison = lazy(() => import('./SeasonalComparison').then(m => ({ default: m.SeasonalComparison })))
 const CarbonScenarios = lazy(() => import('./CarbonScenarios').then(m => ({ default: m.CarbonScenarios })))
 const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ default: m.FacilitiesList })))
+const MonthlyEfficiencyChart = lazy(() => import('./MonthlyEfficiencyChart').then(m => ({ default: m.MonthlyEfficiencyChart })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -410,6 +411,11 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* iter #9: Monthly efficiency trend chart */}
+          <Suspense fallback={<LoadingSpinner label="Loading monthly chart…" />}>
+            <MonthlyEfficiencyChart />
+          </Suspense>
         </>
       )}
 
