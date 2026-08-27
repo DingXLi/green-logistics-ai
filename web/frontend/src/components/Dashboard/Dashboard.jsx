@@ -194,6 +194,8 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [error, setError] = useState(null)
+  // iter #7: 记录最近一次 /optimize/pareto 响应的 distance_source, 顶部提示
+  const [paretoMeta, setParetoMeta] = useState({ distance_source: null, use_real_roads: true })
   const [activeTab, setActiveTabRaw] = useState(() => {
     // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
     if (typeof window !== 'undefined') {
@@ -238,6 +240,10 @@ export default function Dashboard() {
       if (paretoRes && paretoRes.ok) {
         const paData = await paretoRes.json()
         pa = paData.pareto || paData || []
+        setParetoMeta({
+          distance_source: paData.distance_source || 'unknown',
+          use_real_roads: paData.use_real_roads !== false,
+        })
       }
       setSummary(sum)
       setTimeseries(ts)
@@ -293,14 +299,25 @@ export default function Dashboard() {
     <div className="dashboard">
       <div className="dashboard-header">
         <h2>📊 30-Day Simulation Dashboard</h2>
-        <label className="auto-refresh">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={e => setAutoRefresh(e.target.checked)}
-          />
-          Auto-refresh (10s)
-        </label>
+        <div className="header-meta">
+          {/* iter #7: 展示最近一次优化使用的路网 source */}
+          {paretoMeta.distance_source && (
+            <span
+              className={`distance-source-badge ${paretoMeta.distance_source}`}
+              title={`VRP uses ${paretoMeta.use_real_roads ? 'real OSM roads (fallback to Haversine on error)' : 'Haversine only'}`}
+            >
+              🛣️ {paretoMeta.distance_source === 'osm' ? 'OSM' : paretoMeta.distance_source === 'haversine' ? 'Haversine' : paretoMeta.distance_source}
+            </span>
+          )}
+          <label className="auto-refresh">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={e => setAutoRefresh(e.target.checked)}
+            />
+            Auto-refresh (10s)
+          </label>
+        </div>
       </div>
 
       {error && <div className="error-banner">⚠️ {error}</div>}
