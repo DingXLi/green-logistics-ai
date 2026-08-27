@@ -520,6 +520,11 @@ class FleetStatusResponse(BaseModel):
     available: int
     en_route: int
     utilization_rate: float
+    # iter #6: 新增 fields
+    loading: Optional[int] = 0
+    total_distance_km: Optional[float] = 0.0
+    avg_distance_to_depot_km: Optional[float] = 0.0
+    depot: Optional[Dict[str, Any]] = None
 
 
 class SupplyPoint(BaseModel):

@@ -71,13 +71,36 @@ class LogisticsAgent:
         """获取车队状态"""
         available = sum(1 for v in self.vehicles if v["status"] == "available")
         en_route = sum(1 for v in self.vehicles if v["status"] == "en_route")
-        
+        loading = sum(1 for v in self.vehicles if v["status"] == "loading")
+        total_distance = sum(v.get("total_distance_km", 0) for v in self.vehicles)
+        # iter #6: 每辆车的距离 depot 平均 (车辆当前位置 vs depot)
+        # 用 haversine 计算, 跟 /api/facilities 一致
+        from .market_agent import _haversine_km
+        depot = self.depot_location
+        distances_to_depot = [
+            _haversine_km(
+                v["current_location"]["lat"],
+                v["current_location"]["lon"],
+                depot["lat"],
+                depot["lon"],
+            )
+            for v in self.vehicles
+        ]
+        avg_distance_to_depot_km = (
+            round(sum(distances_to_depot) / len(distances_to_depot), 2)
+            if distances_to_depot else 0.0
+        )
+
         return {
             "total_vehicles": self.fleet_size,
             "available": available,
             "en_route": en_route,
+            "loading": loading,
             "utilization_rate": (self.fleet_size - available) / self.fleet_size * 100,
-            "timestamp": datetime.now().isoformat()
+            "total_distance_km": round(total_distance, 2),
+            "avg_distance_to_depot_km": avg_distance_to_depot_km,
+            "depot": depot,
+            "timestamp": datetime.now().isoformat(),
         }
 
     # ------------------------------------------------------------
