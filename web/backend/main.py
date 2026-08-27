@@ -189,6 +189,24 @@ async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
     except Exception as e:
         logger.debug(f"WS broadcast efficiency summary failed (ignore): {e}")
 
+    # iter #8: 附带 fleet metrics (n_vehicles, util, distance_to_depot)
+    # 让前端实时显示车队状态, 不需要额外 fetch /api/fleet
+    fleet_metrics: Dict[str, Any] = {}
+    try:
+        if coordinator is not None and coordinator.logistics_agent is not None:
+            fs = await coordinator.logistics_agent.get_fleet_status()
+            fleet_metrics = {
+                "total_vehicles": fs.get("total_vehicles", 0),
+                "available": fs.get("available", 0),
+                "en_route": fs.get("en_route", 0),
+                "loading": fs.get("loading", 0),
+                "utilization_rate": fs.get("utilization_rate", 0),
+                "total_distance_km": fs.get("total_distance_km", 0),
+                "avg_distance_to_depot_km": fs.get("avg_distance_to_depot_km", 0),
+            }
+    except Exception as e:
+        logger.debug(f"WS broadcast fleet metrics failed (ignore): {e}")
+
     payload = {
         "type": "cycle_update",
         "timestamp": datetime.now().isoformat(),
@@ -204,6 +222,8 @@ async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
             "sim_day": cycle_result.get("sim_day"),
             "sim_hour": cycle_result.get("sim_hour"),
             "efficiency": eff_summary,
+            "fleet": fleet_metrics,
+            "distance_source": cycle_result.get("distance_source", "unknown"),
         },
     }
     try:

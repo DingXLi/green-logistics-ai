@@ -1050,3 +1050,17 @@ body {
   margin: 0;
   cursor: pointer;
 }
+
+/* ============================================
+   WS fleet badge (iter #8)
+   ============================================ */
+.ws-fleet-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+}

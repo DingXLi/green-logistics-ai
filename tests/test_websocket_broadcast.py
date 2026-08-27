@@ -249,3 +249,70 @@ def test_broadcast_cycle_update_efficiency_field_empty_when_no_persistence():
             await ws_broadcaster.disconnect(ws)
 
     asyncio.run(run_test())
+
+
+def test_broadcast_cycle_update_includes_fleet_field():
+    """iter #8: WS broadcast 附带 fleet metrics (n_vehicles, util, distance)。"""
+    from web.backend.main import ws_broadcaster, _broadcast_cycle_update
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.sent = []
+        async def accept(self):
+            pass
+        async def send_text(self, msg):
+            import json as _json
+            self.sent.append(_json.loads(msg))
+
+    async def run_test():
+        ws = FakeWebSocket()
+        await ws_broadcaster.connect(ws)
+
+        from web.backend import main as backend_main
+        orig_coord = backend_main.coordinator
+        try:
+            # 构造 fake logistics_agent with get_fleet_status
+            class _FakeFleetStatus:
+                async def get_fleet_status(self):
+                    return {
+                        "total_vehicles": 30,
+                        "available": 21,
+                        "en_route": 7,
+                        "loading": 2,
+                        "utilization_rate": 30.0,
+                        "total_distance_km": 145.5,
+                        "avg_distance_to_depot_km": 4.2,
+                    }
+            class _FakeLogistics:
+                pass
+            fake_logistics = _FakeLogistics()
+            fake_logistics.get_fleet_status = _FakeFleetStatus().get_fleet_status
+            class _FakeCoord:
+                pass
+            fake_coord = _FakeCoord()
+            fake_coord.logistics_agent = fake_logistics
+            fake_coord.persistence = None  # 没 persistence
+            backend_main.coordinator = fake_coord
+
+            await _broadcast_cycle_update({
+                "cycle_id": "test-1",
+                "n_matches": 5,
+                "sim_day": 10,
+                "distance_source": "osm",
+            })
+
+            assert len(ws.sent) == 1
+            payload = ws.sent[0]
+            data = payload["data"]
+            assert "fleet" in data
+            fleet = data["fleet"]
+            assert fleet["total_vehicles"] == 30
+            assert fleet["utilization_rate"] == 30.0
+            assert fleet["avg_distance_to_depot_km"] == 4.2
+            # 同时 iter #8: distance_source 也应在 data 顶层
+            assert data["distance_source"] == "osm"
+        finally:
+            backend_main.coordinator = orig_coord
+            await ws_broadcaster.disconnect(ws)
+
+    asyncio.run(run_test())

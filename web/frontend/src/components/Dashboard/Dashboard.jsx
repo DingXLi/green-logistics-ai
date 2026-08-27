@@ -200,6 +200,8 @@ export default function Dashboard() {
   const [useRealRoads, setUseRealRoads] = useState(true)
   // iter #7: 从 WS 推送拿 efficiency summary (cost/CO2 per ton)
   const [wsEfficiency, setWsEfficiency] = useState(null)
+  // iter #8: 从 WS 推送拿 fleet metrics (util, vehicles, distance)
+  const [wsFleet, setWsFleet] = useState(null)
   const [activeTab, setActiveTabRaw] = useState(() => {
     // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
     if (typeof window !== 'undefined') {
@@ -268,6 +270,10 @@ export default function Dashboard() {
       if (msg.data?.efficiency) {
         setWsEfficiency(msg.data.efficiency)
       }
+      // iter #8: WS 推送的 fleet metrics
+      if (msg.data?.fleet) {
+        setWsFleet(msg.data.fleet)
+      }
     }
   }, [fetchAll])
   const { lastMessage: wsMessage, connected: wsConnected } = useWebSocket(
@@ -323,6 +329,12 @@ export default function Dashboard() {
               📊 {wsEfficiency.cost_per_ton_sek != null ? `${wsEfficiency.cost_per_ton_sek.toFixed(1)} SEK/t` : '—'}
               {' · '}
               {wsEfficiency.co2_per_ton_kg != null ? `${wsEfficiency.co2_per_ton_kg.toFixed(2)} kgCO₂/t` : '—'}
+            </span>
+          )}
+          {/* iter #8: WS 推送的 fleet metrics */}
+          {wsFleet && wsFleet.total_vehicles > 0 && (
+            <span className="ws-fleet-badge" title={`Fleet from WebSocket — ${wsFleet.utilization_rate.toFixed(0)}% utilized`}>
+              🚚 {wsFleet.total_vehicles} veh · {wsFleet.utilization_rate.toFixed(0)}% util
             </span>
           )}
           {/* iter #8: 用户可控制 use_real_roads (toggle) */}
