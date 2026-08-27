@@ -189,6 +189,97 @@ function SimulationControl({ onRun, lastResult, running }) {
   )
 }
 
+function SchedulerControl() {
+  // iter #10: 手动控制后台 scheduler (start / stop / restart)
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/scheduler/status`)
+      const data = await r.json()
+      setStatus(data)
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStatus()
+    const id = setInterval(fetchStatus, 15000)  // 15s poll
+    return () => clearInterval(id)
+  }, [fetchStatus])
+
+  const control = async (action) => {
+    setLoading(true)
+    try {
+      const r = await fetch(`${API_BASE}/scheduler/control?action=${action}`, { method: 'POST' })
+      const data = await r.json()
+      if (data.success) {
+        await fetchStatus()
+      } else {
+        setError(`Action ${action} failed`)
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (error) return <div className="error-banner small">⚠️ Scheduler: {error}</div>
+  if (!status) return <LoadingSpinner size="sm" label="Loading scheduler…" />
+
+  const active = status.active
+  const reason = status.reason
+
+  return (
+    <div className="scheduler-control-panel">
+      <div className="scheduler-status">
+        <span className={`scheduler-dot ${active ? 'active' : 'inactive'}`} />
+        <span className="scheduler-label">
+          Scheduler: <strong>{active ? 'Running' : 'Stopped'}</strong>
+        </span>
+        {status.cycle_count != null && (
+          <span className="scheduler-cycles">· {status.cycle_count} cycles</span>
+        )}
+      </div>
+      {reason && <div className="scheduler-reason">⚠️ {reason}</div>}
+      <div className="scheduler-buttons">
+        {!active ? (
+          <button
+            className="scheduler-btn start"
+            onClick={() => control('start')}
+            disabled={loading || !!reason}
+            title={reason || 'Start background scheduler'}
+          >
+            ▶ Start
+          </button>
+        ) : (
+          <button
+            className="scheduler-btn stop"
+            onClick={() => control('stop')}
+            disabled={loading}
+            title="Stop background scheduler"
+          >
+            ⏸ Stop
+          </button>
+        )}
+        <button
+          className="scheduler-btn restart"
+          onClick={() => control('restart')}
+          disabled={loading || !!reason}
+          title="Restart scheduler (stop + start)"
+        >
+          🔄 Restart
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [summary, setSummary] = useState(null)
   const [timeseries, setTimeseries] = useState([])
@@ -398,6 +489,8 @@ export default function Dashboard() {
             <div className="chart-card control-card">
               <h3>🎮 Simulation Control</h3>
               <SimulationControl onRun={runCycle} lastResult={lastRun} running={running} />
+              {/* iter #10: Scheduler 控制 (start/stop/restart) */}
+              <SchedulerControl />
               <div className="info-list">
                 <div className="info-item">
                   <span className="info-label">Data source:</span>{' '}
