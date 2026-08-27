@@ -1527,6 +1527,66 @@ async def get_scheduler_status():
     return scheduler.status()
 
 
+@app.post("/api/scheduler/control")
+async def scheduler_control(action: str = "status"):
+    """
+    Scheduler 控制 endpoint (iter #10) — 让用户手动 start/stop/restart scheduler。
+
+    - action="status": 返回当前状态 (等价于 GET /api/scheduler/status)
+    - action="start": 启动 scheduler (if not already running)
+    - action="stop": 停止 scheduler (if running)
+    - action="restart": 先 stop 再 start
+
+    限制:
+    - 仅在 GL_SCHEDULER_ENABLED=true 启动的 scheduler 可被操作
+    - 需要 scheduler 存在 (否则 503)
+
+    返回: {action, success, status (scheduler 当前状态)}
+    """
+    global scheduler
+    action = action.lower().strip()
+
+    if scheduler is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Scheduler not initialized. Set GL_SCHEDULER_ENABLED=true on startup.",
+        )
+
+    if action == "status":
+        success = True
+    elif action == "start":
+        if scheduler.scheduler_active:
+            logger.info("Scheduler control: start 已在运行, 跳过")
+        else:
+            scheduler.start()
+            logger.info("Scheduler control: start triggered")
+        success = True
+    elif action == "stop":
+        if not scheduler.scheduler_active:
+            logger.info("Scheduler control: stop 未在运行, 跳过")
+        else:
+            await scheduler.stop()
+            logger.info("Scheduler control: stop triggered")
+        success = True
+    elif action == "restart":
+        if scheduler.scheduler_active:
+            await scheduler.stop()
+        scheduler.start()
+        logger.info("Scheduler control: restart triggered")
+        success = True
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown action: {action}. Allowed: status, start, stop, restart",
+        )
+
+    return {
+        "action": action,
+        "success": success,
+        "status": scheduler.status(),
+    }
+
+
 # ============================================
 # 主程序
 # ============================================
