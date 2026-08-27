@@ -661,3 +661,56 @@ class Persistence:
         )
 
         return result
+
+    def get_monthly_efficiency_trend(self) -> List[Dict[str, Any]]:
+        """
+        按月份聚合的 efficiency 趋势 (iter #8)。
+
+        返回: month (1-12) → {month, month_name, n_cycles, total_tons,
+                total_cost_sek, total_co2_kg, cost_per_ton_sek, co2_per_ton_kg,
+                avg_seasonal_factor, avg_fleet_util_pct, match_rate_pct}
+
+        用于:
+        - Dashboard 月度趋势图
+        - 季节性对 efficiency 的影响分析
+        """
+        month_names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ]
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT seasonal_month,
+                          COUNT(*) as n_cycles,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_cost_sek) as total_cost_sek,
+                          SUM(total_co2_kg) as total_co2_kg,
+                          AVG(seasonal_factor_avg) as avg_seasonal_factor,
+                          AVG(fleet_utilization_pct) as avg_fleet_util_pct,
+                          SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as cycles_with_matches
+                   FROM optimization_cycles
+                   WHERE seasonal_month BETWEEN 1 AND 12
+                   GROUP BY seasonal_month
+                   ORDER BY seasonal_month ASC"""
+            ).fetchall()
+
+        result = []
+        for row in rows:
+            r = dict(row)
+            # SUM 可能 None 在某些边界情况
+            total_tons = r.get("total_tons") or 0.0
+            total_cost = r.get("total_cost_sek") or 0.0
+            total_co2 = r.get("total_co2_kg") or 0.0
+            n = r.get("n_cycles", 0) or 0
+            matches = r.get("cycles_with_matches", 0) or 0
+            r["month_name"] = month_names[(r["seasonal_month"] or 1) - 1]
+            r["total_tons"] = round(total_tons, 2)
+            r["total_cost_sek"] = round(total_cost, 2)
+            r["total_co2_kg"] = round(total_co2, 2)
+            r["cost_per_ton_sek"] = round(total_cost / total_tons, 2) if total_tons > 0 else None
+            r["co2_per_ton_kg"] = round(total_co2 / total_tons, 2) if total_tons > 0 else None
+            r["avg_seasonal_factor"] = round(r["avg_seasonal_factor"], 3) if r.get("avg_seasonal_factor") is not None else None
+            r["avg_fleet_util_pct"] = round(r["avg_fleet_util_pct"], 2) if r.get("avg_fleet_util_pct") is not None else None
+            r["match_rate_pct"] = round(100.0 * matches / n, 1) if n > 0 else None
+            result.append(r)
+        return result

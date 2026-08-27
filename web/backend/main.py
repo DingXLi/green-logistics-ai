@@ -1410,6 +1410,24 @@ async def get_persistence_efficiency_metrics():
     return coordinator.persistence.get_efficiency_metrics()
 
 
+@app.get("/api/persistence/monthly-efficiency-trend")
+async def get_monthly_efficiency_trend():
+    """
+    月度 efficiency 趋势 (iter #8) — 按月份聚合的 cost/CO2 per ton 趋势。
+
+    返回 1-12 月的 efficiency 序列 (按月份升序), 含:
+    - month (1-12), month_name, n_cycles
+    - total_tons, total_cost_sek, total_co2_kg
+    - cost_per_ton_sek, co2_per_ton_kg
+    - avg_seasonal_factor, avg_fleet_util_pct, match_rate_pct
+
+    用途: 分析 summer (Jun-Aug) vs winter (Dec-Feb) 成本/CO2 差异。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_monthly_efficiency_trend()
+
+
 # ============================================
 # V2 新增：调度器状态端点 (Task A)
 # ============================================
