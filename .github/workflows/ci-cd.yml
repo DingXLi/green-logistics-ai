@@ -49,7 +49,7 @@ jobs:
         pip install mypy
         # Non-strict mode to avoid breaking on third-party libs (google-generativeai etc.)
         # Fail on real type errors in our own code
-        MYPYPATH=. mypy agents/ optimization/ web/backend/ \
+        MYPYPATH=. mypy agents/ optimization/ web/backend/ data/real_sweden_facilities.py data/swedish_waste_stats.py data/seasonal_adjuster.py \
           --ignore-missing-imports \
           --no-strict-optional \
           --explicit-package-bases

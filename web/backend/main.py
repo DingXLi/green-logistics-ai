@@ -2106,6 +2106,55 @@ async def get_db_stats():
     return coordinator.persistence.get_db_stats()
 
 
+@app.get("/api/facilities/distance-matrix")
+async def get_facility_distance_matrix(
+    city: Optional[str] = None,
+    facility_type: Optional[str] = None,
+    use_real_roads: bool = False,
+):
+    """
+    设施间距离矩阵 (iter #15) — N×N pairwise distance。
+
+    Query:
+    - city: 过滤 (Borås / Göteborg / Stockholm)
+    - facility_type: 过滤 (recycling_center / metal_recovery / ...)
+    - use_real_roads: bool = False (用 haversine, 快, 够用)
+      True 尝试 OSM (慢, 可能超时)
+
+    Returns:
+        {
+            n_facilities, facility_ids, matrix_km (N×N),
+            method: "haversine" | "osrm" | "haversine_fallback",
+            pair_count: N*(N-1)/2
+        }
+    """
+    from data.real_sweden_facilities import (
+        ALL_FACILITIES,
+        get_facilities_by_city,
+        get_facilities_by_type,
+        get_distance_matrix,
+    )
+
+    # 过滤 (复制避免 mutate module-level)
+    if city:
+        facilities = [dict(f) for f in get_facilities_by_city(city)]
+    elif facility_type:
+        facilities = [dict(f) for f in get_facilities_by_type(facility_type)]
+    else:
+        facilities = [dict(f) for f in ALL_FACILITIES]
+
+    if not facilities:
+        return {
+            "n_facilities": 0,
+            "facility_ids": [],
+            "matrix_km": [],
+            "method": "haversine",
+            "pair_count": 0,
+        }
+
+    return get_distance_matrix(facilities, use_haversine=not use_real_roads)
+
+
 @app.get("/api/materials")
 async def get_materials():
     """

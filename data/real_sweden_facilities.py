@@ -22,7 +22,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # ============================================
 # Göteborg 真实设施 (西海岸, 大港口)
@@ -229,3 +229,85 @@ def get_facilities_by_type(facility_type: str) -> List[Dict[str, Any]]:
 def get_facility_count() -> int:
     """返回设施总数"""
     return len(ALL_FACILITIES)
+
+def get_distance_matrix(
+    facilities: Optional[List[Dict[str, Any]]] = None,
+    use_haversine: bool = True,
+) -> Dict[str, Any]:
+    """
+    设施间距离矩阵 (iter #15) — N×N pairwise distance。
+
+    Args:
+        facilities: 设施列表 (default: ALL_FACILITIES)
+        use_haversine: True = haversine (快速, 无 OSM); False = OSM 真实路网 (慢)
+
+    Returns:
+        {
+            "n_facilities": N,
+            "facility_ids": [id1, id2, ...],
+            "matrix_km": [[0, d12, d13, ...], [d21, 0, d23, ...], ...],
+            "method": "haversine" | "osrm",
+            "pair_count": N*(N-1)/2
+        }
+    """
+    if facilities is None:
+        facilities = ALL_FACILITIES
+
+    n = len(facilities)
+    matrix: List[List[float]] = [[0.0] * n for _ in range(n)]
+    facility_ids = [f["id"] for f in facilities]
+
+    if use_haversine:
+        # Haversine: 快, 够用
+        from math import radians, sin, cos, asin, sqrt
+        for i in range(n):
+            for j in range(i + 1, n):
+                lat1, lon1 = facilities[i]["lat"], facilities[i]["lon"]
+                lat2, lon2 = facilities[j]["lat"], facilities[j]["lon"]
+                # Haversine
+                rlat1, rlon1 = radians(lat1), radians(lon1)
+                rlat2, rlon2 = radians(lat2), radians(lon2)
+                dlat = rlat2 - rlat1
+                dlon = rlon2 - rlon1
+                a = sin(dlat / 2) ** 2 + cos(rlat1) * cos(rlat2) * sin(dlon / 2) ** 2
+                c = 2 * asin(sqrt(a))
+                km = 6371 * c
+                matrix[i][j] = round(km, 2)
+                matrix[j][i] = round(km, 2)
+        method = "haversine"
+    else:
+        # 真实 OSM 距离 (慢, 失败回退 haversine)
+        try:
+            from optimization.real_distance import build_distance_matrix
+            coords = [(f["lat"], f["lon"]) for f in facilities]
+            raw = build_distance_matrix(coords, region="Borås, Sweden", timeout_s=30)
+            # raw shape (n, n), 单位 m → km
+            for i in range(n):
+                for j in range(n):
+                    matrix[i][j] = round(float(raw[i][j]) / 1000.0, 2)
+            method = "osrm"
+        except Exception:
+            # fallback: 重算 haversine
+            from math import radians, sin, cos, asin, sqrt
+            for i in range(n):
+                for j in range(i + 1, n):
+                    lat1, lon1 = facilities[i]["lat"], facilities[i]["lon"]
+                    lat2, lon2 = facilities[j]["lat"], facilities[j]["lon"]
+                    rlat1, rlon1 = radians(lat1), radians(lon1)
+                    rlat2, rlon2 = radians(lat2), radians(lon2)
+                    dlat = rlat2 - rlat1
+                    dlon = rlon2 - rlon1
+                    a = sin(dlat / 2) ** 2 + cos(rlat1) * cos(rlat2) * sin(dlon / 2) ** 2
+                    c = 2 * asin(sqrt(a))
+                    km = 6371 * c
+                    matrix[i][j] = round(km, 2)
+                    matrix[j][i] = round(km, 2)
+            method = "haversine_fallback"
+
+    return {
+        "n_facilities": n,
+        "facility_ids": facility_ids,
+        "matrix_km": matrix,
+        "method": method,
+        "pair_count": n * (n - 1) // 2,
+    }
