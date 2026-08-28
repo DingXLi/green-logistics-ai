@@ -7,7 +7,7 @@ FastAPI 应用提供 REST API
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response as FastAPIResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from loguru import logger
@@ -581,6 +581,35 @@ class OptimizationRequest(BaseModel):
     region: Optional[str] = None
     # iter #12: caller 可控制是否推送 WS (避免手动 API 调用中重复推送给其他连接)
     ws_broadcast: bool = True
+
+
+class BatchScenarioRequest(BaseModel):
+    """iter #13: batch optimization 单个 scenario 的配置"""
+    name: str = "scenario"        # 用户给的名字 (用于 response 识别)
+    n_points: int = 4              # Pareto 点数
+    time_limit_seconds: int = 3    # 每个点的时间限制
+    co2_price: float = 0.0         # 碳价 (SEK/kg)
+    use_real_roads: bool = True
+    region: Optional[str] = None
+
+
+class BatchOptimizeRequest(BaseModel):
+    """iter #13: 批量优化请求 — 多个 scenarios 并行计算"""
+    scenarios: List[BatchScenarioRequest]
+
+    @field_validator("scenarios")
+    @classmethod
+    def _validate_scenarios(cls, v: List[BatchScenarioRequest]) -> List[BatchScenarioRequest]:
+        if not (1 <= len(v) <= 8):
+            raise ValueError("scenarios count must be in [1, 8]")
+        for i, s in enumerate(v):
+            if s.n_points < 2 or s.n_points > 20:
+                raise ValueError(f"scenarios[{i}].n_points must be in [2, 20]")
+            if s.time_limit_seconds < 1 or s.time_limit_seconds > 60:
+                raise ValueError(f"scenarios[{i}].time_limit_seconds must be in [1, 60]")
+            if s.co2_price < 0 or s.co2_price > 100:
+                raise ValueError(f"scenarios[{i}].co2_price must be in [0, 100]")
+        return v
 
 
 class OptimizationResponse(BaseModel):
@@ -1465,6 +1494,191 @@ async def get_carbon_scenarios(
         "n_vehicles": len(vehicles_data),
         "scenarios": scenarios,
         "use_real_roads": use_real_roads,
+    }
+
+
+@app.post("/api/optimize/batch")
+async def optimize_batch(request: BatchOptimizeRequest):
+    """
+    批量优化 endpoint (iter #13) — 一次计算多个 scenario 并返回。
+
+    与 carbon-scenarios 不同:
+    - carbon-scenarios: 4 个默认碳价 (0/1.5/3/5 SEK/kg), 不接受定制
+    - batch: caller 可以提交任意配置组合 (碳价 + time_limit + n_points + region)
+
+    用途: UI 可一次性请求 (no-carbon) + (low-carbon) + (high-carbon) + (other-region)
+    并行计算。返回 scenarios 列表与请求顺序对应。
+
+    Body: {"scenarios": [{name, n_points, time_limit_seconds, co2_price,
+                          use_real_roads, region}, ...]}
+
+    Response: {"scenarios": [{name, carbon_price_sek_per_kg, cost_optimal,
+                              co2_optimal, pareto, error?}, ...]}
+    """
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    from optimization.vrp_solver import VRPSolver, Location, Vehicle
+
+    # 复用碳价场景的世界构建逻辑
+    supply_offers = []
+    for agent_id, agent in coordinator.supply_agents.items():
+        supply_offers.append({
+            "agent_id": agent_id,
+            "available_tons": round(agent.daily_capacity * 0.8, 2),
+            "material_type": agent.material_type,
+            "location": agent.location,
+        })
+    demand_requests = []
+    for dp in coordinator.market_agent.demand_points:
+        demand_requests.append({
+            "id": dp["id"],
+            "name": dp["name"],
+            "demand_tons": dp["current_demand_tons"],
+            "preferred_materials": dp["preferred_materials"],
+            "location": dp["location"],
+            "material_type": dp.get("material_type"),
+        })
+    matches_result = await coordinator.market_agent.match_supply_demand(
+        supply_offers=supply_offers,
+        demand_requests=demand_requests,
+    )
+    matches = matches_result.get("matches", [])[:15]
+
+    if not matches:
+        return {
+            "scenarios": [
+                {"name": s.name, "error": "No matches available"}
+                for s in request.scenarios
+            ],
+            "reason": "No matches available",
+        }
+
+    depot_loc = coordinator.logistics_agent.depot_location
+    depot = Location(id="DEPOT", lat=depot_loc["lat"], lon=depot_loc["lon"], type="depot")
+    supply_idx = {a.agent_id: a for a in coordinator.supply_agents.values()}
+    demand_idx = {d["id"]: d for d in coordinator.market_agent.demand_points}
+
+    pickup_locations = []
+    delivery_locations = []
+    for m in matches:
+        sid = m.get("supply_id")
+        did = m.get("demand_id")
+        if sid not in supply_idx or did not in demand_idx:
+            continue
+        sup = supply_idx[sid]
+        dem = demand_idx[did]
+        pickup_locations.append({
+            "id": sid, "lat": sup.location["lat"], "lon": sup.location["lon"],
+            "tons": m.get("tons", 5.0),
+        })
+        delivery_locations.append({
+            "id": did, "lat": dem["location"]["lat"], "lon": dem["location"]["lon"],
+            "tons": m.get("tons", 5.0),
+        })
+    if not pickup_locations:
+        return {
+            "scenarios": [
+                {"name": s.name, "error": "No usable supply/demand locations"}
+                for s in request.scenarios
+            ],
+            "reason": "No usable locations",
+        }
+
+    vehicles_data = [
+        v for v in coordinator.logistics_agent.vehicles
+        if v.get("status") == "available"
+    ][:len(pickup_locations)]
+    if not vehicles_data:
+        return {
+            "scenarios": [
+                {"name": s.name, "error": "No vehicles available"}
+                for s in request.scenarios
+            ],
+            "reason": "No vehicles available",
+        }
+
+    def _build_solver(use_real_roads: bool, region: Optional[str]) -> VRPSolver:
+        solver_kwargs: Dict[str, Any] = {"use_real_roads": use_real_roads}
+        if region:
+            solver_kwargs["region"] = region
+        solver = VRPSolver(**solver_kwargs)
+        solver.add_location(depot)
+        for loc in pickup_locations:
+            solver.add_location(Location(
+                id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+                demand_tons=loc["tons"], type="pickup",
+            ))
+        for loc in delivery_locations:
+            solver.add_location(Location(
+                id=loc["id"], lat=loc["lat"], lon=loc["lon"],
+                demand_tons=-loc["tons"], type="delivery",
+            ))
+        for vd in vehicles_data:
+            solver.add_vehicle(Vehicle(
+                id=vd["vehicle_id"],
+                capacity_tons=vd.get("capacity_tons", 20.0),
+                start_location=depot,
+                co2_rate=vd.get("co2_emission_rate", 0.85),
+                cost_per_km=2.6,
+            ))
+        return solver
+
+    async def _solve_scenario(s: BatchScenarioRequest) -> Dict[str, Any]:
+        try:
+            solver = _build_solver(s.use_real_roads, s.region)
+            pareto = await asyncio.to_thread(
+                solver.solve_pareto,
+                n_points=s.n_points,
+                time_limit_seconds=s.time_limit_seconds,
+                co2_price=s.co2_price,
+            )
+            cost_opt = next(
+                (p for p in pareto if abs(p["cost_weight"] - 1.0) < 1e-6), None
+            )
+            co2_opt = next(
+                (p for p in pareto if abs(p["co2_weight"] - 1.0) < 1e-6), None
+            )
+            return {
+                "name": s.name,
+                "carbon_price_sek_per_kg": s.co2_price,
+                "n_points": len(pareto),
+                "cost_optimal": {
+                    "cost_sek": cost_opt["cost_sek"] if cost_opt else None,
+                    "co2_kg": cost_opt["co2_kg"] if cost_opt else None,
+                    "n_routes": len(cost_opt["routes"]) if cost_opt else 0,
+                } if cost_opt else None,
+                "co2_optimal": {
+                    "cost_sek": co2_opt["cost_sek"] if co2_opt else None,
+                    "co2_kg": co2_opt["co2_kg"] if co2_opt else None,
+                    "n_routes": len(co2_opt["routes"]) if co2_opt else 0,
+                } if co2_opt else None,
+                "pareto": [
+                    {
+                        "cost_weight": p["cost_weight"],
+                        "co2_weight": p["co2_weight"],
+                        "cost_sek": p["cost_sek"],
+                        "co2_kg": p["co2_kg"],
+                        "total_objective": p["total_objective"],
+                    }
+                    for p in pareto
+                ],
+                "distance_source": solver.distance_source,
+                "use_real_roads": s.use_real_roads,
+            }
+        except Exception as e:
+            return {
+                "name": s.name,
+                "carbon_price_sek_per_kg": s.co2_price,
+                "error": f"{type(e).__name__}: {str(e)[:200]}",
+            }
+
+    scenarios = await asyncio.gather(*[_solve_scenario(s) for s in request.scenarios])
+    return {
+        "n_pickups": len(pickup_locations),
+        "n_deliveries": len(delivery_locations),
+        "n_vehicles": len(vehicles_data),
+        "scenarios": scenarios,
     }
 
 
