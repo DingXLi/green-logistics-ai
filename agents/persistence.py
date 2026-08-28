@@ -992,3 +992,72 @@ class Persistence:
         for r in rows:
             writer.writerow(r)
         return buf.getvalue()
+
+    def get_match_distance_stats(self) -> Dict[str, Any]:
+        """
+        Match 距离统计 (iter #15) — 从 matches 表聚合 distance_km 指标。
+
+        返回:
+            total_matches, n_cycles_with_matches,
+            avg_distance_km, min_distance_km, max_distance_km, median_distance_km,
+            distance_distribution: {<10km: n, 10-50km: n, 50-100km: n, >100km: n}
+
+        用途: 验证 OSM 距离是否合理 (大多数短距离, 偶尔长距离),
+        监控 match quality (距离增加 = 运输成本上升)。
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) as total,
+                          COUNT(DISTINCT cycle_id) as n_cycles,
+                          AVG(distance_km) as avg_dist,
+                          MIN(distance_km) as min_dist,
+                          MAX(distance_km) as max_dist
+                   FROM matches WHERE distance_km IS NOT NULL"""
+            ).fetchone()
+
+            # 距离分桶
+            buckets = conn.execute(
+                """SELECT
+                      SUM(CASE WHEN distance_km < 10 THEN 1 ELSE 0 END) as short,
+                      SUM(CASE WHEN distance_km >= 10 AND distance_km < 50 THEN 1 ELSE 0 END) as medium,
+                      SUM(CASE WHEN distance_km >= 50 AND distance_km < 100 THEN 1 ELSE 0 END) as long_,
+                      SUM(CASE WHEN distance_km >= 100 THEN 1 ELSE 0 END) as very_long
+                   FROM matches WHERE distance_km IS NOT NULL"""
+            ).fetchone()
+
+            # 中位数 (SQLite 没有 MEDIAN, 用 PERCENTILE_CONT 模拟)
+            all_distances = [
+                r["distance_km"] for r in
+                conn.execute("SELECT distance_km FROM matches WHERE distance_km IS NOT NULL ORDER BY distance_km").fetchall()
+            ]
+        total = row["total"] or 0
+        if total == 0:
+            return {
+                "total_matches": 0,
+                "n_cycles_with_matches": 0,
+                "avg_distance_km": None,
+                "min_distance_km": None,
+                "max_distance_km": None,
+                "median_distance_km": None,
+                "distance_distribution": {
+                    "short_<10km": 0,
+                    "medium_10-50km": 0,
+                    "long_50-100km": 0,
+                    "very_long_>=100km": 0,
+                },
+            }
+        median = all_distances[len(all_distances) // 2] if all_distances else None
+        return {
+            "total_matches": total,
+            "n_cycles_with_matches": row["n_cycles"] or 0,
+            "avg_distance_km": round(row["avg_dist"] or 0, 2),
+            "min_distance_km": round(row["min_dist"] or 0, 2),
+            "max_distance_km": round(row["max_dist"] or 0, 2),
+            "median_distance_km": round(median, 2) if median is not None else None,
+            "distance_distribution": {
+                "short_<10km": buckets["short"] or 0,
+                "medium_10-50km": buckets["medium"] or 0,
+                "long_50-100km": buckets["long_"] or 0,
+                "very_long_>=100km": buckets["very_long"] or 0,
+            },
+        }

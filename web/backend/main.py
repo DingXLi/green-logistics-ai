@@ -2072,6 +2072,23 @@ async def export_cycles_csv(limit: int = 1000):
     )
 
 
+@app.get("/api/persistence/match-distance-stats")
+async def get_match_distance_stats():
+    """
+    Match 距离统计 (iter #15) — 从 matches 表聚合 distance_km 指标。
+
+    返回:
+    - total_matches, n_cycles_with_matches
+    - avg / min / max / median distance_km
+    - distance_distribution: 4 桶 (<10, 10-50, 50-100, >=100 km)
+
+    用途: 验证 OSM 距离是否合理, 监控 match quality。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_match_distance_stats()
+
+
 @app.get("/api/materials")
 async def get_materials():
     """
