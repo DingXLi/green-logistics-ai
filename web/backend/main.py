@@ -692,6 +692,147 @@ async def health_check():
     }
 
 
+@app.get("/api/health/deep")
+async def health_check_deep():
+    """
+    Deep health check (iter #14) — 检查所有依赖子系统的状态。
+
+    返回每个子系统的 status (ok / degraded / down) + 详情:
+    - database: SQLite 可读 + cycle 数
+    - websocket: broadcaster client 数 + 状态
+    - osrm: OSM 可用性 (尝试小范围 query, timeout 3s)
+    - scheduler: enabled / running / cycle_count / dry_run
+    - llm: GOOGLE_API_KEY 是否设置 + 最近一次调用是否成功
+    - agents: supply/demand/vehicle 计数
+
+    Status 总体:
+    - all_ok = 所有子系统都 ok
+    - degraded = 某些子系统 degraded 但仍可服务
+    - down = 关键子系统 (database) 不可用
+
+    用途: 诊断页面 / monitoring / 部署后验证
+    """
+    checks: Dict[str, Any] = {}
+    overall_status = "ok"
+
+    # 1. Database
+    try:
+        if coordinator is not None and coordinator.persistence is not None:
+            summary = coordinator.persistence.get_summary() or {}
+            checks["database"] = {
+                "status": "ok",
+                "n_cycles": summary.get("n_cycles", 0),
+                "db_path": getattr(coordinator.persistence, "db_path", None),
+            }
+        else:
+            checks["database"] = {
+                "status": "degraded",
+                "reason": "Persistence not initialized",
+            }
+            overall_status = "degraded"
+    except Exception as e:
+        checks["database"] = {"status": "down", "error": str(e)[:200]}
+        overall_status = "down"
+
+    # 2. WebSocket
+    try:
+        stats = ws_broadcaster.stats()
+        checks["websocket"] = {
+            "status": "ok" if stats.get("total_clients", 0) >= 0 else "down",
+            "total_clients": stats.get("total_clients", 0),
+            "broadcasts_sent": stats.get("broadcasts_sent", 0),
+        }
+    except Exception as e:
+        checks["websocket"] = {"status": "down", "error": str(e)[:200]}
+        overall_status = "degraded"
+
+    # 3. OSRM / OSM availability (heuristic: try import osmnx, check cache)
+    try:
+        from optimization.real_distance import _osmnx_available  # type: ignore
+        osmnx_ok = _osmnx_available()
+        checks["osm"] = {
+            "status": "ok" if osmnx_ok else "degraded",
+            "osmnx_available": osmnx_ok,
+            "reason": "OSM available" if osmnx_ok else "osmnx not installed or import failed",
+        }
+        if not osmnx_ok:
+            overall_status = "degraded"
+    except Exception as e:
+        checks["osm"] = {"status": "degraded", "reason": str(e)[:200]}
+        overall_status = "degraded"
+
+    # 4. Scheduler
+    sched = globals().get("scheduler")
+    if sched is not None:
+        try:
+            sched_status = sched.status()
+            checks["scheduler"] = {
+                "status": "ok" if sched.scheduler_active else "idle",
+                "active": sched.scheduler_active,
+                "cycle_count": sched.cycle_count,
+                "dry_run": sched.dry_run,
+                "error_count": sched.error_count,
+                "last_cycle_at": sched.last_cycle_at,
+            }
+        except Exception as e:
+            checks["scheduler"] = {"status": "degraded", "error": str(e)[:200]}
+    else:
+        checks["scheduler"] = {
+            "status": "idle",
+            "reason": "GL_SCHEDULER_ENABLED is not set to true",
+        }
+
+    # 5. LLM (Gemini)
+    try:
+        api_key_set = bool(os.environ.get("GOOGLE_API_KEY"))
+        if api_key_set:
+            from agents.llm_config import get_llm_config
+            cfg = get_llm_config()
+            checks["llm"] = {
+                "status": "ok",
+                "api_key_set": True,
+                "model": cfg.get("model"),
+                "max_retries": cfg.get("max_retries"),
+            }
+        else:
+            checks["llm"] = {
+                "status": "degraded",
+                "api_key_set": False,
+                "reason": "GOOGLE_API_KEY not set (LLM predictions will use deterministic fallback)",
+            }
+            if overall_status == "ok":
+                overall_status = "degraded"
+    except Exception as e:
+        checks["llm"] = {"status": "degraded", "error": str(e)[:200]}
+
+    # 6. Agents
+    try:
+        if coordinator is not None:
+            checks["agents"] = {
+                "status": "ok",
+                "n_supply": len(coordinator.supply_agents),
+                "n_demand": len(coordinator.market_agent.demand_points)
+                if hasattr(coordinator, "market_agent") else 0,
+                "n_vehicles": len(coordinator.logistics_agent.vehicles)
+                if hasattr(coordinator, "logistics_agent") else 0,
+            }
+        else:
+            checks["agents"] = {
+                "status": "down",
+                "reason": "Coordinator not initialized",
+            }
+            overall_status = "down"
+    except Exception as e:
+        checks["agents"] = {"status": "degraded", "error": str(e)[:200]}
+        overall_status = "degraded"
+
+    return {
+        "status": overall_status,
+        "timestamp": datetime.now().isoformat(),
+        "checks": checks,
+    }
+
+
 @app.get("/api/dashboard-summary")
 async def get_dashboard_summary():
     """

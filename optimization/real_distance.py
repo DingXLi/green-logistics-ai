@@ -153,6 +153,15 @@ def _save_cache(path: Path, matrix: np.ndarray, source: str, n: int) -> None:
 # OSM 内部实现
 # ============================================================
 
+def _osmnx_available() -> bool:
+    """iter #14: 检查 osmnx 是否可导入 (供 /api/health/deep 使用)"""
+    try:
+        import osmnx  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def _try_osm_matrix(
     locations: Sequence[Tuple[float, float]],
     region: str,
