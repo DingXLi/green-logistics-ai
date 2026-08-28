@@ -1565,3 +1565,21 @@ td.no-matches {
   color: #9ca3af;
   padding: 6px 0;
 }
+
+.csv-export-btn {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.csv-export-btn:hover {
+  background: #bfdbfe;
+  border-color: #3b82f6;
+}

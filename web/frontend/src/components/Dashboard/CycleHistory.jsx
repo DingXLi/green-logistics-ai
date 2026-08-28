@@ -130,6 +130,14 @@ export function CycleHistory() {
           <span>· {totalTons.toFixed(1)} t</span>
           <span>· {totalCost.toFixed(0)} SEK</span>
         </div>
+        <a
+          className="csv-export-btn"
+          href={`${API_BASE}/persistence/export/cycles.csv?limit=${limit}`}
+          download={`green_logistics_cycles_${limit}.csv`}
+          title="Download cycle history as CSV (Excel-friendly)"
+        >
+          ⬇️ Export CSV
+        </a>
       </div>
 
       {cycles.length === 0 ? (
