@@ -15,6 +15,8 @@ Schema:
 """
 
 import json
+import csv
+import io
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -905,3 +907,37 @@ class Persistence:
             r["match_rate_pct"] = round(100.0 * matches / n, 1) if n > 0 else None
             result.append(r)
         return result
+
+    def export_cycles_csv(self, limit: int = 1000) -> str:
+        """
+        Export cycle history as CSV string (iter #11) — 让用户下载 KPI 数据。
+
+        Columns (15):
+            cycle_id, sim_day, sim_hour, wall_timestamp, activity_factor,
+            n_supply_offers, n_demand_requests, n_matches, n_routes,
+            total_tons, total_cost_sek, total_co2_kg, total_distance_km,
+            n_vehicles_used, n_vehicles_available, fleet_utilization_pct,
+            solver_status, wall_duration_ms, seasonal_factor_avg, seasonal_month
+
+        Returns: CSV string with header + rows (UTF-8).
+        """
+        rows = self.get_cycle_history(limit=limit)
+        if not rows:
+            return "cycle_id,sim_day,sim_hour,wall_timestamp,activity_factor,n_supply_offers,n_demand_requests,n_matches,total_tons,total_cost_sek,total_co2_kg,total_distance_km,n_vehicles_used,n_vehicles_available,fleet_utilization_pct,solver_status,wall_duration_ms,seasonal_factor_avg,seasonal_month\n"
+
+        # 定义稳定 column 顺序 (避免 dict order 不一致)
+        columns = [
+            "cycle_id", "sim_day", "sim_hour", "wall_timestamp",
+            "activity_factor", "n_supply_offers", "n_demand_requests",
+            "n_matches", "total_tons", "total_cost_sek", "total_co2_kg",
+            "total_distance_km", "n_vehicles_used", "n_vehicles_available",
+            "fleet_utilization_pct", "solver_status", "wall_duration_ms",
+            "seasonal_factor_avg", "seasonal_month",
+        ]
+
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)
+        return buf.getvalue()

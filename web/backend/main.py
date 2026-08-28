@@ -6,6 +6,7 @@ FastAPI 应用提供 REST API
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response as FastAPIResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
@@ -1492,6 +1493,32 @@ async def get_cycle_detail(cycle_id: str):
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
     return detail
+
+
+@app.get("/api/persistence/export/cycles.csv")
+async def export_cycles_csv(limit: int = 1000):
+    """
+    Export cycle history as CSV (iter #11) — 下载 KPI 数据用于 Excel / 论文 figure。
+
+    Query:
+    - limit: 最多多少行 (default 1000, max 10000)
+
+    Returns: text/csv 响应 + Content-Disposition: attachment。
+    包含 19 列 KPI (见 Persistence.export_cycles_csv 注释)。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(10000, limit))
+    csv_data = coordinator.persistence.export_cycles_csv(limit=limit)
+    return FastAPIResponse(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="green_logistics_cycles_{limit}.csv"'
+            ),
+        },
+    )
 
 
 @app.get("/api/materials")

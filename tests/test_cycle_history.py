@@ -166,6 +166,39 @@ class TestCycleHistoryPersistence(unittest.TestCase):
         for c in result:
             self.assertGreater(c["n_matches"], 0)
 
+    def test_export_cycles_csv_returns_header_and_rows(self):
+        csv_str = self.p.export_cycles_csv(limit=10)
+        lines = csv_str.strip().split("\n")
+        # header + 5 cycles
+        self.assertEqual(len(lines), 6)
+        # 验证 header 列名 (strip \r from DictWriter)
+        header_cols = [c.strip() for c in lines[0].split(",")]
+        self.assertIn("cycle_id", header_cols)
+        self.assertIn("n_matches", header_cols)
+        self.assertIn("total_cost_sek", header_cols)
+        self.assertIn("seasonal_month", header_cols)
+        # 第一行数据应该是 c5 (newest first)
+        first_row = [c.strip() for c in lines[1].split(",")]
+        self.assertEqual(first_row[header_cols.index("cycle_id")], "c5")
+
+    def test_export_cycles_csv_empty_db_returns_header_only(self):
+        empty_path = tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir="/tmp").name
+        try:
+            from agents.persistence import Persistence
+            empty_p = Persistence(db_path=empty_path)
+            csv_str = empty_p.export_cycles_csv(limit=10)
+            lines = csv_str.strip().split("\n")
+            self.assertEqual(len(lines), 1)
+            self.assertIn("cycle_id", lines[0])
+        finally:
+            os.unlink(empty_path)
+
+    def test_export_cycles_csv_limit(self):
+        csv_str = self.p.export_cycles_csv(limit=2)
+        lines = csv_str.strip().split("\n")
+        # header + 2 cycles
+        self.assertEqual(len(lines), 3)
+
     def test_cycle_history_empty_db(self):
         empty_path = tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir="/tmp").name
         try:
@@ -302,6 +335,27 @@ class TestCycleHistoryAPI(unittest.TestCase):
         from web.backend import main as backend_main
         backend_main.coordinator = None
         resp = self.client.get("/api/persistence/cycle-history")
+        self.assertEqual(resp.status_code, 503)
+
+    def test_export_cycles_csv_endpoint_200(self):
+        resp = self.client.get("/api/persistence/export/cycles.csv")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/csv", resp.headers.get("content-type", ""))
+        self.assertIn("attachment", resp.headers.get("content-disposition", ""))
+        # body should have header + 1 cycle
+        lines = resp.text.strip().split("\n")
+        self.assertEqual(len(lines), 2)
+        self.assertIn("cycle_id", lines[0])
+
+    def test_export_cycles_csv_endpoint_with_limit(self):
+        resp = self.client.get("/api/persistence/export/cycles.csv?limit=500")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("cycles_500", resp.headers.get("content-disposition", ""))
+
+    def test_export_cycles_csv_endpoint_503(self):
+        from web.backend import main as backend_main
+        backend_main.coordinator = None
+        resp = self.client.get("/api/persistence/export/cycles.csv")
         self.assertEqual(resp.status_code, 503)
 
 
