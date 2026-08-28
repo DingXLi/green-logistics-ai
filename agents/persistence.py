@@ -1115,3 +1115,84 @@ class Persistence:
             "indexes": indexes,
             "time_range": time_range,
         }
+
+    def get_supply_aggregates(self, supply_id: Optional[str] = None,
+                              material_type: Optional[str] = None,
+                              limit_supplies: int = 100) -> List[Dict[str, Any]]:
+        """
+        Supply 聚合统计 (iter #15) — 每个 supply_id 的累计 KPI。
+
+        Args:
+            supply_id: 可选, 只查某个 supply_id (否则返回 top supplies)
+            material_type: 可选, 按 material_type 过滤
+            limit_supplies: 最多返回多少个 supply
+
+        Returns:
+            [{supply_id, material_type, n_cycles_with_supply,
+              total_available_tons, total_matched_tons, total_quality_avg,
+              n_matches, last_seen, first_seen}, ...]
+            按 total_available_tons DESC 排序
+        """
+        with self._conn() as conn:
+            where_clauses: List[str] = []
+            params: List[Any] = []
+            if material_type:
+                where_clauses.append("s.material_type = ?")
+                params.append(material_type)
+
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+            # 注意: supply_id 在表里是 supply_id, 但需要去重 (一个 supply 多个 cycle)
+            if supply_id:
+                # 单个 supply 的聚合
+                where_clauses.append("s.supply_id = ?")
+                params.append(supply_id)
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+                sql = f"""SELECT s.supply_id, s.material_type,
+                                 COUNT(DISTINCT s.cycle_id) as n_cycles,
+                                 SUM(s.available_tons) as total_available,
+                                 AVG(s.quality_score) as avg_quality,
+                                 MAX(s.cycle_id) as last_cycle,
+                                 MIN(s.cycle_id) as first_cycle
+                          FROM supply_offers s
+                          {where_sql}
+                          GROUP BY s.supply_id
+                          ORDER BY total_available DESC
+                          LIMIT 1"""
+                rows = conn.execute(sql, params).fetchall()
+            else:
+                # top supplies (按 total_available 排序)
+                sql = f"""SELECT s.supply_id, s.material_type,
+                                 COUNT(DISTINCT s.cycle_id) as n_cycles,
+                                 SUM(s.available_tons) as total_available,
+                                 AVG(s.quality_score) as avg_quality,
+                                 MAX(s.cycle_id) as last_cycle,
+                                 MIN(s.cycle_id) as first_cycle
+                          FROM supply_offers s
+                          {where_sql}
+                          GROUP BY s.supply_id
+                          ORDER BY total_available DESC
+                          LIMIT ?"""
+                params.append(limit_supplies)
+                rows = conn.execute(sql, params).fetchall()
+
+            # join matches (per supply_id) - 在 with 块内 避免 conn closed
+            result: List[Dict[str, Any]] = []
+            for r in rows:
+                sid = r["supply_id"]
+                match_row = conn.execute(
+                    """SELECT COUNT(*) as n_matches, SUM(tons) as total_matched
+                       FROM matches WHERE supply_id = ?""",
+                    (sid,)
+                ).fetchone()
+                d = dict(r)
+                d["n_matches"] = match_row["n_matches"] or 0
+                d["total_matched_tons"] = round(match_row["total_matched"] or 0, 2)
+                d["total_available_tons"] = round(d.get("total_available") or 0, 2)
+                d["avg_quality_score"] = round(d.pop("avg_quality") or 0, 1)
+                d["n_cycles_with_supply"] = d.pop("n_cycles", 0)
+                d["last_cycle_id"] = d.pop("last_cycle")
+                d["first_cycle_id"] = d.pop("first_cycle")
+                d["material_type"] = d["material_type"]
+                result.append(d)
+        return result

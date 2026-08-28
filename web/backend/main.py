@@ -2089,6 +2089,35 @@ async def get_match_distance_stats():
     return coordinator.persistence.get_match_distance_stats()
 
 
+@app.get("/api/persistence/supply-aggregates")
+async def get_supply_aggregates(
+    supply_id: Optional[str] = None,
+    material_type: Optional[str] = None,
+    limit: int = 100,
+):
+    """
+    Supply 聚合统计 (iter #15) — 每个 supply_id 的累计 KPI。
+
+    Query:
+    - supply_id: 可选, 查单个 supply
+    - material_type: 可选, 按 material_type 过滤
+    - limit: 最多返回多少 supply (default 100, max 500)
+
+    Returns:
+        [{supply_id, material_type, n_cycles_with_supply,
+          total_available_tons, total_matched_tons, avg_quality_score,
+          n_matches, last_cycle_id, first_cycle_id}, ...]
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    return coordinator.persistence.get_supply_aggregates(
+        supply_id=supply_id,
+        material_type=material_type,
+        limit_supplies=limit,
+    )
+
+
 @app.get("/api/admin/db-stats")
 async def get_db_stats():
     """
