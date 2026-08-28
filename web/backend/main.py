@@ -543,6 +543,8 @@ class OptimizationRequest(BaseModel):
     # iter #8: caller 可控制 VRP 距离 (OSM vs Haversine)
     use_real_roads: bool = True
     region: Optional[str] = None
+    # iter #12: caller 可控制是否推送 WS (避免手动 API 调用中重复推送给其他连接)
+    ws_broadcast: bool = True
 
 
 class OptimizationResponse(BaseModel):
@@ -885,6 +887,14 @@ async def run_optimization(request: OptimizationRequest = None):
     # 提取关键指标
     matches = last_result.get("matches", {})
     routes = last_result.get("route_optimization", {})
+
+    # iter #12: 如果 caller 控制 ws_broadcast=False 且是刚跑的 (非 cache),
+    # 主动推送给已连的 WS client (之前 scheduler 路径会推, 现在 API 路径下也推一次)
+    if not cached_flag and request and request.ws_broadcast:
+        try:
+            await _broadcast_cycle_update(last_result)
+        except Exception as e:
+            logger.debug(f"WS broadcast in /api/optimize failed (ignore): {e}")
 
     return OptimizationResponse(
         status="success" if not cached_flag else "cached",
