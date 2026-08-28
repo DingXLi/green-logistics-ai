@@ -1341,3 +1341,227 @@ body {
   padding: 6px 10px;
   font-size: 0.75rem;
 }
+
+/* ============================================ */
+/* iter #11: Cycle History table + detail styles */
+/* ============================================ */
+
+.history-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.history-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+}
+.history-checkbox input {
+  cursor: pointer;
+}
+.history-limit {
+  font-size: 0.85rem;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.history-limit select {
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  font-size: 0.85rem;
+}
+.history-stats {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.history-table-wrap {
+  margin-top: 10px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.history-table thead th {
+  background: #f3f4f6;
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 2px solid #d1d5db;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.history-table tbody td {
+  padding: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+}
+
+.history-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.history-row:hover {
+  background: #fef3c7;
+}
+.history-row.expanded {
+  background: #fef3c7;
+  font-weight: 500;
+}
+.history-row.no-matches {
+  opacity: 0.6;
+}
+
+.history-toggle {
+  width: 24px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.cycle-id-cell {
+  font-family: 'JetBrains Mono', monospace;
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+
+.ts-cell {
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+
+td.has-matches {
+  color: #166534;
+  font-weight: 600;
+}
+td.no-matches {
+  color: #9ca3af;
+}
+
+.solver-status {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.solver-status.optimal {
+  background: #dcfce7;
+  color: #166534;
+}
+.solver-status.feasible {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.solver-status.infeasible,
+.solver-status.failed,
+.solver-status.unknown {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.history-detail {
+  margin-top: 0;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 14px;
+}
+
+.cycle-detail-content h4 {
+  margin: 0 0 10px 0;
+  color: #92400e;
+  font-size: 0.95rem;
+}
+
+.detail-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: #4b5563;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #fde68a;
+}
+
+.detail-section {
+  margin-bottom: 14px;
+}
+.detail-section h5 {
+  margin: 0 0 6px 0;
+  font-size: 0.85rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.detail-table thead th {
+  background: #f9fafb;
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detail-table tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+}
+
+.detail-table .coord,
+.detail-table .stops-cell {
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.profit-cell {
+  color: #166534;
+  font-weight: 600;
+}
+
+.more-note {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.empty.small {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  padding: 6px 0;
+}

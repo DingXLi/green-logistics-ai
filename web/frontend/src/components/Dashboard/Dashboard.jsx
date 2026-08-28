@@ -32,6 +32,8 @@ const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ defaul
 const MonthlyEfficiencyChart = lazy(() => import('./MonthlyEfficiencyChart').then(m => ({ default: m.MonthlyEfficiencyChart })))
 const FleetUtilizationChart = lazy(() => import('./FleetUtilizationChart').then(m => ({ default: m.FleetUtilizationChart })))
 const MaterialsOverview = lazy(() => import('./MaterialsOverview').then(m => ({ default: m.MaterialsOverview })))
+// iter #11: cycle history with expandable detail
+const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -298,14 +300,15 @@ export default function Dashboard() {
   const [wsFleet, setWsFleet] = useState(null)
   const [activeTab, setActiveTabRaw] = useState(() => {
     // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
+    // iter #11: 加 'history' tab
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');
-      if (['overview', 'scenarios', 'network'].includes(hash)) {
+      if (['overview', 'scenarios', 'network', 'history'].includes(hash)) {
         return hash;
       }
     }
     return 'overview';
-  });  // 'overview' | 'scenarios' | 'network'
+  });  // 'overview' | 'scenarios' | 'network' | 'history'
 
   // setActiveTab 同时写 URL hash, 让 tab 可分享/收藏
   const setActiveTab = (tab) => {
@@ -319,7 +322,7 @@ export default function Dashboard() {
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['overview', 'scenarios', 'network'].includes(hash)) {
+      if (['overview', 'scenarios', 'network', 'history'].includes(hash)) {
         setActiveTabRaw(hash);
       }
     };
@@ -477,6 +480,12 @@ export default function Dashboard() {
         >
           🏭 Network
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          📜 History
+        </button>
       </div>
 
       {/* Tab 内容 */}
@@ -542,6 +551,12 @@ export default function Dashboard() {
       {activeTab === 'network' && (
         <Suspense fallback={<LoadingSpinner label="Loading network…" />}>
           <FacilitiesList />
+        </Suspense>
+      )}
+
+      {activeTab === 'history' && (
+        <Suspense fallback={<LoadingSpinner label="Loading history…" />}>
+          <CycleHistory />
         </Suspense>
       )}
     </div>
