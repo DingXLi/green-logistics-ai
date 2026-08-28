@@ -1006,7 +1006,10 @@ async def get_seasonal_factors(sim_day: Optional[int] = None):
 
 @app.get("/api/optimize/last")
 async def get_last_optimization():
-    """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'"""
+    """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'
+
+    iter #12 扩展: 加入 seasonal_factor + month + cost_per_ton + efficiency 指标。
+    """
     if coordinator is None:
         raise HTTPException(status_code=503, detail="System not initialized")
     if coordinator.persistence is None:
@@ -1029,10 +1032,26 @@ async def get_last_optimization():
 
     # iter #8: distance_source 从 coordinator 上次 cycle 拿 (in-memory cache)
     distance_source = "unknown"
+    last_cycle_meta = {}
     if hasattr(coordinator, "_last_cycle_result") and coordinator._last_cycle_result:
-        distance_source = coordinator._last_cycle_result.get("distance_source", "unknown")
+        last_cycle_meta = coordinator._last_cycle_result or {}
+        distance_source = last_cycle_meta.get("distance_source", "unknown")
     elif hasattr(coordinator, "last_distance_source"):
         distance_source = coordinator.last_distance_source
+
+    # iter #12: 计算 cost_per_ton / co2_per_ton / fleet_util
+    last_tons = last_cycle.get("total_tons") or 0
+    last_cost = last_cycle.get("total_cost_sek") or 0
+    last_co2 = last_cycle.get("total_co2_kg") or 0
+    cost_per_ton = round(last_cost / last_tons, 2) if last_tons > 0 else None
+    co2_per_ton = round(last_co2 / last_tons, 2) if last_tons > 0 else None
+
+    # iter #12: aggregate efficiency (全期, 不是 last cycle)
+    efficiency = None
+    try:
+        efficiency = coordinator.persistence.get_efficiency_metrics()
+    except Exception:
+        pass
 
     return {
         "last_cycle_id": last_cycle.get("cycle_id"),
@@ -1043,6 +1062,22 @@ async def get_last_optimization():
         "total_cost_sek": summary.get("total_cost_sek", 0),
         "total_co2_kg": summary.get("total_co2_kg", 0),
         "distance_source": distance_source,
+        # iter #12: last-cycle 详情
+        "last_sim_day": last_cycle.get("sim_day"),
+        "last_sim_hour": last_cycle.get("sim_hour"),
+        "last_n_matches": last_cycle.get("n_matches"),
+        "last_seasonal_factor_avg": last_cycle.get("seasonal_factor_avg"),
+        "last_seasonal_month": last_cycle.get("seasonal_month"),
+        "last_cost_per_ton_sek": cost_per_ton,
+        "last_co2_per_ton_kg": co2_per_ton,
+        "last_fleet_utilization_pct": last_cycle.get("fleet_utilization_pct"),
+        "last_solver_status": last_cycle.get("solver_status"),
+        "last_wall_duration_ms": last_cycle.get("wall_duration_ms"),
+        "last_distance_km": last_cycle.get("total_distance_km"),
+        "last_n_vehicles_used": last_cycle.get("n_vehicles_used"),
+        "last_n_vehicles_available": last_cycle.get("n_vehicles_available"),
+        # iter #12: 全期 efficiency 聚合
+        "efficiency": efficiency,
     }
 
 
