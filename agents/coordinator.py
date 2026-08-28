@@ -166,6 +166,7 @@ class MultiAgentCoordinator:
         self,
         use_real_roads: bool = True,
         region: Optional[str] = None,
+        dry_run: bool = False,
     ) -> Dict[str, Any]:
         """
         运行一次完整的优化周期（= 1 sim-day）。
@@ -182,6 +183,9 @@ class MultiAgentCoordinator:
         iter #8 新参数:
         - use_real_roads: bool = True (VRP 走 OSM 真实路网 vs Haversine)
         - region: OSM 地区名 (None = 从 depot_location 反推)
+
+        iter #12 新参数:
+        - dry_run: bool = False — 跑 cycle 但跳过 persistence (scheduler 调试用)
         """
         t_start = time.time()
 
@@ -302,47 +306,50 @@ class MultiAgentCoordinator:
             / max(len(supply_offers), 1)
         )
         sim_month = _seasonal_month(day)
-        self.persistence.begin_cycle(
-            cycle_id=cycle_id,
-            sim_day=self.clock.now.day,
-            sim_hour=self.clock.now.hour,
-            activity_factor=factor,
-            n_supply_offers=len(supply_offers),
-            n_demand_requests=len(demand_requests),
-            seasonal_factor_avg=round(seasonal_factor_avg, 3),
-            seasonal_month=sim_month,
-        )
-        for sup in supply_offers:
-            self.persistence.record_supply(cycle_id, sup)
-        for dem in demand_requests:
-            self.persistence.record_demand(cycle_id, dem)
-        # 持久化 LLM 决策 (供报告画图)
-        if supply_llm:
-            self.persistence.record_llm_decisions_batch(
+        # iter #12: dry_run 模式下跳过所有 persistence (但 cycle 逻辑仍完整)
+        if not dry_run:
+            self.persistence.begin_cycle(
                 cycle_id=cycle_id,
-                decision_type="supply_prediction",
-                target_type="supply_point",
-                predictions=list(supply_llm.values()),
-                sim_day=day,
+                sim_day=self.clock.now.day,
                 sim_hour=self.clock.now.hour,
+                activity_factor=factor,
+                n_supply_offers=len(supply_offers),
+                n_demand_requests=len(demand_requests),
+                seasonal_factor_avg=round(seasonal_factor_avg, 3),
+                seasonal_month=sim_month,
             )
-        if llm_pred.get("predictions"):
-            self.persistence.record_llm_decisions_batch(
-                cycle_id=cycle_id,
-                decision_type="demand_prediction",
-                target_type="demand_point",
-                predictions=llm_pred["predictions"],
-                sim_day=day,
-                sim_hour=self.clock.now.hour,
-            )
+            for sup in supply_offers:
+                self.persistence.record_supply(cycle_id, sup)
+            for dem in demand_requests:
+                self.persistence.record_demand(cycle_id, dem)
+            # 持久化 LLM 决策 (供报告画图)
+            if supply_llm:
+                self.persistence.record_llm_decisions_batch(
+                    cycle_id=cycle_id,
+                    decision_type="supply_prediction",
+                    target_type="supply_point",
+                    predictions=list(supply_llm.values()),
+                    sim_day=day,
+                    sim_hour=self.clock.now.hour,
+                )
+            if llm_pred.get("predictions"):
+                self.persistence.record_llm_decisions_batch(
+                    cycle_id=cycle_id,
+                    decision_type="demand_prediction",
+                    target_type="demand_point",
+                    predictions=llm_pred["predictions"],
+                    sim_day=day,
+                    sim_hour=self.clock.now.hour,
+                )
 
         # 5. 匹配供需
         matches = await self.market_agent.match_supply_demand(
             supply_offers=supply_offers,
             demand_requests=demand_requests,
         )
-        for m in matches.get("matches", []):
-            self.persistence.record_match(cycle_id, m)
+        if not dry_run:
+            for m in matches.get("matches", []):
+                self.persistence.record_match(cycle_id, m)
 
         # 6. 优化物流路径
         route_optimization = {"status": "no_matches"}
@@ -357,8 +364,9 @@ class MultiAgentCoordinator:
                 region=region,
             )
             # 落盘 routes
-            for route in route_optimization.get("routes", []):
-                self.persistence.record_route(cycle_id, route)
+            if not dry_run:
+                for route in route_optimization.get("routes", []):
+                    self.persistence.record_route(cycle_id, route)
 
         # 6b. 让 supply 库存反映本周期实际被出运的量（quasi-steady，避免单调递增
         # 锁死在单车 cap 上）。**只有当 route opt 真的成功时**才扣减，否则 no_solution
@@ -387,7 +395,9 @@ class MultiAgentCoordinator:
 
         t_end = time.time()
         wall_ms = int((t_end - t_start) * 1000)
-        self.persistence.commit_cycle(cycle_id, kpi, wall_duration_ms=wall_ms)
+        # iter #12: dry_run 跳过 final commit_cycle
+        if not dry_run:
+            self.persistence.commit_cycle(cycle_id, kpi, wall_duration_ms=wall_ms)
 
         # 8. 更新系统状态
         self.system_status["total_optimizations"] = self.clock.total_cycles
@@ -415,10 +425,12 @@ class MultiAgentCoordinator:
         logger.info(
             f"周期 {cycle_id} 完成：matches={kpi['n_matches']} tons={kpi['total_tons']:.1f} "
             f"cost={kpi['total_cost_sek']:.0f} SEK co2={kpi['total_co2_kg']:.1f}kg "
-            f"({wall_ms}ms)"
+            f"({wall_ms}ms){' (DRY RUN)' if dry_run else ''}"
         )
         # iter #8: cache this result (供 /api/optimize/last 读 distance_source)
-        self._last_cycle_result = result
+        # iter #12: dry_run 不覆盖 cache (避免污染 production cache)
+        if not dry_run:
+            self._last_cycle_result = result
         return result
 
     # ------------------------------------------------------------

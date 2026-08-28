@@ -272,6 +272,9 @@ class BackgroundScheduler:
         self.started_at: Optional[str] = None
         self.is_idle: bool = False            # True = 当前在闲置模式, 不跑 cycle
         self.idle_entered_at: Optional[str] = None  # 上次进入闲置的时间
+        # iter #12: dry_run 模式 — 跑 cycle 但不 persist (开发调试用)
+        self.dry_run: bool = False
+        self.dry_run_count: int = 0  # dry-run 跳的 cycle 数 (不加入 cycle_count)
 
     async def _run_cycle_safe(self) -> None:
         """单次 cycle: lock 保护 + try/except 隔离错误"""
@@ -282,21 +285,32 @@ class BackgroundScheduler:
         async with self._lock:
             self.running = True
             try:
-                result = await self.coord.run_optimization_cycle()
-                self.cycle_count += 1
+                result = await self.coord.run_optimization_cycle(dry_run=self.dry_run)
+                # iter #12: dry_run 模式不 persist (但不防礙 cycle 本身逻辑)
+                if self.dry_run and result.get("optimization_id"):
+                    logger.info(
+                        f"Scheduler cycle #{self.cycle_count + 1} 跑成功 (DRY RUN, 未 persist)"
+                    )
+                    # 仍统计 cycle_count (仅表示跳了几次)
+                    self.dry_run_count += 1
+                else:
+                    self.cycle_count += 1
                 self.last_cycle_at = datetime.utcnow().isoformat() + "Z"
                 self.last_cycle_id = result.get("optimization_id")
                 self.last_error = None
                 matches = (result.get("matches") or {}).get("total_matches", 0)
                 logger.info(
-                    f"Scheduler cycle #{self.cycle_count} 完成: "
+                    f"Scheduler cycle 完成: "
                     f"{self.last_cycle_id} ({matches} matches)"
+                    f"{' (DRY RUN)' if self.dry_run else ''}"
                 )
                 # WebSocket 广播: cycle 完成推给所有 dashboard
-                try:
-                    await _broadcast_cycle_update(result)
-                except Exception as e:
-                    logger.warning(f"WS broadcast 在 scheduler cycle 失败: {e}")
+                # dry_run 模式不广播 (避免误导 dashboard 数据)
+                if not self.dry_run:
+                    try:
+                        await _broadcast_cycle_update(result)
+                    except Exception as e:
+                        logger.warning(f"WS broadcast 在 scheduler cycle 失败: {e}")
             except Exception as e:
                 self.error_count += 1
                 self.last_error = f"{type(e).__name__}: {str(e)[:200]}"
@@ -430,12 +444,34 @@ class BackgroundScheduler:
             "last_frontend_path_age_s": round(path_age, 1) if path_age is not None else None,
             "interval_seconds": self.interval_seconds,
             "cycle_count": self.cycle_count,
+            "dry_run": self.dry_run,           # iter #12
+            "dry_run_count": self.dry_run_count,  # iter #12
             "error_count": self.error_count,
             "last_error": self.last_error,
             "last_cycle_at": self.last_cycle_at,
             "last_cycle_id": self.last_cycle_id,
             "next_cycle_in_seconds": next_in,
             "started_at": self.started_at,
+        }
+
+    def set_dry_run(self, enabled: bool) -> Dict[str, Any]:
+        """iter #12: 切换 dry_run 模式 (跑 cycle 但不 persist)。
+
+        Args:
+            enabled: True → dry_run, False → normal mode
+
+        Returns:
+            dict with previous state + new state
+        """
+        prev = self.dry_run
+        self.dry_run = enabled
+        if not enabled:
+            # 退出 dry_run 时清零 dry_run_count (仅作为 diagnostic counter)
+            self.dry_run_count = 0
+        logger.info(f"Scheduler dry_run: {prev} → {enabled}")
+        return {
+            "previous_dry_run": prev,
+            "current_dry_run": enabled,
         }
 
 
@@ -1785,6 +1821,26 @@ async def scheduler_control(action: str = "status"):
         scheduler.start()
         logger.info("Scheduler control: restart triggered")
         success = True
+    elif action == "dry_run_on":
+        result = scheduler.set_dry_run(True)
+        logger.info("Scheduler control: dry_run enabled")
+        return {
+            "action": action,
+            "success": True,
+            "previous_dry_run": result["previous_dry_run"],
+            "current_dry_run": result["current_dry_run"],
+            "status": scheduler.status(),
+        }
+    elif action == "dry_run_off":
+        result = scheduler.set_dry_run(False)
+        logger.info("Scheduler control: dry_run disabled")
+        return {
+            "action": action,
+            "success": True,
+            "previous_dry_run": result["previous_dry_run"],
+            "current_dry_run": result["current_dry_run"],
+            "status": scheduler.status(),
+        }
     else:
         raise HTTPException(
             status_code=400,
