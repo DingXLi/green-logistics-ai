@@ -707,6 +707,152 @@ class Persistence:
 
         return result
 
+    def get_cycle_history(self, limit: int = 50, sim_day_min: Optional[int] = None,
+                          sim_day_max: Optional[int] = None,
+                          has_matches_only: bool = False) -> List[Dict[str, Any]]:
+        """
+        Cycle history list (iter #11) — 列出过往 optimization cycles。
+
+        每个 cycle 含 KPI 摘要 + match/route counts (joins sub-tables),
+        供 dashboard 的 "Cycle History" 表格展示。
+
+        Args:
+            limit: 最多返回多少条 (默认 50)
+            sim_day_min: 最小的 sim_day (可选过滤)
+            sim_day_max: 最大的 sim_day (可选过滤)
+            has_matches_only: True → 仅返回 n_matches > 0 的 cycle
+
+        返回:
+            [{cycle_id, sim_day, sim_hour, wall_timestamp,
+              activity_factor, n_supply_offers, n_demand_requests, n_matches,
+              total_tons, total_cost_sek, total_co2_kg, total_distance_km,
+              n_vehicles_used, n_vehicles_available, fleet_utilization_pct,
+              solver_status, wall_duration_ms, seasonal_factor_avg,
+              seasonal_month, n_routes}, ...]
+        """
+        where_clauses = []
+        params: List[Any] = []
+        if sim_day_min is not None:
+            where_clauses.append("oc.sim_day >= ?")
+            params.append(sim_day_min)
+        if sim_day_max is not None:
+            where_clauses.append("oc.sim_day <= ?")
+            params.append(sim_day_max)
+        if has_matches_only:
+            where_clauses.append("oc.n_matches > 0")
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        # routes 用 sub-query 避免 LEFT JOIN 大表
+        sql = f"""SELECT oc.cycle_id, oc.sim_day, oc.sim_hour,
+                          oc.wall_timestamp, oc.activity_factor,
+                          oc.n_supply_offers, oc.n_demand_requests, oc.n_matches,
+                          oc.total_tons, oc.total_cost_sek, oc.total_co2_kg,
+                          oc.total_distance_km, oc.n_vehicles_used,
+                          oc.n_vehicles_available, oc.fleet_utilization_pct,
+                          oc.solver_status, oc.wall_duration_ms,
+                          oc.seasonal_factor_avg, oc.seasonal_month,
+                          (SELECT COUNT(*) FROM routes r WHERE r.cycle_id = oc.cycle_id) as n_routes
+                     FROM optimization_cycles oc
+                     {where_sql}
+                     ORDER BY oc.id DESC
+                     LIMIT ?"""
+        params.append(limit)
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        result = []
+        for r in rows:
+            d = dict(r)
+            # 数字 round
+            for k in ("total_tons", "total_cost_sek", "total_co2_kg",
+                      "total_distance_km", "fleet_utilization_pct",
+                      "seasonal_factor_avg"):
+                if d.get(k) is not None:
+                    d[k] = round(d[k], 2)
+            result.append(d)
+        return result
+
+    def get_cycle_detail(self, cycle_id: str) -> Optional[Dict[str, Any]]:
+        """
+        单个 cycle 的完整 detail (iter #11) — KPI + 全部 supply/demand/match/route。
+
+        Args:
+            cycle_id: cycle 的 UUID (string)
+
+        Returns:
+            {cycle: {...}, supply_offers: [...], demand_requests: [...],
+             matches: [...], routes: [...]} 或 None (cycle 不存在)
+        """
+        with self._conn() as conn:
+            cycle_row = conn.execute(
+                "SELECT * FROM optimization_cycles WHERE cycle_id = ?",
+                (cycle_id,)
+            ).fetchone()
+            if not cycle_row:
+                return None
+            cycle = dict(cycle_row)
+
+            supplies = conn.execute(
+                """SELECT supply_id, location_lat, location_lon, material_type,
+                          available_tons, moisture_percent, quality_score
+                   FROM supply_offers WHERE cycle_id = ?
+                   ORDER BY id ASC""",
+                (cycle_id,)
+            ).fetchall()
+
+            demands = conn.execute(
+                """SELECT demand_id, name, location_lat, location_lon,
+                          material_type, required_tons, priority, deadline
+                   FROM demand_requests WHERE cycle_id = ?
+                   ORDER BY id ASC""",
+                (cycle_id,)
+            ).fetchall()
+
+            matches = conn.execute(
+                """SELECT supply_id, demand_id, material_type, tons,
+                          distance_km, estimated_profit_sek
+                   FROM matches WHERE cycle_id = ?
+                   ORDER BY id ASC""",
+                (cycle_id,)
+            ).fetchall()
+
+            routes = conn.execute(
+                """SELECT vehicle_id, stops_json, distance_km, duration_hours,
+                          cost_sek, co2_kg
+                   FROM routes WHERE cycle_id = ?
+                   ORDER BY id ASC""",
+                (cycle_id,)
+            ).fetchall()
+
+        # parse stops_json
+        routes_list = []
+        for r in routes:
+            d = dict(r)
+            try:
+                d["stops"] = json.loads(d.pop("stops_json") or "[]")
+            except Exception:
+                d["stops"] = []
+            # round 数字
+            for k in ("distance_km", "duration_hours", "cost_sek", "co2_kg"):
+                if d.get(k) is not None:
+                    d[k] = round(d[k], 2)
+            routes_list.append(d)
+
+        # round cycle 数字
+        for k in ("total_tons", "total_cost_sek", "total_co2_kg",
+                  "total_distance_km", "fleet_utilization_pct",
+                  "seasonal_factor_avg"):
+            if cycle.get(k) is not None:
+                cycle[k] = round(cycle[k], 2)
+
+        return {
+            "cycle": cycle,
+            "supply_offers": [dict(r) for r in supplies],
+            "demand_requests": [dict(r) for r in demands],
+            "matches": [dict(r) for r in matches],
+            "routes": routes_list,
+        }
+
     def get_monthly_efficiency_trend(self) -> List[Dict[str, Any]]:
         """
         按月份聚合的 efficiency 趋势 (iter #8)。

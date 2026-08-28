@@ -1444,6 +1444,56 @@ async def get_monthly_efficiency_trend():
     return coordinator.persistence.get_monthly_efficiency_trend()
 
 
+@app.get("/api/persistence/cycle-history")
+async def get_cycle_history(
+    limit: int = 50,
+    sim_day_min: Optional[int] = None,
+    sim_day_max: Optional[int] = None,
+    has_matches_only: bool = False,
+):
+    """
+    Cycle history list (iter #11) — 列出过往 optimization cycles 摘要。
+
+    Query params:
+    - limit: 最多返回条数 (default 50, max 500)
+    - sim_day_min / sim_day_max: sim_day 范围过滤
+    - has_matches_only: True → 仅 n_matches > 0 的 cycle
+
+    每个 cycle 含 KPI 摘要 + n_routes (subquery join)。
+    按 id DESC (新到旧) 排序。
+
+    用途: Dashboard Cycle History 表格。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    return coordinator.persistence.get_cycle_history(
+        limit=limit,
+        sim_day_min=sim_day_min,
+        sim_day_max=sim_day_max,
+        has_matches_only=has_matches_only,
+    )
+
+
+@app.get("/api/persistence/cycle-detail/{cycle_id}")
+async def get_cycle_detail(cycle_id: str):
+    """
+    Cycle detail (iter #11) — 单个 cycle 的完整数据 (KPI + supply/demand/match/route)。
+
+    Returns:
+        {cycle: {...}, supply_offers: [...], demand_requests: [...],
+         matches: [...], routes: [...]}
+
+    404 if cycle_id 不存在。
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    detail = coordinator.persistence.get_cycle_detail(cycle_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
+    return detail
+
+
 @app.get("/api/materials")
 async def get_materials():
     """
