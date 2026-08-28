@@ -1,5 +1,5 @@
 /**
- * WSStatusIndicator - WebSocket 连接状态指示器 (iter #13)
+ * WSStatusIndicator - WebSocket 连接状态指示器 (iter #13/14)
  *
  * 用法:
  *   <WSStatusIndicator
@@ -7,12 +7,14 @@
  *     reconnecting={wsReconnecting}
  *     attempts={wsAttempts}
  *     lastError={wsLastError}
+ *     isLeader={wsIsLeader}        // iter #14: 显示 leader/follower
  *   />
  *
  * 显示:
- *   - 🟢 Connected (默认, 实时推送)
- *   - 🟡 Reconnecting... (attempt N, max 30s backoff)
- *   - 🔴 Disconnected (多次重连失败)
+ *   - 🟢 Live [👑 Leader]   (本 tab 维持 WS)
+ *   - 🟢 Live [👥 Follower] (从其他 tab 接收)
+ *   - 🟡 Reconnecting (N)   (attempt N, max 30s backoff)
+ *   - 🔴 Disconnected
  */
 
 export function WSStatusIndicator({
@@ -20,17 +22,16 @@ export function WSStatusIndicator({
   reconnecting,
   attempts = 0,
   lastError = null,
+  isLeader = true,
 }) {
-  let status = 'disconnected'
   let label = '🔴 Disconnected'
   let className = 'ws-status disconnected'
 
   if (connected) {
-    status = 'connected'
-    label = '🟢 Live'
+    const role = isLeader ? '[👑 Leader]' : '[👥 Follower]'
+    label = `🟢 Live ${role}`
     className = 'ws-status connected'
   } else if (reconnecting) {
-    status = 'reconnecting'
     label = `🟡 Reconnecting (${attempts})`
     className = 'ws-status reconnecting'
   }

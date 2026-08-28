@@ -20,6 +20,7 @@ import {
   ScatterChart, Scatter, BarChart, Bar, ZAxis
 } from 'recharts'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { useSharedWebSocket } from '../../hooks/useSharedWebSocket'
 import { useDashboardSummary } from '../../hooks/useDashboardSummary'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
 
@@ -406,7 +407,8 @@ export default function Dashboard() {
     reconnecting: wsReconnecting,
     reconnectAttempts: wsAttempts,
     lastError: wsLastError,
-  } = useWebSocket(
+    isLeader: wsIsLeader,
+  } = useSharedWebSocket(
     '/ws/cycle-updates',
     { onMessage: handleWsMessage }
   )
@@ -496,6 +498,7 @@ export default function Dashboard() {
           reconnecting={wsReconnecting}
           attempts={wsAttempts}
           lastError={wsLastError}
+          isLeader={wsIsLeader}
         />
       </div>
 
