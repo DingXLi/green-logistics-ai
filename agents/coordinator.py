@@ -352,7 +352,7 @@ class MultiAgentCoordinator:
                 self.persistence.record_match(cycle_id, m)
 
         # 6. 优化物流路径
-        route_optimization = {"status": "no_matches"}
+        route_optimization: Dict[str, Any] = {"status": "no_matches"}
         if matches["total_matches"] > 0:
             pickup_locations, delivery_locations = self._build_vrp_inputs(
                 matches, supply_offers, demand_status

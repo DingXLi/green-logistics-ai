@@ -1244,7 +1244,7 @@ async def get_pareto_front(
         }
 
     # 构建 solver 并扫描 Pareto
-    solver_kwargs = {"use_real_roads": use_real_roads}
+    solver_kwargs: Dict[str, Any] = {"use_real_roads": use_real_roads}
     if region:
         solver_kwargs["region"] = region
     solver = VRPSolver(**solver_kwargs)

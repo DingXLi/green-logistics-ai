@@ -212,7 +212,7 @@ class LogisticsAgent:
         """
         from optimization.vrp_solver import VRPSolver, Location, Vehicle
 
-        solver_kwargs = {"use_real_roads": use_real_roads}
+        solver_kwargs: Dict[str, Any] = {"use_real_roads": use_real_roads}
         if region:
             solver_kwargs["region"] = region
         solver_kwargs["distance_timeout_s"] = distance_timeout_s

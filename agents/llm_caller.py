@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from typing import Any, Dict, Optional
 
 import google.generativeai as genai  # type: ignore
@@ -85,7 +86,7 @@ def _build_retry_decorator(max_attempts: int) -> Any:
         stop=stop_after_attempt(max_attempts),
         wait=wait_random_exponential(multiplier=0.5, max=30),
         reraise=True,
-        before_sleep=before_sleep_log(logger, "WARNING"),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
 
 
@@ -150,7 +151,7 @@ def call_gemini(
         try:
             m = genai.GenerativeModel(
                 model_name=use_model,
-                generation_config=gen_config,
+                generation_config=gen_config,  # type: ignore[arg-type]
                 system_instruction=system_instruction,
             )
             resp = m.generate_content(prompt, request_options={"timeout": use_timeout})

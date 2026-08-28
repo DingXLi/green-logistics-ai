@@ -21,14 +21,14 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 # ============================================================
 # 1. 全国年度废料基线 (吨 / 年,Sweden 2020 数据)
 # 来源: SCB env_wasgen + Eurostat 2020
 # ============================================================
 
-SWEDEN_WASTE_BASELINES: Dict[str, Dict[str, float]] = {
+SWEDEN_WASTE_BASELINES: Dict[str, Dict[str, Any]] = {
     # material: {total_kt: 千吨 / 年, per_capita_kg: 公斤/人/年, source: 来源}
     "concrete": {
         "total_kt_per_year": 9800,        # 9.8 Mt 建筑混凝土废料 (Eurostat 2020)
@@ -68,7 +68,7 @@ SWEDEN_WASTE_BASELINES: Dict[str, Dict[str, float]] = {
 # 来源: SCB 2023 + 各市statistik
 # ============================================================
 
-CITY_DEMAND_PROFILES: Dict[str, Dict[str, float]] = {
+CITY_DEMAND_PROFILES: Dict[str, Dict[str, Any]] = {
     "Borås": {
         "population": 74000,              # 2023
         "per_capita_waste_kg": 460,      # 含 household + share of C&D
@@ -141,7 +141,7 @@ def get_baseline_demand_tons_per_day(
         raise ValueError(f"month must be 1-12, got {month}")
 
     base = SWEDEN_WASTE_BASELINES[material]
-    city_p = CITY_DEMAND_PROFILES[city]
+    city_p: Dict[str, Any] = CITY_DEMAND_PROFILES[city]
     seasonal = SEASONAL_FACTORS[material][month]
 
     # Sweden total / 365 (t/day) × (city population / Sweden population) × seasonal

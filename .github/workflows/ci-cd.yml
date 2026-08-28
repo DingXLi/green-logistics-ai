@@ -44,6 +44,16 @@ jobs:
         flake8 agents/ optimization/ synthetic/ data/ web/backend/ \
           --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+    - name: Type-check with mypy (iter #13)
+      run: |
+        pip install mypy
+        # Non-strict mode to avoid breaking on third-party libs (google-generativeai etc.)
+        # Fail on real type errors in our own code
+        MYPYPATH=. mypy agents/ optimization/ web/backend/ \
+          --ignore-missing-imports \
+          --no-strict-optional \
+          --explicit-package-bases
+
     - name: Test with pytest
       run: |
         pip install pytest pytest-asyncio
