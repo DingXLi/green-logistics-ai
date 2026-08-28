@@ -774,16 +774,30 @@ class Persistence:
             result.append(d)
         return result
 
-    def get_cycle_detail(self, cycle_id: str) -> Optional[Dict[str, Any]]:
+    def get_cycle_detail(self, cycle_id: str,
+                         match_limit: Optional[int] = None,
+                         match_offset: int = 0,
+                         route_limit: Optional[int] = None,
+                         route_offset: int = 0) -> Optional[Dict[str, Any]]:
         """
         单个 cycle 的完整 detail (iter #11) — KPI + 全部 supply/demand/match/route。
 
+        iter #13: 加 pagination 支持 (match_limit / match_offset / route_limit / route_offset)。
+        None / 0 = 不限。
+
         Args:
             cycle_id: cycle 的 UUID (string)
+            match_limit: 最多返回多少 match 行 (None = 全返)
+            match_offset: match 起始偏移
+            route_limit: 最多返回多少 route 行 (None = 全返)
+            route_offset: route 起始偏移
 
         Returns:
             {cycle: {...}, supply_offers: [...], demand_requests: [...],
-             matches: [...], routes: [...]} 或 None (cycle 不存在)
+             matches: [...], routes: [...],
+             pagination: {matches: {total, limit, offset, has_more},
+                          routes: {total, limit, offset, has_more}}}
+            或 None (cycle 不存在)
         """
         with self._conn() as conn:
             cycle_row = conn.execute(
@@ -810,21 +824,35 @@ class Persistence:
                 (cycle_id,)
             ).fetchall()
 
-            matches = conn.execute(
-                """SELECT supply_id, demand_id, material_type, tons,
-                          distance_km, estimated_profit_sek
-                   FROM matches WHERE cycle_id = ?
-                   ORDER BY id ASC""",
+            # iter #13: matches pagination
+            match_total = conn.execute(
+                "SELECT COUNT(*) as cnt FROM matches WHERE cycle_id = ?",
                 (cycle_id,)
-            ).fetchall()
+            ).fetchone()["cnt"]
+            match_query = """SELECT supply_id, demand_id, material_type, tons,
+                                    distance_km, estimated_profit_sek
+                             FROM matches WHERE cycle_id = ?
+                             ORDER BY id ASC"""
+            match_params: List[Any] = [cycle_id]
+            if match_limit is not None:
+                match_query += " LIMIT ? OFFSET ?"
+                match_params.extend([match_limit, match_offset])
+            matches = conn.execute(match_query, match_params).fetchall()
 
-            routes = conn.execute(
-                """SELECT vehicle_id, stops_json, distance_km, duration_hours,
-                          cost_sek, co2_kg
-                   FROM routes WHERE cycle_id = ?
-                   ORDER BY id ASC""",
+            # iter #13: routes pagination
+            route_total = conn.execute(
+                "SELECT COUNT(*) as cnt FROM routes WHERE cycle_id = ?",
                 (cycle_id,)
-            ).fetchall()
+            ).fetchone()["cnt"]
+            route_query = """SELECT vehicle_id, stops_json, distance_km, duration_hours,
+                                    cost_sek, co2_kg
+                             FROM routes WHERE cycle_id = ?
+                             ORDER BY id ASC"""
+            route_params: List[Any] = [cycle_id]
+            if route_limit is not None:
+                route_query += " LIMIT ? OFFSET ?"
+                route_params.extend([route_limit, route_offset])
+            routes = conn.execute(route_query, route_params).fetchall()
 
         # parse stops_json
         routes_list = []
@@ -853,6 +881,29 @@ class Persistence:
             "demand_requests": [dict(r) for r in demands],
             "matches": [dict(r) for r in matches],
             "routes": routes_list,
+            # iter #13: pagination metadata
+            "pagination": {
+                "matches": {
+                    "total": match_total,
+                    "limit": match_limit,
+                    "offset": match_offset,
+                    "has_more": (
+                        (match_offset + len(matches)) < match_total
+                        if match_limit is not None
+                        else False
+                    ),
+                },
+                "routes": {
+                    "total": route_total,
+                    "limit": route_limit,
+                    "offset": route_offset,
+                    "has_more": (
+                        (route_offset + len(routes)) < route_total
+                        if route_limit is not None
+                        else False
+                    ),
+                },
+            },
         }
 
     def get_monthly_efficiency_trend(self) -> List[Dict[str, Any]]:

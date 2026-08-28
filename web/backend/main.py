@@ -1647,19 +1647,45 @@ async def get_cycle_history(
 
 
 @app.get("/api/persistence/cycle-detail/{cycle_id}")
-async def get_cycle_detail(cycle_id: str):
+async def get_cycle_detail(
+    cycle_id: str,
+    match_limit: Optional[int] = None,
+    match_offset: int = 0,
+    route_limit: Optional[int] = None,
+    route_offset: int = 0,
+):
     """
     Cycle detail (iter #11) — 单个 cycle 的完整数据 (KPI + supply/demand/match/route)。
 
+    iter #13: pagination query params:
+    - match_limit / match_offset: 分页返回 matches (None/0 = 全返)
+    - route_limit / route_offset: 分页返回 routes
+
     Returns:
         {cycle: {...}, supply_offers: [...], demand_requests: [...],
-         matches: [...], routes: [...]}
+         matches: [...], routes: [...],
+         pagination: {matches: {total, limit, offset, has_more},
+                      routes: {total, limit, offset, has_more}}}
 
     404 if cycle_id 不存在。
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    detail = coordinator.persistence.get_cycle_detail(cycle_id)
+    # 防御性 clamp: limit 不能 < 1, offset 不能 < 0
+    if match_limit is not None:
+        match_limit = max(1, min(1000, match_limit))
+    match_offset = max(0, match_offset)
+    if route_limit is not None:
+        route_limit = max(1, min(1000, route_limit))
+    route_offset = max(0, route_offset)
+
+    detail = coordinator.persistence.get_cycle_detail(
+        cycle_id,
+        match_limit=match_limit,
+        match_offset=match_offset,
+        route_limit=route_limit,
+        route_offset=route_offset,
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
     return detail
