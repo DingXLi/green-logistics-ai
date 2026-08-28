@@ -1061,3 +1061,57 @@ class Persistence:
                 "very_long_>=100km": buckets["very_long"] or 0,
             },
         }
+
+    def get_db_stats(self) -> Dict[str, Any]:
+        """
+        DB 统计 (iter #15) — 返回 SQLite DB 大小 + 表行数 + 索引状态。
+
+        用途: 监控 DB 健康 (磁盘占用, 表增长), 诊断性能问题。
+        """
+        import os as _os
+        db_path = self.db_path
+        try:
+            db_size_bytes = _os.path.getsize(db_path) if db_path and _os.path.exists(db_path) else 0
+        except Exception:
+            db_size_bytes = 0
+
+        with self._conn() as conn:
+            table_stats: Dict[str, int] = {}
+            for table in ("optimization_cycles", "supply_offers", "demand_requests",
+                          "matches", "routes", "llm_decisions"):
+                try:
+                    row = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}").fetchone()
+                    table_stats[table] = row["cnt"] or 0
+                except Exception:
+                    table_stats[table] = -1  # table doesn't exist
+
+            # Index list (sqlite_master)
+            try:
+                idx_rows = conn.execute(
+                    "SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+                indexes = [{"name": r["name"], "table": r["tbl_name"]} for r in idx_rows]
+            except Exception:
+                indexes = []
+
+            # 时间范围
+            try:
+                time_row = conn.execute(
+                    "SELECT MIN(wall_timestamp) as oldest, MAX(wall_timestamp) as newest FROM optimization_cycles"
+                ).fetchone()
+                time_range = {
+                    "oldest_cycle": time_row["oldest"],
+                    "newest_cycle": time_row["newest"],
+                }
+            except Exception:
+                time_range = {}
+
+        return {
+            "db_path": db_path,
+            "db_size_bytes": db_size_bytes,
+            "db_size_mb": round(db_size_bytes / 1024 / 1024, 3) if db_size_bytes else 0,
+            "table_counts": table_stats,
+            "total_rows": sum(c for c in table_stats.values() if c > 0),
+            "indexes": indexes,
+            "time_range": time_range,
+        }

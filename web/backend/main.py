@@ -2089,6 +2089,23 @@ async def get_match_distance_stats():
     return coordinator.persistence.get_match_distance_stats()
 
 
+@app.get("/api/admin/db-stats")
+async def get_db_stats():
+    """
+    DB 统计 endpoint (iter #15) — SQLite DB 大小 + 表行数 + 索引 + 时间范围。
+
+    用途: 监控 DB 健康 (磁盘占用, 表增长), 诊断性能问题, CI 验证。
+
+    Returns:
+        db_path, db_size_bytes, db_size_mb,
+        table_counts: {optimization_cycles, supply_offers, ...},
+        total_rows, indexes, time_range
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_db_stats()
+
+
 @app.get("/api/materials")
 async def get_materials():
     """
