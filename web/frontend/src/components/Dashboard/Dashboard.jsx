@@ -20,6 +20,7 @@ import {
   ScatterChart, Scatter, BarChart, Bar, ZAxis
 } from 'recharts'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { useDashboardSummary } from '../../hooks/useDashboardSummary'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
 
 // iter #5: code-splitting — lazy load 重型 tab 组件
@@ -330,14 +331,19 @@ export default function Dashboard() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
+  // iter #12: useDashboardSummary hook 一次性拿聚合数据 (替代独立 fetch /persistence/summary)
+  const { data: summaryBundle, refetch: refetchSummary } = useDashboardSummary({
+    autoRefresh: true,
+    pollIntervalMs: 10000,
+  })
+
   const fetchAll = useCallback(async () => {
     try {
-      const [sumRes, tsRes, paretoRes] = await Promise.all([
-        fetch(`${API_BASE}/persistence/summary`),
+      // iter #12: 并行 fetch 减少为 2 个 (kpi-timeseries + pareto); summary 走 hook
+      const [tsRes, paretoRes] = await Promise.all([
         fetch(`${API_BASE}/persistence/kpi-timeseries`),
         fetch(`${API_BASE}/optimize/pareto`).catch(() => null),
       ])
-      const sum = await sumRes.json()
       const ts = await tsRes.json()
       let pa = []
       if (paretoRes && paretoRes.ok) {
@@ -348,7 +354,6 @@ export default function Dashboard() {
           use_real_roads: paData.use_real_roads !== false,
         })
       }
-      setSummary(sum)
       setTimeseries(ts)
       setPareto(pa)
       setError(null)
@@ -358,11 +363,32 @@ export default function Dashboard() {
     }
   }, [useRealRoads])
 
+  // iter #12: aggregator → 喂给 summary state (与后端 get_summary 兼容)
+  useEffect(() => {
+    if (summaryBundle?.summary && !summaryBundle.summary.error) {
+      setSummary(summaryBundle.summary)
+    }
+  }, [summaryBundle])
+
+  // iter #12: aggregator → 同步 wsEfficiency / wsFleet (后端不会重复 WS 推送这些)
+  useEffect(() => {
+    if (summaryBundle?.efficiency && !summaryBundle.efficiency.error) {
+      setWsEfficiency(summaryBundle.efficiency)
+    }
+    if (summaryBundle?.last_cycle) {
+      setWsFleet(summaryBundle.last_cycle)
+    }
+  }, [summaryBundle])
+
+  // iter #12: 当 WS 推送 cycle_update 时, 同时 refetch aggregator
+  // (复用 refetchSummary 把最新数据 pull 到 hook state)
+
   // WebSocket: 实时接收 cycle_update → 主动刷新数据
   const handleWsMessage = useCallback((msg) => {
     if (msg?.type === 'cycle_update') {
       // 后端告知有新的 cycle 完成, 主动重新拉数据
       fetchAll()
+      refetchSummary()  // iter #12: also refetch aggregator
       // iter #7: 直接用 WS 推送的 efficiency summary, 不需要额外 fetch
       if (msg.data?.efficiency) {
         setWsEfficiency(msg.data.efficiency)
@@ -372,7 +398,7 @@ export default function Dashboard() {
         setWsFleet(msg.data.fleet)
       }
     }
-  }, [fetchAll])
+  }, [fetchAll, refetchSummary])
   const { lastMessage: wsMessage, connected: wsConnected } = useWebSocket(
     '/ws/cycle-updates',
     { onMessage: handleWsMessage }
