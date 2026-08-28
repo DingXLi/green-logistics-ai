@@ -625,6 +625,95 @@ async def health_check():
     }
 
 
+@app.get("/api/dashboard-summary")
+async def get_dashboard_summary():
+    """
+    One-shot dashboard summary (iter #11) — 一次性返回 dashboard 所需所有数据。
+
+    避免前端串行 N 个 fetch 调用。返回:
+    - health: status / timestamp / features
+    - summary: cycles / tons / cost / CO2 / avg util
+    - efficiency: cost_per_ton / co2_per_ton / match_rate
+    - fleet: total vehicles / available / utilization / distance
+    - last_cycle: 最近 cycle 的精简 KPI (供 header badges)
+    - scheduler: status (enabled, cycle_count, etc.)
+
+    适用于: 首次加载 dashboard 时一次性拿全 state。
+    """
+    result: Dict[str, Any] = {
+        "timestamp": datetime.now().isoformat(),
+        "health": None,
+        "summary": None,
+        "efficiency": None,
+        "fleet": None,
+        "last_cycle": None,
+        "scheduler": None,
+    }
+    # health
+    is_hf_space = bool(os.environ.get("SPACE_ID"))
+    is_production = is_hf_space or os.environ.get("ENVIRONMENT") == "production"
+    result["health"] = {
+        "status": "healthy",
+        "environment": "production" if is_production else "development",
+        "features": {
+            "websocket_enabled": True,
+            "carbon_scenarios": True,
+            "seasonal_factors": True,
+            "real_sweden_facilities": True,
+            "scheduler_enabled": bool(os.environ.get("GL_SCHEDULER_ENABLED")),
+        },
+    }
+    if coordinator is None:
+        return result
+
+    # summary + efficiency
+    if coordinator.persistence is not None:
+        try:
+            result["summary"] = coordinator.persistence.get_summary()
+        except Exception as e:
+            result["summary"] = {"error": str(e)}
+        try:
+            result["efficiency"] = coordinator.persistence.get_efficiency_metrics()
+        except Exception as e:
+            result["efficiency"] = {"error": str(e)}
+
+    # last cycle (from cached coordinator._last_cycle_result)
+    last = getattr(coordinator, "_last_cycle_result", None)
+    if last:
+        result["last_cycle"] = {
+            "sim_day": last.get("sim_day"),
+            "sim_hour": last.get("sim_hour"),
+            "total_cost_sek": last.get("total_cost_sek"),
+            "total_co2_kg": last.get("total_co2_kg"),
+            "total_tons": last.get("total_tons"),
+            "n_matches": last.get("n_matches"),
+            "distance_source": last.get("distance_source"),
+            "fleet_utilization_pct": last.get("fleet_utilization_pct"),
+        }
+
+    # fleet status
+    try:
+        fleet = coordinator.persistence.get_summary() if coordinator.persistence else {}
+        result["fleet"] = {
+            "total_cycles": fleet.get("n_cycles", 0),
+            "avg_utilization_pct": fleet.get("avg_utilization"),
+        }
+    except Exception as e:
+        result["fleet"] = {"error": str(e)}
+
+    # scheduler status
+    sched = globals().get("scheduler")
+    if sched is not None:
+        try:
+            result["scheduler"] = sched.status()
+        except Exception as e:
+            result["scheduler"] = {"error": str(e)}
+    else:
+        result["scheduler"] = {"enabled": False, "reason": "GL_SCHEDULER_ENABLED is not set to true"}
+
+    return result
+
+
 @app.websocket("/ws/cycle-updates")
 async def ws_cycle_updates(ws: WebSocket):
     """
