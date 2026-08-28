@@ -54,16 +54,30 @@ jobs:
           --no-strict-optional \
           --explicit-package-bases
 
-    - name: Test with pytest
+    - name: Test with pytest + coverage (iter #14)
       run: |
-        pip install pytest pytest-asyncio
+        pip install pytest pytest-asyncio pytest-cov
         # 跳过 OR-Tools 慢测试 (test_pareto_front ~15s) 和 需要 LLM 的测试
         pytest tests/ \
           --ignore=tests/test_llm_integration.py \
           -k "not test_pareto_front" \
+          --cov=agents --cov=optimization --cov=data --cov=web/backend \
+          --cov-report=term-missing \
+          --cov-report=xml:coverage.xml \
+          --cov-fail-under=35 \
           -v \
           --tb=short \
           --maxfail=5
+      # coverage 报告: term-missing 给每个未覆盖的行号, xml 供 Codecov 上传
+      # 35% 阈值: 现状 39% (as of iter #14), 随新测试递增
+
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v4
+      with:
+        file: coverage.xml
+        flags: unittests
+        fail_ci_if_error: false  # 不要让 Codecov 错误卡住 CI
 
     - name: Test LLM integration (with API key)
       run: |

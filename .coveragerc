@@ -1,0 +1,31 @@
+# pytest-cov configuration (iter #14)
+# 
+# 排除不需要 coverage 的文件:
+# - __init__.py 空文件
+# - main.py 顶层 if __name__ == "__main__" 块
+# - 临时/测试 fixture helper
+
+[run]
+source =
+    agents
+    optimization
+    data
+    web/backend
+
+omit =
+    */__init__.py
+    */__pycache__/*
+    web/backend/main.py  # main.py 是 entry, 大量 except/typing 让 coverage 失真
+
+[report]
+# 显示每个 missing 行号
+show_missing = True
+# 排除完全未覆盖的文件
+skip_empty = True
+# 排除 100% 覆盖 (cosmetic)
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
