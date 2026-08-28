@@ -1583,3 +1583,38 @@ td.no-matches {
   background: #bfdbfe;
   border-color: #3b82f6;
 }
+
+/* iter #13: WebSocket status indicator */
+.ws-status-row {
+  margin-bottom: 8px;
+}
+
+.ws-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.ws-status.connected {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+.ws-status.reconnecting {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  animation: ws-pulse 1.5s ease-in-out infinite;
+}
+.ws-status.disconnected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

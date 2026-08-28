@@ -2,15 +2,15 @@
  * useWebSocket - React hook 订阅后端 WS 推送
  *
  * 用法:
- *   const { lastMessage, connected, sendPing } = useWebSocket('/ws/cycle-updates', {
- *     onMessage: (msg) => { ... },
- *   })
+ *   const { lastMessage, connected, reconnecting, reconnectAttempts, sendPing }
+ *     = useWebSocket('/ws/cycle-updates', { onMessage: (msg) => { ... } })
  *
- * 特性:
+ * 特性 (iter #13):
  *   - 自动重连 (指数退避: 1s → 2s → 4s → 8s → max 30s)
  *   - 组件卸载自动断开
  *   - sendPing() 让客户端主动 ping server (测连通性)
  *   - lastMessage.data 自动解析 JSON
+ *   - 新增 reconnecting + reconnectAttempts + lastError 给 UI 显示状态
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 
@@ -19,6 +19,9 @@ export function useWebSocket(path, options = {}) {
 
   const [connected, setConnected] = useState(false)
   const [lastMessage, setLastMessage] = useState(null)
+  const [reconnecting, setReconnecting] = useState(false)  // iter #13
+  const [reconnectAttempts, setReconnectAttempts] = useState(0)  // iter #13
+  const [lastError, setLastError] = useState(null)  // iter #13
   const wsRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
   const reconnectAttemptRef = useRef(0)
@@ -60,7 +63,10 @@ export function useWebSocket(path, options = {}) {
             return
           }
           setConnected(true)
+          setReconnecting(false)
+          setLastError(null)
           reconnectAttemptRef.current = 0
+          setReconnectAttempts(0)
           if (onConnect) onConnect()
         }
 
@@ -77,8 +83,9 @@ export function useWebSocket(path, options = {}) {
           }
         }
 
-        ws.onerror = () => {
-          // onclose 会接住重连, 这里不重复处理
+        ws.onerror = (event) => {
+          // iter #13: 记录错误给 UI
+          setLastError(`WebSocket error (attempt ${reconnectAttemptRef.current + 1})`)
         }
 
         ws.onclose = () => {
@@ -87,6 +94,8 @@ export function useWebSocket(path, options = {}) {
           if (onDisconnect) onDisconnect()
           if (autoReconnect) {
             reconnectAttemptRef.current += 1
+            setReconnectAttempts(reconnectAttemptRef.current)
+            setReconnecting(true)
             const delay = Math.min(
               30000,
               1000 * Math.pow(2, reconnectAttemptRef.current - 1)
@@ -95,9 +104,12 @@ export function useWebSocket(path, options = {}) {
           }
         }
       } catch (e) {
+        setLastError(`Failed to create WebSocket: ${e.message}`)
         // 创建 WS 失败也走重连
         if (autoReconnect) {
           reconnectAttemptRef.current += 1
+          setReconnectAttempts(reconnectAttemptRef.current)
+          setReconnecting(true)
           const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptRef.current - 1))
           reconnectTimeoutRef.current = setTimeout(connect, delay)
         }
@@ -117,5 +129,12 @@ export function useWebSocket(path, options = {}) {
     }
   }, [path, onMessage, onConnect, onDisconnect, autoReconnect, resolveUrl])
 
-  return { connected, lastMessage, sendPing }
+  return {
+    connected,
+    lastMessage,
+    reconnecting,           // iter #13: UI 可显示 "Reconnecting..."
+    reconnectAttempts,      // iter #13: 重连次数
+    lastError,              // iter #13: 最近一次错误
+    sendPing,
+  }
 }

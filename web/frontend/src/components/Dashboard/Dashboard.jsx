@@ -38,6 +38,7 @@ const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
+import { WSStatusIndicator } from '../common/WSStatusIndicator'
 
 // API base: Vite env var > localhost fallback
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
@@ -399,7 +400,13 @@ export default function Dashboard() {
       }
     }
   }, [fetchAll, refetchSummary])
-  const { lastMessage: wsMessage, connected: wsConnected } = useWebSocket(
+  const {
+    lastMessage: wsMessage,
+    connected: wsConnected,
+    reconnecting: wsReconnecting,
+    reconnectAttempts: wsAttempts,
+    lastError: wsLastError,
+  } = useWebSocket(
     '/ws/cycle-updates',
     { onMessage: handleWsMessage }
   )
@@ -483,6 +490,14 @@ export default function Dashboard() {
       {error && <div className="error-banner">⚠️ {error}</div>}
 
       <LiveCycleIndicator message={wsMessage} connected={wsConnected} />
+      <div className="ws-status-row">
+        <WSStatusIndicator
+          connected={wsConnected}
+          reconnecting={wsReconnecting}
+          attempts={wsAttempts}
+          lastError={wsLastError}
+        />
+      </div>
 
       <KPISummary data={summary} />
 
