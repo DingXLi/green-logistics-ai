@@ -62,32 +62,58 @@ export function DbStatsBadge() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expanded, setExpanded] = useState(false)
+  // iter #18: VACUUM state
+  const [vacuuming, setVacuuming] = useState(false)
+  const [lastVacuum, setLastVacuum] = useState(null)
+
+  const fetchData = (cancelled_ref) => {
+    fetch(`${API_BASE}/admin/db-stats`)
+      .then(r => r.json())
+      .then(d => {
+        if (!cancelled_ref.cancelled) {
+          setData(d)
+          setLoading(false)
+        }
+      })
+      .catch(e => {
+        if (!cancelled_ref.cancelled) {
+          setError(e.message)
+          setLoading(false)
+        }
+      })
+  }
 
   useEffect(() => {
-    let cancelled = false
-    const fetchData = () => {
-      fetch(`${API_BASE}/admin/db-stats`)
-        .then(r => r.json())
-        .then(d => {
-          if (!cancelled) {
-            setData(d)
-            setLoading(false)
-          }
-        })
-        .catch(e => {
-          if (!cancelled) {
-            setError(e.message)
-            setLoading(false)
-          }
-        })
-    }
-    fetchData()
-    const interval = setInterval(fetchData, 30000)  // refresh every 30s
+    const cancelled_ref = { cancelled: false }
+    fetchData(cancelled_ref)
+    const interval = setInterval(() => fetchData(cancelled_ref), 30000)
     return () => {
-      cancelled = true
+      cancelled_ref.cancelled = true
       clearInterval(interval)
     }
   }, [])
+
+  // iter #18: Run VACUUM + ANALYZE
+  const runVacuum = async () => {
+    if (vacuuming) return
+    if (!confirm(`Run VACUUM + ANALYZE on the DB?\n\nThis will:\n- Rebuild DB file (frees fragmented space)\n- Update query planner statistics\n- May take a few seconds for large DBs\n\nCurrent size: ${formatBytes(data?.db_size_bytes)}`)) {
+      return
+    }
+    setVacuuming(true)
+    try {
+      const resp = await fetch(`${API_BASE}/admin/db-maintenance`, { method: 'POST' })
+      const result = await resp.json()
+      setLastVacuum(result)
+      // Refresh stats immediately
+      const cancelled_ref = { cancelled: false }
+      fetchData(cancelled_ref)
+      setTimeout(() => { cancelled_ref.cancelled = true }, 5000)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setVacuuming(false)
+    }
+  }
 
   if (loading) return <LoadingSpinner label="Loading DB stats…" />
   if (error) return <div className="error-banner">⚠️ {error}</div>
@@ -162,6 +188,32 @@ export function DbStatsBadge() {
               <code>{data.db_path}</code>
             </div>
           )}
+
+          {/* iter #18: VACUUM controls */}
+          <div className="db-stats-actions">
+            <button
+              className="db-stats-vacuum-btn"
+              onClick={runVacuum}
+              disabled={vacuuming}
+            >
+              {vacuuming ? '⏳ Running...' : '🧹 Run VACUUM'}
+            </button>
+            {lastVacuum && (
+              <div className="db-stats-vacuum-result">
+                {lastVacuum.success ? (
+                  <span className="db-stats-vacuum-success">
+                    ✓ Reclaimed <strong>{lastVacuum.reclaimed_bytes?.toLocaleString() || 0}</strong> bytes
+                    ({lastVacuum.reclaimed_pct || 0}%)
+                    · {formatBytes(lastVacuum.size_before_bytes)} → {formatBytes(lastVacuum.size_after_bytes)}
+                  </span>
+                ) : (
+                  <span className="db-stats-vacuum-error">
+                    ✗ Failed: {lastVacuum.error || 'unknown error'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
