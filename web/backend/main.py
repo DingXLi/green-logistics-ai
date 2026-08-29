@@ -6,7 +6,7 @@ FastAPI 应用提供 REST API
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response as FastAPIResponse
+from fastapi.responses import Response as FastAPIResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
@@ -17,6 +17,8 @@ import random
 import asyncio
 import time
 import json
+import csv
+import io
 from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
@@ -26,6 +28,35 @@ from agents.coordinator import MultiAgentCoordinator
 from agents.world_builder import WorldConfig
 from optimization.vrp_solver import VRPSolver, Location, Vehicle
 from synthetic.data_generator import SyntheticDataGenerator
+
+
+# ============================================
+# iter #18: DB export helpers
+# ============================================
+def _csv_to_rows(csv_str: str) -> List[Dict[str, Any]]:
+    """Convert CSV string → list of dicts (iter #18 helper).
+
+    Used by /api/admin/db-export to convert existing CSV exports
+    into dicts for JSON/NDJSON output.
+    """
+    reader = csv.DictReader(io.StringIO(csv_str))
+    return [dict(r) for r in reader]
+
+
+def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
+    """Convert list of dicts → CSV string (iter #18 helper).
+
+    Used by /api/admin/db-export to re-emit CSV after since_sim_day filter.
+    """
+    if not rows:
+        return ""
+    buf = io.StringIO()
+    fieldnames = list(rows[0].keys())
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
+    return buf.getvalue()
 
 # ============================================
 # FastAPI 应用
@@ -2321,6 +2352,123 @@ async def post_db_maintenance():
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     return coordinator.persistence.vacuum()
+
+
+@app.get("/api/admin/db-export")
+async def export_db_data(
+    table: str,
+    format: str = "json",
+    limit: int = 10000,
+    since_sim_day: Optional[int] = None,
+):
+    """
+    Unified DB export endpoint (iter #18) — flexible table + format export.
+
+    支持多张表 (cycles / supplies / matches / routes / llm_decisions),
+    多格式 (csv / json / ndjson), 可选 sim_day 过滤。
+
+    Query:
+    - table: 哪张表 (cycles / supplies / matches / routes / llm_decisions)
+    - format: 输出格式 (csv / json / ndjson), default json
+    - limit: 最多多少行 (default 10000, max 50000)
+    - since_sim_day: 只返 >= 该 sim_day 的行 (仅 cycles / supplies / matches / routes)
+
+    Returns:
+        - format=csv → text/csv (existing CSV output)
+        - format=json → application/json (array of dicts)
+        - format=ndjson → application/x-ndjson (newline-delimited JSON)
+
+    使用场景:
+    - JSON: 喂给下游分析脚本 (Python pandas.read_json, etc.)
+    - NDJSON: streaming 处理 (每行一个 JSON 对象, 不需要 load 整个文件)
+    - CSV: Excel / 论文图
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    table = table.strip().lower()
+    if table not in ("cycles", "supplies", "matches", "routes", "llm_decisions"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unknown table '{table}'. "
+                f"Valid: cycles / supplies / matches / routes / llm_decisions"
+            ),
+        )
+    format = format.strip().lower()
+    if format not in ("csv", "json", "ndjson"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown format '{format}'. Valid: csv / json / ndjson",
+        )
+    limit = max(1, min(50000, limit))
+
+    # 拿原始 rows via 现有的 export_* 方法 (CSV)
+    csv_str = None
+    if table == "cycles":
+        csv_str = coordinator.persistence.export_cycles_csv(limit=limit)
+    elif table == "supplies":
+        csv_str = coordinator.persistence.export_supplies_csv(limit=limit)
+    elif table == "matches":
+        csv_str = coordinator.persistence.export_matches_csv(limit=limit)
+    elif table == "routes":
+        csv_str = coordinator.persistence.export_routes_csv(limit=limit)
+    # llm_decisions 没现成 CSV — 直接返回 JSON (iter #18 简化为仅 JSON/NDJSON)
+    if csv_str is None and table == "llm_decisions":
+        rows = coordinator.persistence.get_llm_decisions(
+            limit=limit,
+            sim_day_min=since_sim_day,
+        )
+    else:
+        rows = _csv_to_rows(csv_str)
+
+    # Apply since_sim_day filter
+    if since_sim_day is not None and table in ("cycles", "supplies", "matches", "routes"):
+        # CSV rows are strings — convert sim_day to int for comparison
+        def _passes(r: Dict[str, Any]) -> bool:
+            sd = r.get("sim_day")
+            if sd is None or sd == "":
+                return True
+            try:
+                return int(sd) >= since_sim_day
+            except (ValueError, TypeError):
+                return True
+        rows = [r for r in rows if _passes(r)]
+
+    # Format dispatch
+    if format == "csv":
+        # Re-emit CSV (since_sim_day filter applied → re-render)
+        if table == "llm_decisions":
+            # llm_decisions 没 CSV 格式 — 返回空 header 提示
+            return FastAPIResponse(
+                content="id,note\nllm_decisions,format=csv+not implemented yet\n",
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f"attachment; filename=\"llm_decisions.csv\""},
+            )
+        csv_out = _rows_to_csv(rows)
+        return FastAPIResponse(
+            content=csv_out,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.csv\"",
+            },
+        )
+    elif format == "json":
+        return JSONResponse(
+            content=rows,
+            headers={
+                "Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.json\"",
+            },
+        )
+    else:  # ndjson
+        ndjson_str = "\n".join(json.dumps(r) for r in rows)
+        return FastAPIResponse(
+            content=ndjson_str,
+            media_type="application/x-ndjson",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.ndjson\"",
+            },
+        )
 
 
 @app.get("/api/admin/db-stats")
