@@ -34,6 +34,9 @@ const FacilitiesList = lazy(() => import('./FacilitiesList').then(m => ({ defaul
 const MonthlyEfficiencyChart = lazy(() => import('./MonthlyEfficiencyChart').then(m => ({ default: m.MonthlyEfficiencyChart })))
 const FleetUtilizationChart = lazy(() => import('./FleetUtilizationChart').then(m => ({ default: m.FleetUtilizationChart })))
 const MaterialsOverview = lazy(() => import('./MaterialsOverview').then(m => ({ default: m.MaterialsOverview })))
+// iter #16: material aggregates table + cycle KPI summary
+const MaterialAggregates = lazy(() => import('./MaterialAggregates').then(m => ({ default: m.MaterialAggregates })))
+const CycleKpiSummary = lazy(() => import('./CycleKpiSummary').then(m => ({ default: m.CycleKpiSummary })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -573,6 +576,16 @@ export default function Dashboard() {
           {/* iter #10: Materials overview grid */}
           <Suspense fallback={<LoadingSpinner label="Loading materials…" />}>
             <MaterialsOverview />
+          </Suspense>
+
+          {/* iter #16: Cycle KPI summary */}
+          <Suspense fallback={<LoadingSpinner label="Loading cycle summary…" />}>
+            <CycleKpiSummary />
+          </Suspense>
+
+          {/* iter #16: Material aggregates table */}
+          <Suspense fallback={<LoadingSpinner label="Loading material aggregates…" />}>
+            <MaterialAggregates />
           </Suspense>
         </>
       )}
