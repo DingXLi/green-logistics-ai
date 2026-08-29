@@ -1005,9 +1005,10 @@ class Persistence:
             result.append(r)
         return result
 
-    def export_cycles_csv(self, limit: int = 1000) -> str:
+    def export_cycles_csv(self, limit: int = 1000,
+                           include_metadata: bool = False) -> str:
         """
-        Export cycle history as CSV string (iter #11) — 让用户下载 KPI 数据。
+        Export cycle history as CSV string (iter #11 + iter #19 metadata)。
 
         Columns (15):
             cycle_id, sim_day, sim_hour, wall_timestamp, activity_factor,
@@ -1016,13 +1017,19 @@ class Persistence:
             n_vehicles_used, n_vehicles_available, fleet_utilization_pct,
             solver_status, wall_duration_ms, seasonal_factor_avg, seasonal_month
 
+        Args (iter #19):
+            include_metadata: 是否在 CSV 顶部加 metadata header (生成时间 + row count)
+
         Returns: CSV string with header + rows (UTF-8).
+        Metadata 格式 (iter #19):
+            # Green Logistics AI CSV export
+            # generated_at: 2026-08-29T20:00:00Z
+            # db_path: /data/simulation.db
+            # db_size_bytes: 90112
+            # table: cycles
+            # row_count: 9
         """
         rows = self.get_cycle_history(limit=limit)
-        if not rows:
-            return "cycle_id,sim_day,sim_hour,wall_timestamp,activity_factor,n_supply_offers,n_demand_requests,n_matches,total_tons,total_cost_sek,total_co2_kg,total_distance_km,n_vehicles_used,n_vehicles_available,fleet_utilization_pct,solver_status,wall_duration_ms,seasonal_factor_avg,seasonal_month\n"
-
-        # 定义稳定 column 顺序 (避免 dict order 不一致)
         columns = [
             "cycle_id", "sim_day", "sim_hour", "wall_timestamp",
             "activity_factor", "n_supply_offers", "n_demand_requests",
@@ -1031,17 +1038,24 @@ class Persistence:
             "fleet_utilization_pct", "solver_status", "wall_duration_ms",
             "seasonal_factor_avg", "seasonal_month",
         ]
-
         buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# table: cycles\n")
+            buf.write(f"# row_count: {len(rows)}\n")
         writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         for r in rows:
             writer.writerow(r)
         return buf.getvalue()
 
-    def export_supplies_csv(self, limit: int = 10000) -> str:
+    def export_supplies_csv(self, limit: int = 10000,
+                           include_metadata: bool = False) -> str:
         """
-        Export supply_offers as CSV (iter #17) — analyst-friendly.
+        Export supply_offers as CSV (iter #17 + iter #19 metadata)。
 
         Columns (10):
             cycle_id, supply_id, material_type, location_lat, location_lon,
@@ -1049,6 +1063,7 @@ class Persistence:
 
         Args:
             limit: max rows to export (default 10000)
+            include_metadata: iter #19, 是否在顶部加 metadata header
         """
         with self._conn() as conn:
             rows = conn.execute(
@@ -1069,15 +1084,23 @@ class Persistence:
             "quality_score", "sim_day", "sim_hour",
         ]
         buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# table: supplies\n")
+            buf.write(f"# row_count: {len(rows)}\n")
         writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         for r in rows:
             writer.writerow(dict(r))
         return buf.getvalue()
 
-    def export_matches_csv(self, limit: int = 10000) -> str:
+    def export_matches_csv(self, limit: int = 10000,
+                           include_metadata: bool = False) -> str:
         """
-        Export matches as CSV (iter #17) — analyst-friendly.
+        Export matches as CSV (iter #17 + iter #19 metadata)。
 
         Columns (8):
             cycle_id, supply_id, demand_id, material_type,
@@ -1085,6 +1108,7 @@ class Persistence:
 
         Args:
             limit: max rows (default 10000)
+            include_metadata: iter #19, 是否在顶部加 metadata header
         """
         with self._conn() as conn:
             rows = conn.execute(
@@ -1103,15 +1127,23 @@ class Persistence:
             "tons", "distance_km", "estimated_profit_sek", "sim_day",
         ]
         buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# table: matches\n")
+            buf.write(f"# row_count: {len(rows)}\n")
         writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         for r in rows:
             writer.writerow(dict(r))
         return buf.getvalue()
 
-    def export_routes_csv(self, limit: int = 10000) -> str:
+    def export_routes_csv(self, limit: int = 10000,
+                          include_metadata: bool = False) -> str:
         """
-        Export routes as CSV (iter #17) — analyst-friendly.
+        Export routes as CSV (iter #17 + iter #19 metadata)。
 
         Columns (8):
             cycle_id, vehicle_id, distance_km, duration_hours,
@@ -1119,6 +1151,7 @@ class Persistence:
 
         Args:
             limit: max rows (default 10000)
+            include_metadata: iter #19, 是否在顶部加 metadata header
         """
         with self._conn() as conn:
             rows = conn.execute(
@@ -1139,6 +1172,13 @@ class Persistence:
             "cost_sek", "co2_kg", "stops_count", "sim_day",
         ]
         buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# table: routes\n")
+            buf.write(f"# row_count: {len(rows)}\n")
         writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         for r in rows:

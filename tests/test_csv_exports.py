@@ -26,6 +26,20 @@ def persistence(tmp_path) -> Persistence:
     return Persistence(str(db_path))
 
 
+@pytest.fixture
+def persistence_with_cycle(tmp_path):
+    """Fresh DB with 1 seeded cycle (matches + supply + route)."""
+    db_path = tmp_path / "test_csv_cycle.db"
+    p = Persistence(str(db_path))
+    _record_basic_cycle(
+        p, "TEST-CYCLE-1", day=1,
+        supply_tons={"SUP001": ("wood", 10.0, 80.0)},
+        matches=[("SUP001", "DEM001", "wood", 5.0, 15.0)],
+        routes=[("VEH001", 15.0, 1.0, 100.0, 5.0, ["DEPOT", "SUP001"])],
+    )
+    return p, "TEST-CYCLE-1"
+
+
 def _record_basic_cycle(p: Persistence, cycle_id: str, day: int = 1,
                         supply_tons: dict = None, matches: list = None,
                         routes: list = None) -> None:
@@ -322,3 +336,93 @@ class TestAPIExportEndpoints:
                 assert response.status_code == 503, f"{path} should return 503"
         finally:
             backend_main.coordinator = old_coord
+
+
+class TestMetadataHeader:
+    """Tests for include_metadata option in CSV exports (iter #19)."""
+
+    def test_cycles_csv_metadata(self, persistence_with_cycle):
+        p, cid = persistence_with_cycle
+        csv_str = p.export_cycles_csv(limit=10, include_metadata=True)
+        # Should start with metadata comments
+        assert csv_str.startswith("# Green Logistics AI CSV export")
+        assert "# generated_at:" in csv_str
+        assert "# db_path:" in csv_str
+        assert "# db_size_bytes:" in csv_str
+        assert "# table: cycles" in csv_str
+        assert "# row_count: 1" in csv_str
+
+    def test_supplies_csv_metadata(self, persistence_with_cycle):
+        p, cid = persistence_with_cycle
+        csv_str = p.export_supplies_csv(limit=10, include_metadata=True)
+        assert csv_str.startswith("# Green Logistics AI CSV export")
+        assert "# table: supplies" in csv_str
+
+    def test_matches_csv_metadata(self, persistence_with_cycle):
+        p, cid = persistence_with_cycle
+        csv_str = p.export_matches_csv(limit=10, include_metadata=True)
+        assert csv_str.startswith("# Green Logistics AI CSV export")
+        assert "# table: matches" in csv_str
+
+    def test_routes_csv_metadata(self, persistence_with_cycle):
+        p, cid = persistence_with_cycle
+        csv_str = p.export_routes_csv(limit=10, include_metadata=True)
+        assert csv_str.startswith("# Green Logistics AI CSV export")
+        assert "# table: routes" in csv_str
+
+    def test_no_metadata_by_default(self, persistence_with_cycle):
+        """Default (include_metadata=False) doesn't add header."""
+        p, cid = persistence_with_cycle
+        csv_str = p.export_cycles_csv(limit=10)
+        assert not csv_str.startswith("#")
+
+    def test_empty_data_with_metadata(self, tmp_path):
+        """Empty DB + include_metadata → header but no data rows."""
+        p = Persistence(str(tmp_path / "empty_meta.db"))
+        csv_str = p.export_cycles_csv(limit=10, include_metadata=True)
+        # Metadata present
+        assert "# Green Logistics AI CSV export" in csv_str
+        assert "# row_count: 0" in csv_str
+
+
+class TestAPIMetadataEndpoint:
+    """API test for include_metadata query param (iter #19)."""
+
+    @pytest.fixture(autouse=True)
+    def setup_fake_coordinator(self, tmp_path):
+        from unittest.mock import MagicMock
+        from web.backend import main as backend_main
+        from fastapi.testclient import TestClient
+
+        db_path = tmp_path / "api_meta.db"
+        persistence = Persistence(str(db_path))
+        _record_basic_cycle(
+            persistence, "API-META-001", day=1,
+            supply_tons={"SUP001": ("wood", 10.0, 80.0)},
+        )
+        fake_coord = MagicMock()
+        fake_coord.persistence = persistence
+        backend_main.coordinator = fake_coord
+        self.client = TestClient(backend_main.app)
+
+    def test_api_cycles_csv_with_metadata(self):
+        """GET ?include_metadata=true adds metadata header."""
+        resp = self.client.get(
+            "/api/persistence/export/cycles.csv?include_metadata=true"
+        )
+        assert resp.status_code == 200
+        assert resp.text.startswith("# Green Logistics AI CSV export")
+        assert "# table: cycles" in resp.text
+
+    def test_api_supplies_csv_with_metadata(self):
+        resp = self.client.get(
+            "/api/persistence/export/supplies.csv?include_metadata=true"
+        )
+        assert resp.status_code == 200
+        assert "# table: supplies" in resp.text
+
+    def test_api_no_metadata_default(self):
+        """GET without include_metadata param → no metadata."""
+        resp = self.client.get("/api/persistence/export/cycles.csv")
+        assert resp.status_code == 200
+        assert not resp.text.startswith("#")

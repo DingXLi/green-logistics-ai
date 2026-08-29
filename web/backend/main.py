@@ -2115,12 +2115,13 @@ async def get_cycle_detail(
 
 
 @app.get("/api/persistence/export/cycles.csv")
-async def export_cycles_csv(limit: int = 1000):
+async def export_cycles_csv(limit: int = 1000, include_metadata: bool = False):
     """
-    Export cycle history as CSV (iter #11) — 下载 KPI 数据用于 Excel / 论文 figure。
+    Export cycle history as CSV (iter #11 + iter #19 metadata)。
 
     Query:
     - limit: 最多多少行 (default 1000, max 10000)
+    - include_metadata: iter #19, 是否在 CSV 顶部加 metadata (生成时间 + db 路径 + size + row count)
 
     Returns: text/csv 响应 + Content-Disposition: attachment。
     包含 19 列 KPI (见 Persistence.export_cycles_csv 注释)。
@@ -2128,7 +2129,9 @@ async def export_cycles_csv(limit: int = 1000):
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     limit = max(1, min(10000, limit))
-    csv_data = coordinator.persistence.export_cycles_csv(limit=limit)
+    csv_data = coordinator.persistence.export_cycles_csv(
+        limit=limit, include_metadata=include_metadata,
+    )
     return FastAPIResponse(
         content=csv_data,
         media_type="text/csv; charset=utf-8",
@@ -2141,12 +2144,13 @@ async def export_cycles_csv(limit: int = 1000):
 
 
 @app.get("/api/persistence/export/supplies.csv")
-async def export_supplies_csv(limit: int = 10000):
+async def export_supplies_csv(limit: int = 10000, include_metadata: bool = False):
     """
-    Export supply_offers as CSV (iter #17) — 供应数据下载。
+    Export supply_offers as CSV (iter #17 + iter #19 metadata)。
 
     Query:
     - limit: 最多多少行 (default 10000, max 50000)
+    - include_metadata: iter #19, 是否在 CSV 顶部加 metadata header
 
     Returns: text/csv 响应 + Content-Disposition: attachment。
     10 列: cycle_id, supply_id, material_type, location_lat, location_lon,
@@ -2155,7 +2159,9 @@ async def export_supplies_csv(limit: int = 10000):
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     limit = max(1, min(50000, limit))
-    csv_data = coordinator.persistence.export_supplies_csv(limit=limit)
+    csv_data = coordinator.persistence.export_supplies_csv(
+        limit=limit, include_metadata=include_metadata,
+    )
     return FastAPIResponse(
         content=csv_data,
         media_type="text/csv; charset=utf-8",
@@ -2168,12 +2174,13 @@ async def export_supplies_csv(limit: int = 10000):
 
 
 @app.get("/api/persistence/export/matches.csv")
-async def export_matches_csv(limit: int = 10000):
+async def export_matches_csv(limit: int = 10000, include_metadata: bool = False):
     """
-    Export matches as CSV (iter #17) — 匹配数据下载。
+    Export matches as CSV (iter #17 + iter #19 metadata)。
 
     Query:
     - limit: 最多多少行 (default 10000, max 50000)
+    - include_metadata: iter #19, 是否在 CSV 顶部加 metadata header
 
     Returns: text/csv 响应。
     8 列: cycle_id, supply_id, demand_id, material_type, tons, distance_km,
@@ -2182,7 +2189,9 @@ async def export_matches_csv(limit: int = 10000):
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     limit = max(1, min(50000, limit))
-    csv_data = coordinator.persistence.export_matches_csv(limit=limit)
+    csv_data = coordinator.persistence.export_matches_csv(
+        limit=limit, include_metadata=include_metadata,
+    )
     return FastAPIResponse(
         content=csv_data,
         media_type="text/csv; charset=utf-8",
@@ -2195,12 +2204,13 @@ async def export_matches_csv(limit: int = 10000):
 
 
 @app.get("/api/persistence/export/routes.csv")
-async def export_routes_csv(limit: int = 10000):
+async def export_routes_csv(limit: int = 10000, include_metadata: bool = False):
     """
-    Export routes as CSV (iter #17) — 路线数据下载。
+    Export routes as CSV (iter #17 + iter #19 metadata)。
 
     Query:
     - limit: 最多多少行 (default 10000, max 50000)
+    - include_metadata: iter #19, 是否在 CSV 顶部加 metadata header
 
     Returns: text/csv 响应。
     8 列: cycle_id, vehicle_id, distance_km, duration_hours, cost_sek, co2_kg,
@@ -2209,7 +2219,9 @@ async def export_routes_csv(limit: int = 10000):
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     limit = max(1, min(50000, limit))
-    csv_data = coordinator.persistence.export_routes_csv(limit=limit)
+    csv_data = coordinator.persistence.export_routes_csv(
+        limit=limit, include_metadata=include_metadata,
+    )
     return FastAPIResponse(
         content=csv_data,
         media_type="text/csv; charset=utf-8",
