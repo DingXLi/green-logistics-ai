@@ -450,8 +450,19 @@ class Persistence:
         self,
         decision_type: Optional[str] = None,
         target_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        sim_day_min: Optional[int] = None,
+        sim_day_max: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """查询 LLM 决策。可按类型/目标过滤。"""
+        """查询 LLM 决策。可按类型/目标/时间/limit 过滤 (iter #18)。
+
+        Args:
+            decision_type: 'demand_prediction' | 'supply_prediction'
+            target_id: 'DEM001' | 'SUP000'
+            limit: 最多返多少行 (None = 不限)
+            sim_day_min: 起始 sim_day (含)
+            sim_day_max: 结束 sim_day (含)
+        """
         sql = "SELECT * FROM llm_decisions"
         clauses: List[str] = []
         params: List[Any] = []
@@ -461,9 +472,18 @@ class Persistence:
         if target_id:
             clauses.append("target_id = ?")
             params.append(target_id)
+        if sim_day_min is not None:
+            clauses.append("sim_day >= ?")
+            params.append(sim_day_min)
+        if sim_day_max is not None:
+            clauses.append("sim_day <= ?")
+            params.append(sim_day_max)
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
-        sql += " ORDER BY sim_day, id"
+        sql += " ORDER BY sim_day DESC, id DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
         with self._conn() as conn:
             rows = conn.execute(sql, params).fetchall()
             return [dict(r) for r in rows]

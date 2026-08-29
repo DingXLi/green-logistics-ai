@@ -6,7 +6,7 @@ FastAPI 应用提供 REST API
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response as FastAPIResponse
+from fastapi.responses import Response as FastAPIResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
@@ -17,6 +17,8 @@ import random
 import asyncio
 import time
 import json
+import csv
+import io
 from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
@@ -26,6 +28,28 @@ from agents.coordinator import MultiAgentCoordinator
 from agents.world_builder import WorldConfig
 from optimization.vrp_solver import VRPSolver, Location, Vehicle
 from synthetic.data_generator import SyntheticDataGenerator
+
+
+# ============================================
+# iter #18: DB export helpers
+# ============================================
+def _csv_to_rows(csv_str: str) -> List[Dict[str, Any]]:
+    """Convert CSV string → list of dicts."""
+    reader = csv.DictReader(io.StringIO(csv_str))
+    return [dict(r) for r in reader]
+
+
+def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
+    """Convert list of dicts → CSV string."""
+    if not rows:
+        return ""
+    buf = io.StringIO()
+    fieldnames = list(rows[0].keys())
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
+    return buf.getvalue()
 
 # ============================================
 # FastAPI 应用
@@ -2321,6 +2345,103 @@ async def post_db_maintenance():
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     return coordinator.persistence.vacuum()
+
+
+@app.get("/api/admin/db-export")
+async def export_db_data(
+    table: str,
+    fmt: str = "json",
+    limit: int = 10000,
+    since_sim_day: Optional[int] = None,
+):
+    """
+    Unified DB export endpoint (iter #18 retry) — table + format export。
+
+    Query:
+    - table: cycles / supplies / matches / routes / llm_decisions
+    - fmt: csv / json / ndjson (注意: 用 fmt 不是 format, 避免与 builtin 冲突)
+    - limit: 最多多少行 (default 10000, max 50000)
+    - since_sim_day: 只返 >= 该 sim_day 的行
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    table = table.strip().lower()
+    if table not in ("cycles", "supplies", "matches", "routes", "llm_decisions"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown table '{table}'. Valid: cycles / supplies / matches / routes / llm_decisions",
+        )
+    fmt = fmt.strip().lower()
+    if fmt not in ("csv", "json", "ndjson"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown format '{fmt}'. Valid: csv / json / ndjson",
+        )
+    limit = max(1, min(50000, limit))
+
+    # 拿 rows
+    rows: List[Dict[str, Any]]
+    if table == "cycles":
+        rows = coordinator.persistence.get_cycle_history(limit=limit)
+    elif table == "supplies":
+        # 用 export_supplies_csv 然后 parse (最简单)
+        csv_str = coordinator.persistence.export_supplies_csv(limit=limit)
+        rows = _csv_to_rows(csv_str)
+    elif table == "matches":
+        csv_str = coordinator.persistence.export_matches_csv(limit=limit)
+        rows = _csv_to_rows(csv_str)
+    elif table == "routes":
+        csv_str = coordinator.persistence.export_routes_csv(limit=limit)
+        rows = _csv_to_rows(csv_str)
+    else:  # llm_decisions
+        rows = coordinator.persistence.get_llm_decisions(
+            limit=limit,
+            sim_day_min=since_sim_day,
+        )
+
+    # since_sim_day filter (CSV 解析后 sim_day 是字符串)
+    if since_sim_day is not None and table != "llm_decisions":
+        filtered = []
+        for r in rows:
+            sd = r.get("sim_day")
+            if sd is None or sd == "":
+                filtered.append(r)
+                continue
+            try:
+                if int(sd) >= since_sim_day:
+                    filtered.append(r)
+            except (ValueError, TypeError):
+                filtered.append(r)
+        rows = filtered
+
+    # format dispatch
+    if fmt == "csv":
+        if table == "llm_decisions":
+            # llm_decisions 没 CSV export, 返回 placeholder
+            return FastAPIResponse(
+                content="id,note\nllm_decisions,format=csv+not implemented yet\n",
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f"attachment; filename=\"llm_decisions.csv\""},
+            )
+        csv_out = _rows_to_csv(rows)
+        return FastAPIResponse(
+            content=csv_out,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.csv\""},
+        )
+    elif fmt == "json":
+        return JSONResponse(
+            content=rows,
+            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.json\""},
+        )
+    else:  # ndjson
+        ndjson_str = "\n".join(json.dumps(r) for r in rows)
+        return FastAPIResponse(
+            content=ndjson_str,
+            media_type="application/x-ndjson",
+            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.ndjson\""},
+        )
 
 
 @app.get("/api/admin/db-stats")
