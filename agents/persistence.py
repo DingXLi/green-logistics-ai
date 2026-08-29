@@ -1533,6 +1533,128 @@ class Persistence:
             "material_type_filter": material_type,
         }
 
+    def get_cohort_retention_by_period(self, n_periods: int = 4) -> Dict[str, Any]:
+        """
+        Supply 留存按时段划分 (iter #19) — 早期 vs 后期 retention 对比。
+
+        把所有 cycle 按 sim_day 顺序分成 n_periods 段 (默认 4 段 = 四分位),
+        每段独立计算 retention rate, 让用户看 早期 vs 后期 churn 趋势。
+
+        Args:
+            n_periods: 分多少段 (default 4 = quartiles, max 10)
+
+        Returns:
+            {
+              total_supply_ids: int,
+              n_periods: int,
+              period_labels: ["1 (sim_day 1-10)",)", ...],
+              periods: [{
+                period_idx: 1,
+                period_label: "...",
+                sim_day_range: {min, max},
+                n_supply_ids: int,
+                n_one_time: int,
+                n_repeating: int,
+                retention_rate_pct: float,
+                one_time_pct: float,
+              }, ...],
+              trend: "improving" | "declining" | "stable" | "unknown"
+              (比较 first vs last period retention_rate_pct, ±5% 阈值)
+            }
+        """
+        if n_periods < 1:
+            raise ValueError("n_periods must be >= 1")
+        if n_periods > 10:
+            raise ValueError("n_periods must be <= 10")
+
+        with self._conn() as conn:
+            # Get min/max sim_day from supply_offers (the table we care about)
+            range_row = conn.execute(
+                """SELECT MIN(c.sim_day) as min_day, MAX(c.sim_day) as max_day,
+                          COUNT(DISTINCT s.cycle_id) as n_cycles,
+                          COUNT(DISTINCT s.supply_id) as n_supplies
+                   FROM supply_offers s
+                   JOIN optimization_cycles c ON c.cycle_id = s.cycle_id"""
+            ).fetchone()
+            min_day = range_row["min_day"]
+            max_day = range_row["max_day"]
+            n_cycles = range_row["n_cycles"] or 0
+
+            if min_day is None or max_day is None or n_cycles < n_periods:
+                return {
+                    "total_supply_ids": range_row["n_supplies"] or 0,
+                    "n_periods": n_periods,
+                    "period_labels": [],
+                    "periods": [],
+                    "trend": "unknown",
+                }
+
+            # 分段: 按 n_periods 等分 sim_day range
+            total_days = max_day - min_day + 1
+            days_per_period = max(1, total_days // n_periods)
+            period_labels = []
+            for i in range(n_periods):
+                p_start = min_day + i * days_per_period
+                p_end = min_day + (i + 1) * days_per_period - 1 if i < n_periods - 1 else max_day
+                period_labels.append({
+                    "period_idx": i + 1,
+                    "sim_day_min": p_start,
+                    "sim_day_max": p_end,
+                })
+
+            periods_data = []
+            for p in period_labels:
+                # 该段内的 supply_ids + 出现次数
+                rows = conn.execute(
+                    """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                       FROM supply_offers s
+                       JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                       WHERE c.sim_day BETWEEN ? AND ?
+                       GROUP BY s.supply_id""",
+                    (p["sim_day_min"], p["sim_day_max"]),
+                ).fetchall()
+
+                n_ids = len(rows)
+                n_one = sum(1 for r in rows if r["n_cycles"] == 1)
+                n_rep = n_ids - n_one
+                ret_pct = round(n_rep / n_ids * 100, 1) if n_ids > 0 else 0.0
+                one_pct = round(n_one / n_ids * 100, 1) if n_ids > 0 else 0.0
+
+                periods_data.append({
+                    "period_idx": p["period_idx"],
+                    "period_label": f"Period {p['period_idx']} (sim_day {p['sim_day_min']}-{p['sim_day_max']})",
+                    "sim_day_range": {"min": p["sim_day_min"], "max": p["sim_day_max"]},
+                    "n_supply_ids": n_ids,
+                    "n_one_time": n_one,
+                    "n_repeating": n_rep,
+                    "retention_rate_pct": ret_pct,
+                    "one_time_pct": one_pct,
+                })
+
+        # Trend: 比较 first vs last period
+        trend = "unknown"
+        if len(periods_data) >= 2:
+            first_ret = periods_data[0]["retention_rate_pct"]
+            last_ret = periods_data[-1]["retention_rate_pct"]
+            diff = last_ret - first_ret
+            if diff > 5:
+                trend = "improving"
+            elif diff < -5:
+                trend = "declining"
+            else:
+                trend = "stable"
+
+        return {
+            "total_supply_ids": range_row["n_supplies"] or 0,
+            "n_periods": n_periods,
+            "period_labels": [
+                f"Period {i+1} (sim_day {min_day + i*days_per_period}-{min_day + (i+1)*days_per_period - 1 if i < n_periods-1 else max_day})"
+                for i in range(n_periods)
+            ],
+            "periods": periods_data,
+            "trend": trend,
+        }
+
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
                            since_sim_day: Optional[int] = None,
                            until_sim_day: Optional[int] = None) -> Dict[str, Any]:

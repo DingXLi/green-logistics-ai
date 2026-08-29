@@ -2328,6 +2328,38 @@ async def get_supply_cohort_retention(material_type: Optional[str] = None):
     )
 
 
+@app.get("/api/persistence/cohort-retention-by-period")
+async def get_cohort_retention_by_period(n_periods: int = 4):
+    """
+    Supply 留存按时段划分 (iter #19) — 早期 vs 后期 retention 对比。
+
+    将所有 cycle 按 sim_day 顺序分成 n_periods 段 (默认 4 段 = 四分位),
+    每段独立计算 retention rate, 让用户看 早期 vs 后期 churn 趋势。
+
+    Query:
+    - n_periods: 分多少段 (default 4, range 1-10)
+
+    Returns:
+        {
+          total_supply_ids, n_periods, period_labels,
+          periods: [{period_idx, period_label, sim_day_range,
+                     n_supply_ids, n_one_time, n_repeating,
+                     retention_rate_pct, one_time_pct}, ...],
+          trend: "improving" | "declining" | "stable" | "unknown"
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if n_periods < 1 or n_periods > 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"n_periods must be 1-10, got {n_periods}",
+        )
+    return coordinator.persistence.get_cohort_retention_by_period(
+        n_periods=n_periods,
+    )
+
+
 @app.get("/api/persistence/cycle-kpi-summary")
 async def get_cycle_kpi_summary(
     last_n: Optional[int] = None,
