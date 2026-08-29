@@ -993,6 +993,112 @@ class Persistence:
             writer.writerow(r)
         return buf.getvalue()
 
+    def export_supplies_csv(self, limit: int = 10000) -> str:
+        """
+        Export supply_offers as CSV (iter #17) — analyst-friendly.
+
+        Columns (10):
+            cycle_id, supply_id, material_type, location_lat, location_lon,
+            available_tons, moisture_percent, quality_score, sim_day, sim_hour
+
+        Args:
+            limit: max rows to export (default 10000)
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT s.cycle_id, s.supply_id, s.material_type,
+                          s.location_lat, s.location_lon,
+                          s.available_tons, s.moisture_percent, s.quality_score,
+                          c.sim_day, c.sim_hour
+                   FROM supply_offers s
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                   ORDER BY c.sim_day DESC, s.supply_id
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+
+        columns = [
+            "cycle_id", "supply_id", "material_type", "location_lat",
+            "location_lon", "available_tons", "moisture_percent",
+            "quality_score", "sim_day", "sim_hour",
+        ]
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(dict(r))
+        return buf.getvalue()
+
+    def export_matches_csv(self, limit: int = 10000) -> str:
+        """
+        Export matches as CSV (iter #17) — analyst-friendly.
+
+        Columns (8):
+            cycle_id, supply_id, demand_id, material_type,
+            tons, distance_km, estimated_profit_sek, sim_day
+
+        Args:
+            limit: max rows (default 10000)
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT m.cycle_id, m.supply_id, m.demand_id, m.material_type,
+                          m.tons, m.distance_km, m.estimated_profit_sek,
+                          c.sim_day
+                   FROM matches m
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                   ORDER BY c.sim_day DESC, m.id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+
+        columns = [
+            "cycle_id", "supply_id", "demand_id", "material_type",
+            "tons", "distance_km", "estimated_profit_sek", "sim_day",
+        ]
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(dict(r))
+        return buf.getvalue()
+
+    def export_routes_csv(self, limit: int = 10000) -> str:
+        """
+        Export routes as CSV (iter #17) — analyst-friendly.
+
+        Columns (8):
+            cycle_id, vehicle_id, distance_km, duration_hours,
+            cost_sek, co2_kg, stops_count, sim_day
+
+        Args:
+            limit: max rows (default 10000)
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT r.cycle_id, r.vehicle_id,
+                          r.distance_km, r.duration_hours,
+                          r.cost_sek, r.co2_kg,
+                          COALESCE(json_array_length(r.stops_json), 0) AS stops_count,
+                          c.sim_day
+                   FROM routes r
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                   ORDER BY c.sim_day DESC, r.id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+
+        columns = [
+            "cycle_id", "vehicle_id", "distance_km", "duration_hours",
+            "cost_sek", "co2_kg", "stops_count", "sim_day",
+        ]
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(dict(r))
+        return buf.getvalue()
+
     def get_match_distance_stats(self) -> Dict[str, Any]:
         """
         Match 距离统计 (iter #15) — 从 matches 表聚合 distance_km 指标。
