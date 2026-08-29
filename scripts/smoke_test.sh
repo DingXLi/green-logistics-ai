@@ -116,6 +116,9 @@ check_endpoint "/api/health/deep" 200 GET "/api/health/deep"
 # ---- Admin / DB ----
 check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats"
 check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance"
+check_endpoint "/api/admin/db-export?table=cycles" 200 GET "/api/admin/db-export?table=cycles"
+check_endpoint "/api/admin/db-export?format=ndjson" 200 GET "/api/admin/db-export?table=cycles&format=ndjson"
+check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus"
 
 # ---- Persistence endpoints ----
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
