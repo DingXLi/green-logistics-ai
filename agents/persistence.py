@@ -523,21 +523,47 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def get_kpi_timeseries(self) -> List[Dict[str, Any]]:
-        """KPI 时间序列（按 sim_day 排序）"""
+    def get_kpi_timeseries(self, since_sim_day: Optional[int] = None,
+                         until_sim_day: Optional[int] = None) -> List[Dict[str, Any]]:
+        """KPI 时间序列 (iter #8 + iter #18 时间窗口) — 按 sim_day 聚合。
+
+        Args (iter #18 新增):
+            since_sim_day: 起始 sim_day (含)
+            until_sim_day: 结束 sim_day (含)
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
         with self._conn() as conn:
             rows = conn.execute(
-                """SELECT sim_day,
+                f"""SELECT sim_day,
                           SUM(total_tons) as tons,
                           SUM(total_cost_sek) as cost_sek,
                           SUM(total_co2_kg) as co2_kg,
                           AVG(fleet_utilization_pct) as util_pct,
-                          SUM(n_matches) as matches
+                          SUM(n_matches) as matches,
+                          COUNT(*) as n_cycles_in_day
                    FROM optimization_cycles
+                   {where_sql}
                    GROUP BY sim_day
-                   ORDER BY sim_day ASC"""
+                   ORDER BY sim_day ASC""",
+                params,
             ).fetchall()
-            return [dict(r) for r in rows]
+            result = []
+            for r in rows:
+                d = dict(r)
+                for k in ("tons", "cost_sek", "co2_kg", "util_pct"):
+                    if d.get(k) is not None:
+                        d[k] = round(d[k], 2)
+                result.append(d)
+            return result
 
     def get_fleet_timeseries(self) -> List[Dict[str, Any]]:
         """

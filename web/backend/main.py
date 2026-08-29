@@ -1911,11 +1911,28 @@ async def get_recent_cycles(limit: int = 10):
 
 
 @app.get("/api/persistence/kpi-timeseries")
-async def get_kpi_timeseries():
-    """KPI 时间序列（按 sim_day 聚合）"""
+async def get_kpi_timeseries(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """KPI 时间序列 (iter #8 + iter #18 时间窗口) — 按 sim_day 聚合。
+
+    Query (iter #18):
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+    """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    return coordinator.persistence.get_kpi_timeseries()
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+            )
+    return coordinator.persistence.get_kpi_timeseries(
+        since_sim_day=since_sim_day,
+        until_sim_day=until_sim_day,
+    )
 
 
 @app.get("/api/persistence/fleet-timeseries")
