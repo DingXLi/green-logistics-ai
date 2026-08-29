@@ -2115,7 +2115,7 @@ async def get_cycle_detail(
 
 
 @app.get("/api/persistence/export/cycles.csv")
-async def export_cycles_csv(limit: int = 1000, include_metadata: bool = False):
+async def export_cycles_csv(limit: int = 1000, include_metadata: bool = True):
     """
     Export cycle history as CSV (iter #11 + iter #19 metadata)。
 
@@ -2144,7 +2144,7 @@ async def export_cycles_csv(limit: int = 1000, include_metadata: bool = False):
 
 
 @app.get("/api/persistence/export/supplies.csv")
-async def export_supplies_csv(limit: int = 10000, include_metadata: bool = False):
+async def export_supplies_csv(limit: int = 10000, include_metadata: bool = True):
     """
     Export supply_offers as CSV (iter #17 + iter #19 metadata)。
 
@@ -2174,7 +2174,7 @@ async def export_supplies_csv(limit: int = 10000, include_metadata: bool = False
 
 
 @app.get("/api/persistence/export/matches.csv")
-async def export_matches_csv(limit: int = 10000, include_metadata: bool = False):
+async def export_matches_csv(limit: int = 10000, include_metadata: bool = True):
     """
     Export matches as CSV (iter #17 + iter #19 metadata)。
 
@@ -2204,7 +2204,7 @@ async def export_matches_csv(limit: int = 10000, include_metadata: bool = False)
 
 
 @app.get("/api/persistence/export/routes.csv")
-async def export_routes_csv(limit: int = 10000, include_metadata: bool = False):
+async def export_routes_csv(limit: int = 10000, include_metadata: bool = True):
     """
     Export routes as CSV (iter #17 + iter #19 metadata)。
 

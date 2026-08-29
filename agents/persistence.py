@@ -1006,7 +1006,7 @@ class Persistence:
         return result
 
     def export_cycles_csv(self, limit: int = 1000,
-                           include_metadata: bool = False) -> str:
+                           include_metadata: bool = True) -> str:
         """
         Export cycle history as CSV string (iter #11 + iter #19 metadata)。
 
@@ -1053,7 +1053,7 @@ class Persistence:
         return buf.getvalue()
 
     def export_supplies_csv(self, limit: int = 10000,
-                           include_metadata: bool = False) -> str:
+                           include_metadata: bool = True) -> str:
         """
         Export supply_offers as CSV (iter #17 + iter #19 metadata)。
 
@@ -1098,7 +1098,7 @@ class Persistence:
         return buf.getvalue()
 
     def export_matches_csv(self, limit: int = 10000,
-                           include_metadata: bool = False) -> str:
+                           include_metadata: bool = True) -> str:
         """
         Export matches as CSV (iter #17 + iter #19 metadata)。
 
@@ -1141,7 +1141,7 @@ class Persistence:
         return buf.getvalue()
 
     def export_routes_csv(self, limit: int = 10000,
-                          include_metadata: bool = False) -> str:
+                          include_metadata: bool = True) -> str:
         """
         Export routes as CSV (iter #17 + iter #19 metadata)。
 

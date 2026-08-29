@@ -99,9 +99,17 @@ def _record_basic_cycle(p: Persistence, cycle_id: str, day: int = 1,
     }, wall_duration_ms=100)
 
 
-def _parse_csv(csv_str: str):
-    """Parse CSV string → (header, rows)."""
-    reader = csv.reader(io.StringIO(csv_str))
+def _parse_csv(csv_str: str, skip_comments: bool = True):
+    """Parse CSV string → (header, rows).
+
+    Args:
+        skip_comments: If True (default), skip lines starting with '#' (metadata header).
+    """
+    lines = csv_str.split("\n")
+    if skip_comments:
+        lines = [l for l in lines if not l.startswith("#")]
+    csv_clean = "\n".join(lines)
+    reader = csv.reader(io.StringIO(csv_clean))
     header = next(reader)
     rows = list(reader)
     return header, rows
@@ -370,10 +378,17 @@ class TestMetadataHeader:
         assert csv_str.startswith("# Green Logistics AI CSV export")
         assert "# table: routes" in csv_str
 
-    def test_no_metadata_by_default(self, persistence_with_cycle):
-        """Default (include_metadata=False) doesn't add header."""
+    def test_metadata_by_default(self, persistence_with_cycle):
+        """Default is include_metadata=True (iter #20: was False in iter #19)."""
         p, cid = persistence_with_cycle
         csv_str = p.export_cycles_csv(limit=10)
+        assert csv_str.startswith("# Green Logistics AI CSV export")
+        assert "# table: cycles" in csv_str
+
+    def test_explicit_no_metadata(self, persistence_with_cycle):
+        """Pass include_metadata=False explicitly to skip metadata header."""
+        p, cid = persistence_with_cycle
+        csv_str = p.export_cycles_csv(limit=10, include_metadata=False)
         assert not csv_str.startswith("#")
 
     def test_empty_data_with_metadata(self, tmp_path):
@@ -421,8 +436,14 @@ class TestAPIMetadataEndpoint:
         assert resp.status_code == 200
         assert "# table: supplies" in resp.text
 
-    def test_api_no_metadata_default(self):
-        """GET without include_metadata param → no metadata."""
+    def test_api_metadata_default(self):
+        """GET without include_metadata param → metadata present (iter #20 default)."""
         resp = self.client.get("/api/persistence/export/cycles.csv")
+        assert resp.status_code == 200
+        assert resp.text.startswith("# Green Logistics AI CSV export")
+
+    def test_api_explicit_no_metadata(self):
+        """GET ?include_metadata=false → no metadata."""
+        resp = self.client.get("/api/persistence/export/cycles.csv?include_metadata=false")
         assert resp.status_code == 200
         assert not resp.text.startswith("#")
