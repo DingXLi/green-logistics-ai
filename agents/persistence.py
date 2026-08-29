@@ -1308,6 +1308,113 @@ class Persistence:
             "time_range": time_range,
         }
 
+    def get_db_info(self) -> Dict[str, Any]:
+        """
+        DB 完整 info (iter #20) — 给 audit / debugging /ops 用的详细 DB metadata。
+
+        包括:
+        - db_path / db_size_bytes / db_size_mb / db_modified_at
+        - md5_checksum (前 100KB, 用于 detect DB 变化)
+        - sqlite_version / schema_version
+        - table_counts / index_count / total_rows
+        - vacuum_status (上次 VACUUM 时间)
+        - 时间范围
+
+        与 get_db_stats 区别:
+- get_db_stats: 运行时 size + table counts (监控用, ~cheap)
+- get_db_info: audit-friendly (checksum, version, ~10-50ms)
+        """
+        import os as _os
+        import hashlib as _hashlib
+        import sqlite3 as _sqlite3
+
+        db_path = self.db_path
+        db_exists = bool(db_path) and _os.path.exists(db_path)
+
+        # md5 checksum (前 100KB, 避免读整个文件)
+        md5 = ""
+        size_bytes = 0
+        mtime = None
+        if db_exists:
+            try:
+                size_bytes = _os.path.getsize(db_path)
+                mtime = _os.path.getmtime(db_path)
+                with open(db_path, "rb") as f:
+                    chunk = f.read(min(size_bytes, 102400))
+                    md5 = _hashlib.md5(chunk).hexdigest()
+            except Exception:
+                pass
+
+        # sqlite 版本 + schema 版本
+        sqlite_version = _sqlite3.sqlite_version
+        schema_version = 0
+        vacuum_status = "unknown"
+        with self._conn() as conn:
+            try:
+                schema_version_row = conn.execute("PRAGMA schema_version").fetchone()
+                schema_version = schema_version_row[0] if schema_version_row else 0
+            except Exception:
+                pass
+            try:
+                vacuum_row = conn.execute(
+                    "SELECT MAX(integrity_check) FROM pragma_integrity_check"
+                ).fetchone()
+                # pragma_integrity_check 没有 last_vacuum 概念, 使用 auto_vacuum setting
+                auto_vacuum_row = conn.execute("PRAGMA auto_vacuum").fetchone()
+                auto_vacuum = auto_vacuum_row[0] if auto_vacuum_row else 0
+                vacuum_status = {
+                    0: "disabled",
+                    1: "full",
+                    2: "incremental",
+                }.get(auto_vacuum, "unknown")
+            except Exception:
+                pass
+
+            # Table counts + indexes + time range
+            table_counts: Dict[str, int] = {}
+            for table in ("optimization_cycles", "supply_offers", "demand_requests",
+                          "matches", "routes", "llm_decisions"):
+                try:
+                    row = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}").fetchone()
+                    table_counts[table] = row["cnt"] or 0
+                except Exception:
+                    table_counts[table] = -1
+
+            try:
+                idx_count_row = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
+                ).fetchone()
+                index_count = idx_count_row["cnt"] or 0
+            except Exception:
+                index_count = 0
+
+            try:
+                time_row = conn.execute(
+                    "SELECT MIN(wall_timestamp) as oldest, MAX(wall_timestamp) as newest FROM optimization_cycles"
+                ).fetchone()
+                time_range = {
+                    "oldest_cycle": time_row["oldest"],
+                    "newest_cycle": time_row["newest"],
+                }
+            except Exception:
+                time_range = {}
+
+        return {
+            "db_path": db_path,
+            "db_exists": db_exists,
+            "db_size_bytes": size_bytes,
+            "db_size_mb": round(size_bytes / 1024 / 1024, 3) if size_bytes else 0,
+            "db_modified_at": datetime.fromtimestamp(mtime).isoformat() if mtime else None,
+            "md5_checksum_first_100kb": md5,
+            "sqlite_version": sqlite_version,
+            "schema_version": schema_version,
+            "auto_vacuum_mode": vacuum_status,
+            "table_counts": table_counts,
+            "total_rows": sum(c for c in table_counts.values() if c > 0),
+            "index_count": index_count,
+            "time_range": time_range,
+        }
+
     def get_supply_aggregates(self, supply_id: Optional[str] = None,
                               material_type: Optional[str] = None,
                               limit_supplies: int = 100) -> List[Dict[str, Any]]:

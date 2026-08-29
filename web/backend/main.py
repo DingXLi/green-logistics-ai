@@ -2564,6 +2564,28 @@ async def get_db_stats():
     return coordinator.persistence.get_db_stats()
 
 
+@app.get("/api/admin/db-info")
+async def get_db_info():
+    """
+    DB 完整 info (iter #20) — audit / debugging / ops 详细信息。
+
+    包括:
+    - db_path / db_size_bytes / db_size_mb / db_modified_at
+    - md5_checksum (前 100KB, 用于 detect DB 变化)
+    - sqlite_version / schema_version / auto_vacuum_mode
+    - table_counts / total_rows / index_count
+    - time_range
+
+    用途:
+    - 调试: 'DB 是不是同一个?' '什么时候被改过?'
+    - audit: 每次重要操作 记录 db checksum
+    - ops: schema 升级、 migration 验证
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_db_info()
+
+
 @app.get("/api/facilities/distance-matrix")
 async def get_facility_distance_matrix(
     city: Optional[str] = None,
