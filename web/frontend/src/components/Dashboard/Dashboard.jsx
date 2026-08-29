@@ -37,6 +37,8 @@ const MaterialsOverview = lazy(() => import('./MaterialsOverview').then(m => ({ 
 // iter #16: material aggregates table + cycle KPI summary
 const MaterialAggregates = lazy(() => import('./MaterialAggregates').then(m => ({ default: m.MaterialAggregates })))
 const CycleKpiSummary = lazy(() => import('./CycleKpiSummary').then(m => ({ default: m.CycleKpiSummary })))
+// iter #17: DB stats badge (size + table rows + indexes)
+const DbStatsBadge = lazy(() => import('./DbStatsBadge').then(m => ({ default: m.DbStatsBadge })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -506,6 +508,11 @@ export default function Dashboard() {
       </div>
 
       <KPISummary data={summary} />
+
+      {/* iter #17: DB stats badge (size + tables + indexes) */}
+      <Suspense fallback={<LoadingSpinner label="Loading DB stats…" />}>
+        <DbStatsBadge />
+      </Suspense>
 
       {/* Tab 切换器 */}
       <div className="dashboard-tabs">
