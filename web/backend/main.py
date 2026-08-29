@@ -35,8 +35,15 @@ from synthetic.data_generator import SyntheticDataGenerator
 # iter #18: DB export helpers
 # ============================================
 def _csv_to_rows(csv_str: str) -> List[Dict[str, Any]]:
-    """Convert CSV string → list of dicts."""
-    reader = csv.DictReader(io.StringIO(csv_str))
+    """Convert CSV string → list of dicts.
+
+    Skips metadata header lines (starting with '#') that may be present
+    when CSV was exported with include_metadata=True (iter #20+).
+    """
+    # Filter out # comment lines (metadata header)
+    lines = [l for l in csv_str.split("\n") if not l.startswith("#")]
+    csv_clean = "\n".join(lines)
+    reader = csv.DictReader(io.StringIO(csv_clean))
     return [dict(r) for r in reader]
 
 
