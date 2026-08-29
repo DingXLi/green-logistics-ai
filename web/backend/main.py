@@ -19,6 +19,7 @@ import time
 import json
 import csv
 import io
+import gzip
 from contextlib import asynccontextmanager
 
 # 添加父目录到路径以便导入
@@ -50,6 +51,32 @@ def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
     for r in rows:
         writer.writerow(r)
     return buf.getvalue()
+
+
+def _maybe_gzip(content: bytes, use_gzip: bool, filename: str) -> FastAPIResponse:
+    """可选 gzip 包装 (iter #19)。返回 Response with Content-Encoding header。
+
+    Args:
+        content: raw bytes (text content as UTF-8)
+        use_gzip: 是否启用 gzip
+        filename: 下载文件名
+    """
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    }
+    if use_gzip:
+        compressed = gzip.compress(content)
+        headers["Content-Encoding"] = "gzip"
+        return FastAPIResponse(
+            content=compressed,
+            media_type="application/octet-stream",
+            headers=headers,
+        )
+    # not gzipped — content 直接传
+    return FastAPIResponse(
+        content=content,
+        headers=headers,
+    )
 
 # ============================================
 # FastAPI 应用
@@ -2370,15 +2397,17 @@ async def export_db_data(
     fmt: str = "json",
     limit: int = 10000,
     since_sim_day: Optional[int] = None,
+    gzip: bool = False,
 ):
     """
-    Unified DB export endpoint (iter #18 retry) — table + format export。
+    Unified DB export endpoint (iter #18 + iter #19 gzip) — table + format export。
 
     Query:
     - table: cycles / supplies / matches / routes / llm_decisions
     - fmt: csv / json / ndjson (注意: 用 fmt 不是 format, 避免与 builtin 冲突)
     - limit: 最多多少行 (default 10000, max 50000)
     - since_sim_day: 只返 >= 该 sim_day 的行
+    - gzip: bool = False — 是否 gzip 压缩 (iter #19, 大 payload 省带宽)
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
@@ -2432,32 +2461,45 @@ async def export_db_data(
                 filtered.append(r)
         rows = filtered
 
-    # format dispatch
+    # format dispatch (iter #19 加 gzip 选项)
     if fmt == "csv":
         if table == "llm_decisions":
             # llm_decisions 没 CSV export, 返回 placeholder
+            content = "id,note\nllm_decisions,format=csv+not implemented yet\n"
+            if gzip:
+                return _maybe_gzip(content.encode("utf-8"), True, "llm_decisions.csv")
             return FastAPIResponse(
-                content="id,note\nllm_decisions,format=csv+not implemented yet\n",
+                content=content,
                 media_type="text/csv; charset=utf-8",
-                headers={"Content-Disposition": f"attachment; filename=\"llm_decisions.csv\""},
+                headers={"Content-Disposition": "attachment; filename=\"llm_decisions.csv\""},
             )
         csv_out = _rows_to_csv(rows)
+        filename = f"green_logistics_{table}_{limit}.csv"
+        if gzip:
+            return _maybe_gzip(csv_out.encode("utf-8"), True, filename)
         return FastAPIResponse(
             content=csv_out,
             media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.csv\""},
+            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
     elif fmt == "json":
+        filename = f"green_logistics_{table}_{limit}.json"
+        if gzip:
+            json_str = json.dumps(rows)
+            return _maybe_gzip(json_str.encode("utf-8"), True, filename)
         return JSONResponse(
             content=rows,
-            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.json\""},
+            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
     else:  # ndjson
         ndjson_str = "\n".join(json.dumps(r) for r in rows)
+        filename = f"green_logistics_{table}_{limit}.ndjson"
+        if gzip:
+            return _maybe_gzip(ndjson_str.encode("utf-8"), True, filename)
         return FastAPIResponse(
             content=ndjson_str,
             media_type="application/x-ndjson",
-            headers={"Content-Disposition": f"attachment; filename=\"green_logistics_{table}_{limit}.ndjson\""},
+            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
 
 

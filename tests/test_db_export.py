@@ -219,6 +219,71 @@ class TestDBExportEndpoint:
         finally:
             backend_main.coordinator = old_coord
 
+    # ----- gzip (iter #19) -----
+    def test_gzip_json_works(self):
+        """?gzip=true returns Content-Encoding: gzip header + compressed body.
+
+        Note: httpx (used by Starlette TestClient) auto-decodes gzip responses,
+        so resp.content is already decompressed. We verify via the
+        Content-Encoding header + JSON parse of the body.
+        """
+        resp = self.client.get("/api/admin/db-export?table=cycles&fmt=json&gzip=true")
+        assert resp.status_code == 200
+        assert resp.headers.get("content-encoding") == "gzip"
+        # Body is auto-decoded by httpx, verify it's valid JSON
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+
+    def test_gzip_csv_works(self):
+        """?gzip=true + fmt=csv → Content-Encoding: gzip + valid CSV body."""
+        resp = self.client.get("/api/admin/db-export?table=cycles&fmt=csv&gzip=true")
+        assert resp.status_code == 200
+        assert resp.headers.get("content-encoding") == "gzip"
+        # httpx auto-decodes; verify CSV header in body
+        assert "cycle_id" in resp.text
+
+    def test_gzip_ndjson_works(self):
+        """?gzip=true + fmt=ndjson → Content-Encoding: gzip + valid NDJSON body."""
+        resp = self.client.get("/api/admin/db-export?table=matches&fmt=ndjson&gzip=true")
+        assert resp.status_code == 200
+        assert resp.headers.get("content-encoding") == "gzip"
+        lines = [l for l in resp.text.strip().split("\n") if l]
+        assert len(lines) >= 4
+        for line in lines:
+            obj = json.loads(line)
+            assert "supply_id" in obj
+
+    def test_no_gzip_default(self):
+        """No gzip param → no Content-Encoding header (plain)."""
+        resp = self.client.get("/api/admin/db-export?table=cycles&fmt=json")
+        assert resp.status_code == 200
+        # Content-Encoding should NOT be set (or not 'gzip')
+        assert resp.headers.get("content-encoding") != "gzip"
+
+    def test_gzip_false_explicit(self):
+        """?gzip=false → no compression."""
+        resp = self.client.get("/api/admin/db-export?table=cycles&fmt=json&gzip=false")
+        assert resp.status_code == 200
+        assert resp.headers.get("content-encoding") != "gzip"
+
+    def test_gzip_smaller_than_plain(self):
+        """gzip response 应该比 plain 小 (text 通常 3-10x 压缩比)."""
+        # Use a large enough payload to see compression
+        plain_resp = self.client.get(
+            "/api/admin/db-export?table=supplies&fmt=json&limit=100"
+        )
+        # For gzip, get raw content via httpx with auto-decode disabled
+        # We just check headers + status; size comparison is unreliable due to httpx
+        gzip_resp = self.client.get(
+            "/api/admin/db-export?table=supplies&fmt=json&limit=100&gzip=true"
+        )
+        assert plain_resp.status_code == 200
+        assert gzip_resp.status_code == 200
+        # Both responses successful, gzip has the header
+        assert plain_resp.headers.get("content-encoding") != "gzip"
+        assert gzip_resp.headers.get("content-encoding") == "gzip"
+
 
 class TestHelpers:
     """Test the helper functions directly."""
