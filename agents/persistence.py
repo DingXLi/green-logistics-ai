@@ -1383,6 +1383,110 @@ class Persistence:
                 result.append(d)
         return result
 
+    def get_supply_cohort_retention(self, material_type: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Supply 留存分析 (iter #17) — 哪些 supply 点反复出现 vs 一次性出现。
+
+        "留存" = supply_id 在不同 sim_day 都出现 (说明它在持续生成废料)
+        "一次性" = supply_id 只在 1 个 cycle 出现 (可能是临时生成点)
+
+        Args:
+            material_type: 可选, 只查某种 material
+
+        Returns:
+            {
+              total_supply_ids: int,
+              n_one_time: int,           # 只出现 1 次
+              n_repeating: int,          # 出现 ≥2 次
+              retention_rate_pct: float, # n_repeating / total_supply_ids
+              one_time_pct: float,       # n_one_time / total_supply_ids
+              by_appearance_count: [{
+                appearance_count: 2, n_supplies: 5, pct: 12.5
+              }, ...],                  # 分布 (出现 1 次 / 2 次 / 3-5 次 / ...)
+              material_type_filter: str|None,
+            }
+        """
+        with self._conn() as conn:
+            where_clause = ""
+            params: List[Any] = []
+            if material_type:
+                where_clause = "WHERE material_type = ?"
+                params.append(material_type)
+
+            # 1. 按 supply_id 聚合 cycle 数
+            counts = conn.execute(
+                f"""SELECT COUNT(DISTINCT cycle_id) as n_cycles, COUNT(*) as n_offers
+                    FROM supply_offers
+                    {where_clause}""",
+                params,
+            ).fetchone()
+
+            # 2. 按 supply_id 计数出现次数
+            rows = conn.execute(
+                f"""SELECT supply_id, COUNT(DISTINCT cycle_id) as n_cycles
+                    FROM supply_offers
+                    {where_clause}
+                    GROUP BY supply_id""",
+                params,
+            ).fetchall()
+
+        total_ids = len(rows)
+        if total_ids == 0:
+            return {
+                "total_supply_ids": 0,
+                "n_one_time": 0,
+                "n_repeating": 0,
+                "retention_rate_pct": 0.0,
+                "one_time_pct": 0.0,
+                "by_appearance_count": [],
+                "material_type_filter": material_type,
+            }
+
+        n_one_time = sum(1 for r in rows if r["n_cycles"] == 1)
+        n_repeating = total_ids - n_one_time
+
+        # 3. 按 appearance_count 分桶 (1 / 2 / 3-5 / 6-10 / 11+)
+        buckets = {
+            "1 (one-time)": 0,
+            "2": 0,
+            "3-5": 0,
+            "6-10": 0,
+            "11+": 0,
+        }
+        for r in rows:
+            c = r["n_cycles"]
+            if c == 1:
+                buckets["1 (one-time)"] += 1
+            elif c == 2:
+                buckets["2"] += 1
+            elif c <= 5:
+                buckets["3-5"] += 1
+            elif c <= 10:
+                buckets["6-10"] += 1
+            else:
+                buckets["11+"] += 1
+
+        by_appearance_count = [
+            {
+                "appearance_count_label": label,
+                "n_supplies": n,
+                "pct": round(n / total_ids * 100, 1),
+            }
+            for label, n in buckets.items()
+        ]
+
+        return {
+            "total_supply_ids": total_ids,
+            "n_one_time": n_one_time,
+            "n_repeating": n_repeating,
+            "retention_rate_pct": round(n_repeating / total_ids * 100, 1),
+            "one_time_pct": round(n_one_time / total_ids * 100, 1),
+            "by_appearance_count": by_appearance_count,
+            "total_supply_offers": counts["n_offers"] or 0,
+            "total_cycles_with_supply": counts["n_cycles"] or 0,
+            "material_type_filter": material_type,
+        }
+
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
                            since_sim_day: Optional[int] = None,
                            until_sim_day: Optional[int] = None) -> Dict[str, Any]:

@@ -2231,6 +2231,35 @@ async def get_material_aggregates(
     )
 
 
+@app.get("/api/persistence/supply-cohort-retention")
+async def get_supply_cohort_retention(material_type: Optional[str] = None):
+    """
+    Supply 留存分析 (iter #17) — 哪些 supply 点反复出现 vs 一次性出现。
+
+    指标:
+    - retention_rate_pct: 出现 ≥2 次的 supply 占比
+    - one_time_pct: 只出现 1 次的 supply 占比
+    - by_appearance_count: 按出现次数分布 (1 / 2 / 3-5 / 6-10 / 11+)
+
+    Query:
+    - material_type: 可选, 只查某种 material 的 supply 留存
+
+    Returns:
+        {
+          total_supply_ids, n_one_time, n_repeating,
+          retention_rate_pct, one_time_pct,
+          by_appearance_count: [{label, n_supplies, pct}, ...],
+          total_supply_offers, total_cycles_with_supply,
+          material_type_filter,
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_supply_cohort_retention(
+        material_type=material_type,
+    )
+
+
 @app.get("/api/persistence/cycle-kpi-summary")
 async def get_cycle_kpi_summary(
     last_n: Optional[int] = None,
