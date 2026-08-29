@@ -123,6 +123,8 @@ check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence
 check_endpoint "/api/persistence/supply-aggregates" 200 GET "/api/persistence/supply-aggregates"
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
+check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
+check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 
 # ---- Optimization endpoints ----
 check_endpoint "/api/optimize/last" 200 GET "/api/optimize/last"
