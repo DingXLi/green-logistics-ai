@@ -190,7 +190,12 @@ green-logistics-ai/
 | GET    | `/api/persistence/match-distance-stats` | Match distance buckets + avg/median (iter #15) |
 | GET    | `/api/persistence/supply-aggregates` | Per-supply cumulative KPIs (iter #15) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
-| GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16) |
+| GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
+| GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
+| GET    | `/api/persistence/export/cycles.csv` | Download cycles as CSV (iter #11) |
+| GET    | `/api/persistence/export/supplies.csv` | Download supplies as CSV (iter #17) |
+| GET    | `/api/persistence/export/matches.csv` | Download matches as CSV (iter #17) |
+| GET    | `/api/persistence/export/routes.csv` | Download routes as CSV (iter #17) |
 | GET    | `/api/admin/db-stats` | SQLite DB size, table counts, indexes (iter #15) |
 | POST   | `/api/admin/db-maintenance` | VACUUM + ANALYZE (iter #16) |
 | GET    | `/api/facilities/distance-matrix` | N×N facility distance matrix (iter #15) |
