@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+# E2E smoke test script for green-logistics-ai API (iter #16)
+#
+# Exercises the live API surface end-to-end:
+# - /health (basic liveness)
+# - /api/health/deep (multi-subsystem check)
+# - /api/admin/db-stats (DB inventory)
+# - /api/admin/db-maintenance (VACUUM + ANALYZE)
+# - /api/persistence/summary (cycle count)
+# - /api/persistence/match-distance-stats
+# - /api/persistence/supply-aggregates
+# - /api/persistence/material-aggregates
+# - /api/persistence/cycle-kpi-summary
+# - /api/optimize/last
+# - /api/optimize/batch?scenarios=baseline&limit=1
+# - /api/facilities/distance-matrix
+# - /api/seasonal/factors
+# - /api/optimize/pareto?n_points=3
+#
+# Usage:
+#   ./scripts/smoke_test.sh                              # localhost:8000
+#   HF_BASE=https://lidingx-green-logistics.hf.space ./scripts/smoke_test.sh
+#
+# Exit codes:
+#   0 = all checks passed
+#   1 = at least one endpoint failed
+
+set -u
+
+BASE="${HF_BASE:-http://localhost:8000}"
+COOKIE_JAR="$(mktemp)"
+trap 'rm -f "$COOKIE_JAR"' EXIT
+
+# Colors (auto-disabled if no TTY)
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
+fi
+
+PASS=0
+FAIL=0
+FAILED_ENDPOINTS=()
+
+# check_endpoint <name> <expected_status> <method> <path> [extra args...]
+check_endpoint() {
+    local name="$1"
+    local expected_status="$2"
+    local method="$3"
+    local path="$4"
+    shift 4
+    local url="${BASE}${path}"
+    local http_code
+
+    if [[ "$method" == "POST" ]]; then
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+            "$@" "$url" 2>/dev/null)
+    else
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+            "$url" 2>/dev/null)
+    fi
+
+    if [[ "$http_code" == "$expected_status" ]]; then
+        echo -e "  ${GREEN}✓${NC} $name [$method $path → $http_code]"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $name [$method $path → expected $expected_status, got $http_code]"
+        FAIL=$((FAIL + 1))
+        FAILED_ENDPOINTS+=("$name")
+    fi
+}
+
+# check_json_field <name> <method> <path> <jq_filter> <expected_value>
+check_json_field() {
+    local name="$1"
+    local method="$2"
+    local path="$3"
+    local jq_filter="$4"
+    local expected="$5"
+    local url="${BASE}${path}"
+    local actual
+
+    actual=$(curl -s -X "$method" -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+        "$url" 2>/dev/null | jq -r "$jq_filter" 2>/dev/null)
+
+    if [[ "$actual" == "$expected" ]]; then
+        echo -e "  ${GREEN}✓${NC} $name [$jq_filter == $expected]"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $name [$jq_filter: expected '$expected', got '$actual']"
+        FAIL=$((FAIL + 1))
+        FAILED_ENDPOINTS+=("$name")
+    fi
+}
+
+echo ""
+echo "🦞 Green Logistics AI — E2E smoke test"
+echo "   target: $BASE"
+echo "   time:   $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+echo ""
+
+# ---- Basic liveness ----
+check_endpoint "/health basic" 200 GET "/health"
+
+# ---- Deep health (multi-subsystem) ----
+check_endpoint "/api/health/deep" 200 GET "/api/health/deep"
+
+# ---- Admin / DB ----
+check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats"
+check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance"
+
+# ---- Persistence endpoints ----
+check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
+check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence/match-distance-stats"
+check_endpoint "/api/persistence/supply-aggregates" 200 GET "/api/persistence/supply-aggregates"
+check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
+check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
+
+# ---- Optimization endpoints ----
+check_endpoint "/api/optimize/last" 200 GET "/api/optimize/last"
+check_endpoint "/api/optimize/batch" 200 POST "/api/optimize/batch" \
+    -H "Content-Type: application/json" \
+    -d '{"scenarios":[{"name":"baseline","n_points":3,"time_limit_seconds":3,"co2_price":0,"use_real_roads":false}]}'
+check_endpoint "/api/optimize/pareto" 200 GET "/api/optimize/pareto?n_points=3"
+
+# ---- Data / facilities ----
+check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distance-matrix"
+
+# ---- Seasonal / external ----
+check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
+
+# ---- JSON field validation (use python instead of jq for portability) ----
+check_python_field() {
+    local name="$1"
+    local method="$2"
+    local path="$3"
+    local py_expr="$4"
+    local expected="$5"
+    local url="${BASE}${path}"
+    local actual
+
+    actual=$(curl -s -X "$method" -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+        "$url" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    result = $py_expr
+    print(result if result is not None else 'null')
+except Exception as e:
+    print(f'ERR: {e}')
+" 2>/dev/null)
+
+    if [[ "$actual" == "$expected" ]]; then
+        echo -e "  ${GREEN}✓${NC} $name [$py_expr == $expected]"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $name [$py_expr: expected '$expected', got '$actual']"
+        FAIL=$((FAIL + 1))
+        FAILED_ENDPOINTS+=("$name")
+    fi
+}
+
+# /health should have status field == 'healthy'
+check_python_field "/health has status" GET "/health" \
+    "data.get('status')" "healthy"
+
+# /api/admin/db-stats should have db_size_bytes (a number)
+check_python_field "/api/admin/db-stats has db_size_bytes" GET "/api/admin/db-stats" \
+    "type(data.get('db_size_bytes', None)).__name__" "int"
+
+# /api/persistence/cycle-kpi-summary should have total_cycles (a number)
+check_python_field "/api/persistence/cycle-kpi-summary has total_cycles" GET "/api/persistence/cycle-kpi-summary" \
+    "type(data.get('total_cycles', None)).__name__" "int"
+
+echo ""
+echo "--- summary ---"
+echo "  passed: $PASS"
+echo "  failed: $FAIL"
+if [[ $FAIL -gt 0 ]]; then
+    echo ""
+    echo -e "${RED}failed endpoints:${NC}"
+    for ep in "${FAILED_ENDPOINTS[@]}"; do
+        echo "  - $ep"
+    done
+    echo ""
+    echo -e "${RED}❌ smoke test FAILED${NC}"
+    exit 1
+fi
+echo ""
+echo -e "${GREEN}✅ smoke test PASSED${NC}"
+exit 0
