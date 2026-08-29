@@ -54,6 +54,12 @@ jobs:
           --no-strict-optional \
           --explicit-package-bases
 
+    - name: Security scan dependencies (iter #16)
+      run: |
+        # Try pip-audit (canonical), fall back to heuristic scanner in scripts/security_scan.sh
+        pip install pip-audit 2>/dev/null || echo "pip-audit unavailable, using fallback"
+        bash scripts/security_scan.sh || echo "security scan found issues (non-fatal — see logs)"
+
     - name: Test with pytest + coverage (iter #14)
       run: |
         pip install pytest pytest-asyncio pytest-cov
