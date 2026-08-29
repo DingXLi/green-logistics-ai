@@ -105,6 +105,54 @@ app.add_middleware(
 
 
 # ============================================
+# iter #21: Performance tracking middleware
+# ============================================
+import time as _time
+from collections import deque as _deque
+import threading as _threading
+
+_PERF_LOCK = _threading.Lock()
+# 每个 endpoint 保留最近 100 次响应时间 (ms)
+_PERF_BUFFER: Dict[str, _deque] = {}
+# 总请求数 + 总错误数
+_PERF_TOTAL = 0
+_PERF_ERRORS = 0
+
+
+@app.middleware("http")
+async def perf_middleware(request: Request, call_next):
+    """记录每个 endpoint 的响应时间 (iter #21)。
+
+    格式: X-Perf-Time-Ms header (每个响应都加) +
+          /api/admin/perf-stats endpoint (聚合报告)
+    """
+    global _PERF_TOTAL, _PERF_ERRORS
+    path = request.url.path
+    method = request.method
+    key = f"{method} {path}"
+    start = _time.time()
+    try:
+        response = await call_next(request)
+        elapsed_ms = (_time.time() - start) * 1000
+        response.headers["X-Perf-Time-Ms"] = f"{elapsed_ms:.1f}"
+        with _PERF_LOCK:
+            _PERF_TOTAL += 1
+            if response.status_code >= 500:
+                _PERF_ERRORS += 1
+            buf = _PERF_BUFFER.setdefault(key, _deque(maxlen=100))
+            buf.append(elapsed_ms)
+        return response
+    except Exception as e:
+        elapsed_ms = (_time.time() - start) * 1000
+        with _PERF_LOCK:
+            _PERF_TOTAL += 1
+            _PERF_ERRORS += 1
+            buf = _PERF_BUFFER.setdefault(key, _deque(maxlen=100))
+            buf.append(elapsed_ms)
+        raise
+
+
+# ============================================
 # 前端活动跟踪 middleware (智能调度用)
 # ============================================
 @app.middleware("http")
@@ -2591,6 +2639,64 @@ async def get_db_info():
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
     return coordinator.persistence.get_db_info()
+
+
+@app.get("/api/admin/perf-stats")
+async def get_perf_stats(top: int = 10):
+    """
+    Performance stats (iter #21) — endpoint 响应时间聚合。
+
+    返回:
+    - total_requests: 总请求数 (包括 4xx/5xx)
+    - total_errors: 5xx 错误数
+    - error_rate_pct: error_rate
+    - endpoints: [{endpoint, n_calls, avg_ms, min_ms, max_ms,
+                   p50_ms, p95_ms, p99_ms, last_ms}, ...]
+      按 avg_ms DESC 排序 (top N 最慢)
+    """
+    with _PERF_LOCK:
+        total = _PERF_TOTAL
+        errors = _PERF_ERRORS
+        endpoints = []
+        for key, buf in _PERF_BUFFER.items():
+            if not buf:
+                continue
+            sorted_buf = sorted(buf)
+            n = len(sorted_buf)
+            avg = sum(sorted_buf) / n
+            p50 = sorted_buf[n // 2]
+            p95_idx = min(n - 1, int(n * 0.95))
+            p99_idx = min(n - 1, int(n * 0.99))
+            endpoints.append({
+                "endpoint": key,
+                "n_calls": n,
+                "avg_ms": round(avg, 2),
+                "min_ms": round(sorted_buf[0], 2),
+                "max_ms": round(sorted_buf[-1], 2),
+                "p50_ms": round(p50, 2),
+                "p95_ms": round(sorted_buf[p95_idx], 2),
+                "p99_ms": round(sorted_buf[p99_idx], 2),
+                "last_ms": round(sorted_buf[-1], 2),
+            })
+        endpoints.sort(key=lambda x: x["avg_ms"], reverse=True)
+    return {
+        "total_requests": total,
+        "total_errors": errors,
+        "error_rate_pct": round(errors / total * 100, 2) if total > 0 else 0.0,
+        "buffer_size_per_endpoint": 100,
+        "endpoints": endpoints[:max(1, min(100, top))],
+    }
+
+
+@app.post("/api/admin/perf-stats/reset")
+async def reset_perf_stats():
+    """Reset perf stats buffer (iter #21)。仅在测试用。"""
+    global _PERF_TOTAL, _PERF_ERRORS
+    with _PERF_LOCK:
+        _PERF_BUFFER.clear()
+        _PERF_TOTAL = 0
+        _PERF_ERRORS = 0
+    return {"reset": True}
 
 
 @app.get("/api/facilities/distance-matrix")
