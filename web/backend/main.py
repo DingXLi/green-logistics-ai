@@ -2151,11 +2151,20 @@ async def get_material_aggregates(
 
 
 @app.get("/api/persistence/cycle-kpi-summary")
-async def get_cycle_kpi_summary():
+async def get_cycle_kpi_summary(
+    last_n: Optional[int] = None,
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
     """
-    Cycle KPI summary (iter #16) — 所有 cycles 的整体 KPI。
+    Cycle KPI summary (iter #16 + iter #17 时间窗口) — 所有 cycles 的整体 KPI。
 
     用于 dashboard 顶部数字 + 趋势 (last cycle, best cycle, worst cycle)。
+
+    Query (iter #17):
+    - last_n: 只看最近 N 个 cycle (按 sim_day DESC, e.g. last_n=7 看最近一周)
+    - since_sim_day: 起始 sim_day (含), e.g. since_sim_day=20 看 day 20+ 后
+    - until_sim_day: 结束 sim_day (含), e.g. until_sim_day=30 看 day 30 之前
 
     Returns:
         {
@@ -2164,11 +2173,27 @@ async def get_cycle_kpi_summary():
           avg_tons_per_cycle, avg_cost_per_ton_sek, avg_co2_per_ton_kg,
           fleet_utilization_avg_pct,
           sim_day_range, best_cycle, worst_cycle, last_cycle,
+          filter: {last_n, since_sim_day, until_sim_day}
         }
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    return coordinator.persistence.get_cycle_kpi_summary()
+    # 边界检查
+    if last_n is not None and last_n < 1:
+        raise HTTPException(status_code=400, detail="last_n must be >= 1")
+    if last_n is not None and last_n > 10000:
+        raise HTTPException(status_code=400, detail="last_n too large (max 10000)")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})"
+            )
+    return coordinator.persistence.get_cycle_kpi_summary(
+        last_n=last_n,
+        since_sim_day=since_sim_day,
+        until_sim_day=until_sim_day,
+    )
 
 
 @app.post("/api/admin/db-maintenance")

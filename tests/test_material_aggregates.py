@@ -270,6 +270,91 @@ class TestCycleKpiSummary:
         assert result["sim_day_range"]["min"] == 1
         assert result["sim_day_range"]["max"] == 3
 
+    def test_filter_echoed_in_response(self, persistence):
+        """Filter params echoed back in result['filter']."""
+        result = persistence.get_cycle_kpi_summary(
+            last_n=7, since_sim_day=20, until_sim_day=30
+        )
+        assert result["filter"]["last_n"] == 7
+        assert result["filter"]["since_sim_day"] == 20
+        assert result["filter"]["until_sim_day"] == 30
+
+    def test_last_n_filter_limits_to_recent_n(self, persistence):
+        """last_n=2 returns stats from only the 2 most recent cycles."""
+        # 5 cycles, increasing tons
+        for i in range(1, 6):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i * 10), 10.0)],
+            )
+        result = persistence.get_cycle_kpi_summary(last_n=2)
+        assert result["total_cycles"] == 2
+        # Day range should be 4-5 (the last 2)
+        assert result["sim_day_range"]["min"] == 4
+        assert result["sim_day_range"]["max"] == 5
+        # Last cycle = OPT0005 (day 5)
+        assert result["last_cycle"]["cycle_id"] == "OPT0005"
+        # Best cycle within last 2 = OPT0005 (50 tons) > OPT0004 (40 tons)
+        assert result["best_cycle"]["cycle_id"] == "OPT0005"
+
+    def test_since_until_filter_by_sim_day(self, persistence):
+        """since_sim_day + until_sim_day limits to day range."""
+        for i in range(1, 6):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i * 10), 10.0)],
+            )
+        # Day 2-4 only (3 cycles)
+        result = persistence.get_cycle_kpi_summary(since_sim_day=2, until_sim_day=4)
+        assert result["total_cycles"] == 3
+        assert result["sim_day_range"]["min"] == 2
+        assert result["sim_day_range"]["max"] == 4
+
+    def test_since_only_inclusive(self, persistence):
+        """since_sim_day=N includes day N (>=)."""
+        for i in range(1, 4):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i), 1.0)],
+            )
+        result = persistence.get_cycle_kpi_summary(since_sim_day=2)
+        assert result["total_cycles"] == 2  # day 2 + day 3
+
+    def test_until_only_inclusive(self, persistence):
+        """until_sim_day=N includes day N (<=)."""
+        for i in range(1, 4):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i), 1.0)],
+            )
+        result = persistence.get_cycle_kpi_summary(until_sim_day=2)
+        assert result["total_cycles"] == 2  # day 1 + day 2
+
+    def test_filter_no_match_returns_zero(self, persistence):
+        """Filter excludes all cycles → 0 cycles, None best/worst/last."""
+        for i in range(1, 4):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i), 1.0)],
+            )
+        result = persistence.get_cycle_kpi_summary(since_sim_day=100)
+        assert result["total_cycles"] == 0
+        assert result["best_cycle"] is None
+        assert result["last_cycle"] is None
+
+    def test_combined_last_n_and_day_range(self, persistence):
+        """last_n + since/until: both filters apply (AND)."""
+        for i in range(1, 11):
+            _record_basic_cycle(
+                persistence, f"OPT{i:04d}", day=i,
+                matches=[("SUP001", "DEM001", "wood", float(i * 10), 10.0)],
+            )
+        # last_n=3, but also since_sim_day=8 → intersection = day 8,9,10 = 3 cycles
+        result = persistence.get_cycle_kpi_summary(last_n=3, since_sim_day=8)
+        assert result["total_cycles"] == 3
+        assert result["sim_day_range"]["min"] == 8
+        assert result["sim_day_range"]["max"] == 10
+
 
 class TestVacuum:
     """Tests for Persistence.vacuum()."""
@@ -396,3 +481,37 @@ class TestAPIMaterialAggregates:
             assert response.status_code == 503
         finally:
             backend_main.coordinator = old_coord
+
+    def test_cycle_kpi_summary_with_last_n_filter(self):
+        """GET ?last_n=7 returns 200 with filter echoed."""
+        response = self.client.get("/api/persistence/cycle-kpi-summary?last_n=7")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["filter"]["last_n"] == 7
+
+    def test_cycle_kpi_summary_with_since_until(self):
+        """GET ?since_sim_day=1&until_sim_day=10 returns 200 with filter echoed."""
+        response = self.client.get("/api/persistence/cycle-kpi-summary?since_sim_day=1&until_sim_day=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["filter"]["since_sim_day"] == 1
+        assert data["filter"]["until_sim_day"] == 10
+
+    def test_cycle_kpi_summary_invalid_last_n(self):
+        """GET ?last_n=0 returns 400 (last_n must be >= 1)."""
+        response = self.client.get("/api/persistence/cycle-kpi-summary?last_n=0")
+        assert response.status_code == 400
+        assert "last_n" in response.json()["detail"]
+
+    def test_cycle_kpi_summary_invalid_day_range(self):
+        """GET ?since_sim_day=20&until_sim_day=10 returns 400 (since > until)."""
+        response = self.client.get(
+            "/api/persistence/cycle-kpi-summary?since_sim_day=20&until_sim_day=10"
+        )
+        assert response.status_code == 400
+        assert "since_sim_day" in response.json()["detail"]
+
+    def test_cycle_kpi_summary_last_n_too_large(self):
+        """GET ?last_n=99999 returns 400 (max 10000)."""
+        response = self.client.get("/api/persistence/cycle-kpi-summary?last_n=99999")
+        assert response.status_code == 400

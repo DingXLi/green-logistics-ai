@@ -1277,11 +1277,18 @@ class Persistence:
                 result.append(d)
         return result
 
-    def get_cycle_kpi_summary(self) -> Dict[str, Any]:
+    def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
+                           since_sim_day: Optional[int] = None,
+                           until_sim_day: Optional[int] = None) -> Dict[str, Any]:
         """
-        Cycle KPI summary (iter #16) — 所有 cycles 的整体 KPI。
+        Cycle KPI summary (iter #16 + iter #17 时间窗口过滤) — 所有 cycles 的整体 KPI。
 
         用于 dashboard 顶部数字 + 趋势 (last cycle, best cycle, worst cycle)。
+
+        Args (iter #17 新增):
+            last_n: 只看最近 N 个 cycle (按 sim_day DESC)
+            since_sim_day: 起始 sim_day (含), None = 不限
+            until_sim_day: 结束 sim_day (含), None = 不限
 
         Returns:
             {
@@ -1293,40 +1300,99 @@ class Persistence:
               worst_cycle: {...},
               last_cycle: {...},
               sim_day_range: {min, max},
+              filter: {last_n, since_sim_day, until_sim_day} (echo back)
             }
         """
-        with self._conn() as conn:
-            row = conn.execute(
-                """SELECT COUNT(*) as total_cycles,
-                          SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as n_with_matches,
-                          SUM(total_tons) as total_tons,
-                          SUM(total_distance_km) as total_distance,
-                          SUM(total_co2_kg) as total_co2,
-                          SUM(total_cost_sek) as total_cost,
-                          AVG(total_tons) as avg_tons,
-                          AVG(total_distance_km) as avg_distance,
-                          AVG(fleet_utilization_pct) as avg_util,
-                          MIN(sim_day) as min_day,
-                          MAX(sim_day) as max_day
-                   FROM optimization_cycles"""
-            ).fetchone()
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
+        with self._conn() as conn:
+            # 如果指定 last_n, 拿最近 N 个 cycle_id (按 sim_day DESC) 作为子集过滤
+            if last_n is not None and last_n > 0:
+                # 拿到最近 N 个 cycle_id
+                limit_clause = "ORDER BY sim_day DESC LIMIT ?"
+                # 重写 where: 子查询取最近 N 个
+                inner_where = where_sql or "WHERE 1=1"
+                cycle_ids_subq = (
+                    f"SELECT cycle_id FROM optimization_cycles "
+                    f"{inner_where} {limit_clause}"
+                )
+                row = conn.execute(
+                    f"""SELECT COUNT(*) as total_cycles,
+                              SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as n_with_matches,
+                              SUM(total_tons) as total_tons,
+                              SUM(total_distance_km) as total_distance,
+                              SUM(total_co2_kg) as total_co2,
+                              SUM(total_cost_sek) as total_cost,
+                              AVG(total_tons) as avg_tons,
+                              AVG(total_distance_km) as avg_distance,
+                              AVG(fleet_utilization_pct) as avg_util,
+                              MIN(sim_day) as min_day,
+                              MAX(sim_day) as max_day
+                       FROM optimization_cycles
+                       WHERE cycle_id IN ({cycle_ids_subq})""",
+                    params + [last_n],
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    f"""SELECT COUNT(*) as total_cycles,
+                              SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as n_with_matches,
+                              SUM(total_tons) as total_tons,
+                              SUM(total_distance_km) as total_distance,
+                              SUM(total_co2_kg) as total_co2,
+                              SUM(total_cost_sek) as total_cost,
+                              AVG(total_tons) as avg_tons,
+                              AVG(total_distance_km) as avg_distance,
+                              AVG(fleet_utilization_pct) as avg_util,
+                              MIN(sim_day) as min_day,
+                              MAX(sim_day) as max_day
+                       FROM optimization_cycles
+                       {where_sql}""",
+                    params,
+                ).fetchone()
+
+            # best/worst/last cycle: 需遵循同一过滤
+            if last_n is not None and last_n > 0:
+                # 取同一个 cycle_id 子集
+                cycle_ids_subq_for_bw = (
+                    f"SELECT cycle_id FROM optimization_cycles {where_sql} "
+                    f"ORDER BY sim_day DESC LIMIT ?"
+                )
+                bw_params = params + [last_n]
+            else:
+                cycle_ids_subq_for_bw = (
+                    f"SELECT cycle_id FROM optimization_cycles {where_sql}"
+                )
+                bw_params = params
+
+            bw_where = "WHERE cycle_id IN (" + cycle_ids_subq_for_bw + ")"
             best = conn.execute(
-                """SELECT cycle_id, sim_day, total_tons, total_cost_sek
+                f"""SELECT cycle_id, sim_day, total_tons, total_cost_sek
                    FROM optimization_cycles
-                   WHERE total_tons > 0
-                   ORDER BY total_tons DESC LIMIT 1"""
+                   {bw_where} AND total_tons > 0
+                   ORDER BY total_tons DESC LIMIT 1""",
+                bw_params,
             ).fetchone()
             worst = conn.execute(
-                """SELECT cycle_id, sim_day, total_tons, total_cost_sek
+                f"""SELECT cycle_id, sim_day, total_tons, total_cost_sek
                    FROM optimization_cycles
-                   WHERE total_tons > 0
-                   ORDER BY total_tons ASC LIMIT 1"""
+                   {bw_where} AND total_tons > 0
+                   ORDER BY total_tons ASC LIMIT 1""",
+                bw_params,
             ).fetchone()
             last = conn.execute(
-                """SELECT cycle_id, sim_day, total_tons, total_cost_sek, n_matches
+                f"""SELECT cycle_id, sim_day, total_tons, total_cost_sek, n_matches
                    FROM optimization_cycles
-                   ORDER BY sim_day DESC LIMIT 1"""
+                   {bw_where}
+                   ORDER BY sim_day DESC LIMIT 1""",
+                bw_params,
             ).fetchone()
 
         total_tons = row["total_tons"] or 0
@@ -1352,6 +1418,11 @@ class Persistence:
             "best_cycle": dict(best) if best else None,
             "worst_cycle": dict(worst) if worst else None,
             "last_cycle": dict(last) if last else None,
+            "filter": {
+                "last_n": last_n,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
         }
 
     def vacuum(self) -> Dict[str, Any]:
