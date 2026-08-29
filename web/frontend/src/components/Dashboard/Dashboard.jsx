@@ -39,6 +39,8 @@ const MaterialAggregates = lazy(() => import('./MaterialAggregates').then(m => (
 const CycleKpiSummary = lazy(() => import('./CycleKpiSummary').then(m => ({ default: m.CycleKpiSummary })))
 // iter #17: DB stats badge (size + table rows + indexes)
 const DbStatsBadge = lazy(() => import('./DbStatsBadge').then(m => ({ default: m.DbStatsBadge })))
+// iter #20: cohort retention by period (early vs late trend)
+const CohortRetentionByPeriod = lazy(() => import('./CohortRetentionByPeriod').then(m => ({ default: m.CohortRetentionByPeriod })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -593,6 +595,11 @@ export default function Dashboard() {
           {/* iter #16: Material aggregates table */}
           <Suspense fallback={<LoadingSpinner label="Loading material aggregates…" />}>
             <MaterialAggregates />
+          </Suspense>
+
+          {/* iter #20: Cohort retention by period (trend) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cohort retention…" />}>
+            <CohortRetentionByPeriod />
           </Suspense>
         </>
       )}
