@@ -2118,6 +2118,76 @@ async def get_supply_aggregates(
     )
 
 
+@app.get("/api/persistence/material-aggregates")
+async def get_material_aggregates(
+    material_type: Optional[str] = None,
+    limit: int = 50,
+):
+    """
+    Material type 聚合统计 (iter #16) — 每个 material_type 的累计 KPI。
+
+    和 supply-aggregates 类似, 但按 material_type 维度聚合:
+    - 哪些材料最常被生成 (建筑废料? 金属? 混合废料?)
+    - 哪些材料匹配率最高
+    - 哪些材料运输距离最长
+
+    Query:
+    - material_type: 可选, 只查某个 material
+    - limit: 最多返回多少 material (default 50, max 200)
+
+    Returns:
+        [{material_type, n_supply_offers, n_cycles_with_material,
+          n_distinct_supplies, total_available_tons, total_matched_tons,
+          avg_quality_score, n_matches, avg_match_distance_km,
+          max_match_distance_km, match_rate_pct}, ...]
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(200, limit))
+    return coordinator.persistence.get_material_aggregates(
+        material_type=material_type,
+        limit=limit,
+    )
+
+
+@app.get("/api/persistence/cycle-kpi-summary")
+async def get_cycle_kpi_summary():
+    """
+    Cycle KPI summary (iter #16) — 所有 cycles 的整体 KPI。
+
+    用于 dashboard 顶部数字 + 趋势 (last cycle, best cycle, worst cycle)。
+
+    Returns:
+        {
+          total_cycles, n_cycles_with_matches,
+          total_tons_matched, total_distance_km, total_co2_kg, total_cost_sek,
+          avg_tons_per_cycle, avg_cost_per_ton_sek, avg_co2_per_ton_kg,
+          fleet_utilization_avg_pct,
+          sim_day_range, best_cycle, worst_cycle, last_cycle,
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_cycle_kpi_summary()
+
+
+@app.post("/api/admin/db-maintenance")
+async def post_db_maintenance():
+    """
+    DB 维护 (iter #16) — VACUUM + ANALYZE。
+
+    VACUUM: rebuild DB file, 释放碎片空间, 减小文件体积
+    ANALYZE: 收集统计信息, 帮助 query planner 选最优 index
+
+    Returns:
+        {action, size_before_bytes, size_after_bytes,
+         reclaimed_bytes, reclaimed_pct, success}
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.vacuum()
+
+
 @app.get("/api/admin/db-stats")
 async def get_db_stats():
     """

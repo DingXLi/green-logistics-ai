@@ -1196,3 +1196,197 @@ class Persistence:
                 d["material_type"] = d["material_type"]
                 result.append(d)
         return result
+
+    def get_material_aggregates(self, material_type: Optional[str] = None,
+                                 limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Material type 聚合统计 (iter #16) — 每个 material_type 的累计 KPI。
+
+        和 get_supply_aggregates 类似, 但按 material_type 维度聚合:
+        - 哪些材料最常被生成 (建筑废料? 金属? 混合废料?)
+        - 哪些材料匹配率最高 (demand 多?)
+        - 哪些材料运输距离最长 (供需地理分布)
+
+        Args:
+            material_type: 可选, 只查某个 material_type
+            limit: 最多返回多少 material (default 50)
+
+        Returns:
+            [{material_type, n_supply_offers, n_cycles_with_material,
+              total_available_tons, total_matched_tons,
+              avg_quality_score, n_matches, n_distinct_supplies,
+              avg_match_distance_km, max_match_distance_km,
+              match_rate_pct}, ...]
+            按 total_available_tons DESC 排序
+        """
+        with self._conn() as conn:
+            where_clauses: List[str] = []
+            params: List[Any] = []
+
+            # material_type 过滤 — 注意 material_type 在 supply_offers + matches 两张表都有
+            # 这里从 supply_offers 主聚合, matches 走 join
+            if material_type:
+                where_clauses.append("s.material_type = ?")
+                params.append(material_type)
+
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+            sql = f"""SELECT s.material_type,
+                             COUNT(*) as n_offers,
+                             COUNT(DISTINCT s.cycle_id) as n_cycles,
+                             COUNT(DISTINCT s.supply_id) as n_distinct_supplies,
+                             SUM(s.available_tons) as total_available,
+                             AVG(s.quality_score) as avg_quality
+                      FROM supply_offers s
+                      {where_sql}
+                      GROUP BY s.material_type
+                      ORDER BY total_available DESC
+                      LIMIT ?"""
+            params.append(limit)
+            rows = conn.execute(sql, params).fetchall()
+
+            result: List[Dict[str, Any]] = []
+            for r in rows:
+                mt = r["material_type"]
+                # matches join: 同 material_type 的所有 match 行
+                match_row = conn.execute(
+                    """SELECT COUNT(*) as n_matches,
+                              SUM(tons) as total_matched,
+                              AVG(distance_km) as avg_dist,
+                              MAX(distance_km) as max_dist
+                       FROM matches
+                       WHERE material_type = ?""",
+                    (mt,),
+                ).fetchone()
+                total_avail = r["total_available"] or 0
+                total_matched = match_row["total_matched"] or 0
+                match_rate = (total_matched / total_avail * 100) if total_avail > 0 else 0.0
+                d = {
+                    "material_type": mt,
+                    "n_supply_offers": r["n_offers"] or 0,
+                    "n_cycles_with_material": r["n_cycles"] or 0,
+                    "n_distinct_supplies": r["n_distinct_supplies"] or 0,
+                    "total_available_tons": round(total_avail, 2),
+                    "total_matched_tons": round(total_matched, 2),
+                    "avg_quality_score": round(r["avg_quality"] or 0, 1),
+                    "n_matches": match_row["n_matches"] or 0,
+                    "avg_match_distance_km": round(match_row["avg_dist"] or 0, 2),
+                    "max_match_distance_km": round(match_row["max_dist"] or 0, 2),
+                    "match_rate_pct": round(match_rate, 1),
+                }
+                result.append(d)
+        return result
+
+    def get_cycle_kpi_summary(self) -> Dict[str, Any]:
+        """
+        Cycle KPI summary (iter #16) — 所有 cycles 的整体 KPI。
+
+        用于 dashboard 顶部数字 + 趋势 (last cycle, best cycle, worst cycle)。
+
+        Returns:
+            {
+              total_cycles, n_cycles_with_matches,
+              total_tons_matched, total_distance_km, total_co2_kg, total_cost_sek,
+              avg_tons_per_cycle, avg_cost_per_ton_sek, avg_co2_per_ton_kg,
+              fleet_utilization_avg_pct,
+              best_cycle: {cycle_id, sim_day, total_tons, total_cost_sek},
+              worst_cycle: {...},
+              last_cycle: {...},
+              sim_day_range: {min, max},
+            }
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) as total_cycles,
+                          SUM(CASE WHEN n_matches > 0 THEN 1 ELSE 0 END) as n_with_matches,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_distance_km) as total_distance,
+                          SUM(total_co2_kg) as total_co2,
+                          SUM(total_cost_sek) as total_cost,
+                          AVG(total_tons) as avg_tons,
+                          AVG(total_distance_km) as avg_distance,
+                          AVG(fleet_utilization_pct) as avg_util,
+                          MIN(sim_day) as min_day,
+                          MAX(sim_day) as max_day
+                   FROM optimization_cycles"""
+            ).fetchone()
+
+            best = conn.execute(
+                """SELECT cycle_id, sim_day, total_tons, total_cost_sek
+                   FROM optimization_cycles
+                   WHERE total_tons > 0
+                   ORDER BY total_tons DESC LIMIT 1"""
+            ).fetchone()
+            worst = conn.execute(
+                """SELECT cycle_id, sim_day, total_tons, total_cost_sek
+                   FROM optimization_cycles
+                   WHERE total_tons > 0
+                   ORDER BY total_tons ASC LIMIT 1"""
+            ).fetchone()
+            last = conn.execute(
+                """SELECT cycle_id, sim_day, total_tons, total_cost_sek, n_matches
+                   FROM optimization_cycles
+                   ORDER BY sim_day DESC LIMIT 1"""
+            ).fetchone()
+
+        total_tons = row["total_tons"] or 0
+        total_cost = row["total_cost"] or 0
+        total_co2 = row["total_co2"] or 0
+        n_cycles = row["total_cycles"] or 0
+        avg_tons = row["avg_tons"] or 0
+        return {
+            "total_cycles": n_cycles,
+            "n_cycles_with_matches": int(row["n_with_matches"] or 0),
+            "total_tons_matched": round(total_tons, 2),
+            "total_distance_km": round(row["total_distance"] or 0, 2),
+            "total_co2_kg": round(total_co2, 2),
+            "total_cost_sek": round(total_cost, 2),
+            "avg_tons_per_cycle": round(avg_tons, 2),
+            "avg_cost_per_ton_sek": round(total_cost / total_tons, 2) if total_tons > 0 else None,
+            "avg_co2_per_ton_kg": round(total_co2 / total_tons, 2) if total_tons > 0 else None,
+            "fleet_utilization_avg_pct": round(row["avg_util"] or 0, 1),
+            "sim_day_range": {
+                "min": row["min_day"],
+                "max": row["max_day"],
+            },
+            "best_cycle": dict(best) if best else None,
+            "worst_cycle": dict(worst) if worst else None,
+            "last_cycle": dict(last) if last else None,
+        }
+
+    def vacuum(self) -> Dict[str, Any]:
+        """
+        VACUUM + ANALYZE (iter #16) — SQLite 性能维护。
+
+        VACUUM: rebuild DB file, 释放碎片空间, 减小文件体积
+        ANALYZE: 收集统计信息, 帮助 query planner 选最优 index
+
+        Returns:
+            {action: "vacuum_analyze", size_before_bytes, size_after_bytes,
+             reclaimed_bytes, success: bool}
+        """
+        size_before = self.db_path.stat().st_size if self.db_path.exists() else 0
+        try:
+            with self._conn() as conn:
+                conn.execute("VACUUM")
+                conn.execute("ANALYZE")
+            size_after = self.db_path.stat().st_size if self.db_path.exists() else 0
+            return {
+                "action": "vacuum_analyze",
+                "size_before_bytes": size_before,
+                "size_after_bytes": size_after,
+                "reclaimed_bytes": max(0, size_before - size_after),
+                "reclaimed_pct": round((1 - size_after / size_before) * 100, 2) if size_before > 0 else 0,
+                "success": True,
+            }
+        except Exception as e:
+            logger.error(f"VACUUM/ANALYZE failed: {e}")
+            return {
+                "action": "vacuum_analyze",
+                "size_before_bytes": size_before,
+                "size_after_bytes": size_before,
+                "reclaimed_bytes": 0,
+                "reclaimed_pct": 0,
+                "success": False,
+                "error": str(e),
+            }
