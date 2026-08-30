@@ -60,6 +60,61 @@ def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
     return buf.getvalue()
 
 
+# ============================================
+# iter #23: Parquet helpers (columnar analytics)
+# ============================================
+PARQUET_MIMETYPE = "application/vnd.apache.parquet"
+
+
+def _rows_to_parquet_bytes(rows: List[Dict[str, Any]]) -> bytes:
+    """
+    把 list of dicts → Apache Parquet binary (iter #23)。
+
+    优势 vs CSV:
+    - Columnar storage (analytics query 更快)
+    - 内嵌 schema (typed columns, no parse needed)
+    - 压缩更好 (snappy 默认, 比 CSV gzip 还小 ~3-5x)
+    - pandas/polars/duckdb/spark 原生支持
+
+    处理:
+    - 强制 schema 推断 (pyarrow default)
+    - 空 rows → 返回最小 parquet (1 行 schema-only, schema 在 metadata 里)
+    - 混合类型列 → 转 string (避免 pyarrow type conflict)
+    """
+    if not rows:
+        # 返回空 parquet: schema-only table with no rows
+        # pyarrow schema with single nullable int64 column (任何 schema 都可以)
+        import pyarrow as pa
+        schema = pa.schema([("_empty", pa.int64())])
+        empty_table = pa.table({"_empty": pa.array([], type=pa.int64())}, schema=schema)
+        sink = io.BytesIO()
+        import pyarrow.parquet as pq
+        pq.write_table(empty_table, sink, compression="snappy")
+        return sink.getvalue()
+
+    # Build DataFrame + handle type coercion (iter #23 best-effort)
+    import pandas as pd
+    df = pd.DataFrame(rows)
+
+    # Convert mixed-type object columns to string (avoid pyarrow type errors)
+    for col in df.columns:
+        if df[col].dtype == "object":
+            # Try to keep numeric if all values are numeric
+            try:
+                # Quick test: can it be int?
+                pd.to_numeric(df[col], errors="raise")
+                # keep numeric
+            except (ValueError, TypeError):
+                # stringify
+                df[col] = df[col].astype(str).replace({"None": "", "nan": ""})
+
+    table = __import__("pyarrow").Table.from_pandas(df, preserve_index=False)
+    sink = io.BytesIO()
+    import pyarrow.parquet as pq
+    pq.write_table(table, sink, compression="snappy")
+    return sink.getvalue()
+
+
 def _maybe_gzip(content: bytes, use_gzip: bool, filename: str) -> FastAPIResponse:
     """可选 gzip 包装 (iter #19)。返回 Response with Content-Encoding header。
 
@@ -2499,14 +2554,19 @@ async def export_db_data(
     gzip: bool = False,
 ):
     """
-    Unified DB export endpoint (iter #18 + iter #19 gzip) — table + format export。
+    Unified DB export endpoint (iter #18 + iter #19 gzip + iter #23 parquet) — table + format export。
 
     Query:
     - table: cycles / supplies / matches / routes / llm_decisions
-    - fmt: csv / json / ndjson (注意: 用 fmt 不是 format, 避免与 builtin 冲突)
+    - fmt: csv / json / ndjson / parquet (注意: 用 fmt 不是 format, 避免与 builtin 冲突)
+            - parquet (iter #23): Apache Parquet columnar binary, snappy compressed.
+              适合 pandas / polars / duckdb / spark analytics. 比 CSV gzip 还小 3-5x.
     - limit: 最多多少行 (default 10000, max 50000)
     - since_sim_day: 只返 >= 该 sim_day 的行
     - gzip: bool = False — 是否 gzip 压缩 (iter #19, 大 payload 省带宽)
+
+    Returns:
+        binary file with Content-Disposition: attachment; filename=...
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
@@ -2518,10 +2578,10 @@ async def export_db_data(
             detail=f"Unknown table '{table}'. Valid: cycles / supplies / matches / routes / llm_decisions",
         )
     fmt = fmt.strip().lower()
-    if fmt not in ("csv", "json", "ndjson"):
+    if fmt not in ("csv", "json", "ndjson", "parquet"):
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown format '{fmt}'. Valid: csv / json / ndjson",
+            detail=f"Unknown format '{fmt}'. Valid: csv / json / ndjson / parquet",
         )
     limit = max(1, min(50000, limit))
 
@@ -2590,7 +2650,7 @@ async def export_db_data(
             content=rows,
             headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
-    else:  # ndjson
+    elif fmt == "ndjson":
         ndjson_str = "\n".join(json.dumps(r) for r in rows)
         filename = f"green_logistics_{table}_{limit}.ndjson"
         if gzip:
@@ -2598,6 +2658,16 @@ async def export_db_data(
         return FastAPIResponse(
             content=ndjson_str,
             media_type="application/x-ndjson",
+            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+        )
+    else:  # parquet (iter #23, columnar analytics-friendly)
+        parquet_bytes = _rows_to_parquet_bytes(rows)
+        filename = f"green_logistics_{table}_{limit}.parquet"
+        if gzip:
+            return _maybe_gzip(parquet_bytes, True, filename)
+        return FastAPIResponse(
+            content=parquet_bytes,
+            media_type=PARQUET_MIMETYPE,
             headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
 
