@@ -181,6 +181,7 @@ class SupplyAgent:
                 user_prompt,
                 system_instruction=system_inst,
                 max_tokens=2048,
+                caller="supply_agent.predict_supply_batch",
             )
             text = text.strip()
             text = _re.sub(r"^```(?:json)?\s*", "", text)

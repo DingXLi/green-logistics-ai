@@ -445,6 +445,7 @@ class MarketAgent:
                 user_prompt,
                 system_instruction=system_inst,
                 max_tokens=2048,
+                caller="market_agent.predict_demand",
             )
             # 去掉 ```json fences
             text = text.strip()

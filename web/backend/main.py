@@ -1110,7 +1110,7 @@ async def debug_llm():
     for name, prompt, max_tok in tests:
         sys_instr = "You are a helpful assistant. Always respond with exactly what is asked." if name == "with_system" else None
         try:
-            text = call_gemini(prompt, max_tokens=max_tok, system_instruction=sys_instr)
+            text = call_gemini(prompt, max_tokens=max_tok, system_instruction=sys_instr, caller=f"debug_llm.{name}")
             result["tests"][name] = {"ok": True, "response": text[:80], "len": len(text)}
         except GeminiAPIError as e:
             result["tests"][name] = {"ok": False, "error": str(e)[:300]}
@@ -2696,6 +2696,46 @@ async def reset_perf_stats():
         _PERF_BUFFER.clear()
         _PERF_TOTAL = 0
         _PERF_ERRORS = 0
+    return {"reset": True}
+
+
+# ============================================================
+# LLM cost tracking (iter #22)
+# ============================================================
+
+@app.get("/api/admin/llm-stats")
+async def get_llm_stats(recent: int = 50):
+    """
+    LLM call 聚合统计 (iter #22) — token usage + 估算 cost。
+
+    Query:
+    - recent: int = 50 — 包含的最近 N 条 record (最多 500)
+
+    Returns:
+        {
+            total_calls, total_errors, error_rate_pct,
+            total_prompt_tokens, total_candidate_tokens, total_tokens,
+            total_cost_usd, avg_tokens_per_call,
+            by_caller: {caller: {calls, prompt_tokens, ..., errors}},
+            by_model:  {model:  {...}},
+            buffer_size, buffer_max,
+            recent: [{timestamp, caller, model, tokens, cost, ...}, ...]
+        }
+    """
+    from agents.llm_tracker import get_llm_tracker
+    tracker = get_llm_tracker()
+    stats = tracker.get_stats()
+    n = max(0, min(500, recent))
+    if n > 0:
+        stats["recent"] = tracker.get_recent(n)
+    return stats
+
+
+@app.post("/api/admin/llm-stats/reset")
+async def reset_llm_stats():
+    """Reset LLM tracker (iter #22)。仅测试用。"""
+    from agents.llm_tracker import get_llm_tracker
+    get_llm_tracker().reset()
     return {"reset": True}
 
 

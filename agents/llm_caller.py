@@ -113,6 +113,7 @@ def call_gemini(
     max_tokens: Optional[int] = None,
     system_instruction: Optional[str] = None,
     timeout_s: Optional[int] = None,
+    caller: Optional[str] = None,
 ) -> str:
     """
     调一次 Gemini,带 retry。
@@ -124,6 +125,7 @@ def call_gemini(
         max_tokens: 覆盖默认
         system_instruction: 可选系统指令
         timeout_s: 覆盖默认
+        caller: 调用方标识 (用于 token usage tracking, e.g., "supply_agent.predict_supply_batch")
 
     Returns:
         模型返回的文本
@@ -132,12 +134,14 @@ def call_gemini(
         GeminiClientError: 4xx (非 429) — 不重试
         GeminiRateLimitError / GeminiServerError: 重试用尽后抛出
     """
+    import time as _time
     cfg = get_llm_config()
     use_model = model or cfg["model"]
     use_temp = temperature if temperature is not None else cfg["temperature"]
     use_max = max_tokens if max_tokens is not None else cfg["max_tokens"]
     use_timeout = timeout_s if timeout_s is not None else cfg["timeout_s"]
     max_attempts = max(1, cfg["max_retries"] + 1)  # 1 initial + N retries
+    caller_label = caller or "call_gemini"
 
     _ensure_configured()
 
@@ -146,8 +150,17 @@ def call_gemini(
         "max_output_tokens": use_max,
     }
 
+    # iter #22: token usage tracking — best-effort, failures in tracker don't affect LLM call
+    try:
+        from .llm_tracker import get_llm_tracker
+        _tracker = get_llm_tracker()
+    except Exception:
+        _tracker = None
+
     @_build_retry_decorator(max_attempts)
     def _do_call() -> str:
+        _t0 = _time.monotonic()
+        usage: Optional[Dict[str, int]] = None
         try:
             m = genai.GenerativeModel(
                 model_name=use_model,
@@ -155,9 +168,41 @@ def call_gemini(
                 system_instruction=system_instruction,
             )
             resp = m.generate_content(prompt, request_options={"timeout": use_timeout})
+            # iter #22: capture usage_metadata for cost tracking
+            try:
+                um = getattr(resp, "usage_metadata", None)
+                if um is not None:
+                    usage = {
+                        "prompt_token_count": int(getattr(um, "prompt_token_count", 0) or 0),
+                        "candidates_token_count": int(getattr(um, "candidates_token_count", 0) or 0),
+                        "total_token_count": int(getattr(um, "total_token_count", 0) or 0),
+                    }
+            except Exception:
+                usage = None
             return resp.text or ""
         except Exception as e:
-            raise _classify_http_error(e) from e
+            classified = _classify_http_error(e)
+            if _tracker is not None:
+                try:
+                    error_type = type(classified).__name__.replace("Gemini", "").replace("Error", "").lower() or "unknown"
+                    _tracker.record(
+                        caller=caller_label, model=use_model, usage=None,
+                        duration_ms=(_time.monotonic() - _t0) * 1000,
+                        success=False, error_type=error_type,
+                    )
+                except Exception:
+                    pass
+            raise classified from e
+        finally:
+            if _tracker is not None and usage is not None:
+                try:
+                    _tracker.record(
+                        caller=caller_label, model=use_model, usage=usage,
+                        duration_ms=(_time.monotonic() - _t0) * 1000,
+                        success=True,
+                    )
+                except Exception:
+                    pass
 
     return _do_call()
 
