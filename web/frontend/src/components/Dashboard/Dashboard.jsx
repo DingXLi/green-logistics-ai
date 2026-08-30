@@ -41,6 +41,10 @@ const CycleKpiSummary = lazy(() => import('./CycleKpiSummary').then(m => ({ defa
 const DbStatsBadge = lazy(() => import('./DbStatsBadge').then(m => ({ default: m.DbStatsBadge })))
 // iter #20: cohort retention by period (early vs late trend)
 const CohortRetentionByPeriod = lazy(() => import('./CohortRetentionByPeriod').then(m => ({ default: m.CohortRetentionByPeriod })))
+// iter #22: API performance monitoring (perf middleware backend)
+const PerfStats = lazy(() => import('./PerfStats').then(m => ({ default: m.PerfStats })))
+// iter #22: LLM token usage + cost tracking
+const LLMStats = lazy(() => import('./LLMStats').then(m => ({ default: m.LLMStats })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -536,6 +540,13 @@ export default function Dashboard() {
         >
           🏭 Network
         </button>
+        {/* iter #22: new Performance tab (perf + LLM) */}
+        <button
+          className={`tab-btn ${activeTab === 'performance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('performance')}
+        >
+          ⚡ Performance
+        </button>
         <button
           className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
@@ -622,6 +633,15 @@ export default function Dashboard() {
       {activeTab === 'network' && (
         <Suspense fallback={<LoadingSpinner label="Loading network…" />}>
           <FacilitiesList />
+        </Suspense>
+      )}
+
+      {activeTab === 'performance' && (
+        <Suspense fallback={<LoadingSpinner label="Loading performance…" />}>
+          {/* iter #22: API performance monitoring (perf middleware) */}
+          <PerfStats />
+          {/* iter #22: LLM token usage + cost tracking */}
+          <LLMStats />
         </Suspense>
       )}
 
