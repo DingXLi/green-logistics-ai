@@ -23,7 +23,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field, asdict
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional, TypedDict
 
 
 # ============================================================
@@ -62,6 +62,28 @@ class LLMCallRecord:
         return asdict(self)
 
 
+# Per-caller / per-model aggregator schema (iter #22, mypy-clean).
+# cost_usd is float; token counts + calls/errors are int.
+class LLMStatsBucket(TypedDict, total=False):
+    calls: int
+    prompt_tokens: int
+    candidate_tokens: int
+    total_tokens: int
+    cost_usd: float
+    errors: int
+
+
+def _empty_stats_dict() -> LLMStatsBucket:
+    return {
+        "calls": 0,
+        "prompt_tokens": 0,
+        "candidate_tokens": 0,
+        "total_tokens": 0,
+        "cost_usd": 0.0,
+        "errors": 0,
+    }
+
+
 # ============================================================
 # Tracker
 # ============================================================
@@ -95,8 +117,8 @@ class LLMTracker:
         self._total_tokens = 0
         self._total_cost_usd = 0.0
         self._total_errors = 0
-        self._by_caller: Dict[str, Dict[str, int]] = {}  # {caller: {calls, prompt, candidate, total, cost_usd, errors}}
-        self._by_model: Dict[str, Dict[str, int]] = {}
+        self._by_caller: Dict[str, LLMStatsBucket] = {}  # {caller: {calls, prompt, candidate, total, cost_usd, errors}}
+        self._by_model: Dict[str, LLMStatsBucket] = {}
 
     def _estimate_cost_usd(self, model: str, prompt_tokens: int, candidate_tokens: int) -> float:
         """按 model 估算 USD cost。"""
@@ -156,27 +178,21 @@ class LLMTracker:
             if not success:
                 self._total_errors += 1
             # by_caller
-            cstats = self._by_caller.setdefault(caller, {
-                "calls": 0, "prompt_tokens": 0, "candidate_tokens": 0,
-                "total_tokens": 0, "cost_usd": 0.0, "errors": 0,
-            })
+            cstats = self._by_caller.setdefault(caller, _empty_stats_dict())
             cstats["calls"] += 1
             cstats["prompt_tokens"] += prompt_tokens
             cstats["candidate_tokens"] += candidate_tokens
             cstats["total_tokens"] += total_tokens
-            cstats["cost_usd"] += cost
+            cstats["cost_usd"] = cstats["cost_usd"] + cost
             if not success:
                 cstats["errors"] += 1
             # by_model
-            mstats = self._by_model.setdefault(model, {
-                "calls": 0, "prompt_tokens": 0, "candidate_tokens": 0,
-                "total_tokens": 0, "cost_usd": 0.0, "errors": 0,
-            })
+            mstats = self._by_model.setdefault(model, _empty_stats_dict())
             mstats["calls"] += 1
             mstats["prompt_tokens"] += prompt_tokens
             mstats["candidate_tokens"] += candidate_tokens
             mstats["total_tokens"] += total_tokens
-            mstats["cost_usd"] += cost
+            mstats["cost_usd"] = mstats["cost_usd"] + cost
             if not success:
                 mstats["errors"] += 1
         return rec
