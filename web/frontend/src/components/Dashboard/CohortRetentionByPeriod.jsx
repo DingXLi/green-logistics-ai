@@ -42,12 +42,13 @@ export function CohortRetentionByPeriod() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [nPeriods, setNPeriods] = useState(4)
+  const [periodUnit, setPeriodUnit] = useState('quartile')  // iter #24
   const [expandedPeriod, setExpandedPeriod] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`${API_BASE}/persistence/cohort-retention-by-period?n_periods=${nPeriods}`)
+    fetch(`${API_BASE}/persistence/cohort-retention-by-period?n_periods=${nPeriods}&period_unit=${periodUnit}`)
       .then(r => r.json())
       .then(d => {
         if (!cancelled) {
@@ -62,9 +63,9 @@ export function CohortRetentionByPeriod() {
         }
       })
     return () => { cancelled = true }
-  }, [nPeriods])
+  }, [nPeriods, periodUnit])
 
-  if (loading) return <LoadingSpinner label={`Loading cohort retention (${nPeriods} periods)…`} />
+  if (loading) return <LoadingSpinner label={`Loading cohort retention (${nPeriods} ${periodUnit} periods)…`} />
   if (error) return <div className="error-banner">⚠️ {error}</div>
   if (!data) return <div className="empty">No cohort retention data.</div>
 
@@ -111,17 +112,66 @@ export function CohortRetentionByPeriod() {
           <span className="cohort-trend-label">{trend.label}</span>
         </div>
         <label className="cohort-periods-label">
+          Unit:
+          <select
+            className="cohort-periods-select"
+            value={periodUnit}
+            onChange={e => {
+              const newUnit = e.target.value
+              setPeriodUnit(newUnit)
+              // Reset nPeriods to sensible default for unit
+              if (newUnit === 'month') setNPeriods(6)
+              else if (newUnit === 'week') setNPeriods(8)
+              else if (newUnit === 'day') setNPeriods(14)
+              else setNPeriods(4)
+            }}
+          >
+            <option value="quartile">Quartile (equal split)</option>
+            <option value="week">Week (7 sim_days)</option>
+            <option value="day">Day (1 sim_day)</option>
+            <option value="month">Month (30 sim_days)</option>
+          </select>
+        </label>
+        <label className="cohort-periods-label">
           Periods:
           <select
             className="cohort-periods-select"
             value={nPeriods}
             onChange={e => setNPeriods(parseInt(e.target.value) || 4)}
           >
-            <option value="2">2 (halves)</option>
-            <option value="3">3 (thirds)</option>
-            <option value="4">4 (quartiles)</option>
-            <option value="6">6</option>
-            <option value="8">8</option>
+            {periodUnit === 'day' && (
+              <>
+                <option value="7">7</option>
+                <option value="14">14</option>
+                <option value="21">21</option>
+                <option value="30">30</option>
+              </>
+            )}
+            {periodUnit === 'week' && (
+              <>
+                <option value="4">4</option>
+                <option value="8">8</option>
+                <option value="12">12</option>
+                <option value="26">26</option>
+                <option value="52">52</option>
+              </>
+            )}
+            {periodUnit === 'month' && (
+              <>
+                <option value="3">3</option>
+                <option value="6">6</option>
+                <option value="12">12</option>
+              </>
+            )}
+            {periodUnit === 'quartile' && (
+              <>
+                <option value="2">2 (halves)</option>
+                <option value="3">3 (thirds)</option>
+                <option value="4">4 (quartiles)</option>
+                <option value="6">6</option>
+                <option value="8">8</option>
+              </>
+            )}
           </select>
         </label>
       </div>

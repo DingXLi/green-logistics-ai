@@ -446,3 +446,270 @@ class TestAPICohortRetentionByPeriod:
             assert resp.status_code == 503
         finally:
             backend_main.coordinator = old_coord
+
+# ============================================================
+# iter #24: Cohort retention by time-window (period_unit)
+# ============================================================
+
+class TestCohortRetentionByTimeWindow:
+    """Tests for Persistence.get_cohort_retention_by_period(period_unit=...) (iter #24)."""
+
+    def _seed(self, p: Persistence, day: int, supplies: list) -> None:
+        cid = f"CYCLE-{day}"
+        p.begin_cycle(
+            cid, sim_day=day, sim_hour=10, activity_factor=1.0,
+            n_supply_offers=len(supplies), n_demand_requests=0,
+        )
+        for sid, mat in supplies:
+            p.record_supply(cid, {
+                "supply_id": sid,
+                "location": {"lat": 57.7, "lon": 14.1},
+                "material_type": mat,
+                "available_tons": 10.0,
+                "moisture_percent": 20.0,
+                "quality_score": 80.0,
+            })
+        p.commit_cycle(cid, kpi={
+            "n_supply_offers": len(supplies),
+            "n_demand_requests": 0, "n_matches": 0,
+            "total_tons": 0, "total_cost_sek": 0, "total_co2_kg": 0,
+            "total_distance_km": 0, "n_vehicles_used": 0,
+            "n_vehicles_available": 0, "fleet_utilization_pct": 0,
+            "solver_status": "feasible",
+        }, wall_duration_ms=0)
+
+    def test_default_period_unit_is_quartile(self, tmp_path):
+        """Backward-compat: default period_unit='quartile'."""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 9):
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period()
+        assert result["period_unit"] == "quartile"
+        # Quartile = equal split (no time labels)
+
+    def test_quartile_period_labels_have_range(self, tmp_path):
+        """Quartile 模式 labels 包含 sim_day range。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 9):
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="quartile", n_periods=4)
+        for period in result["periods"]:
+            assert "Period" in period["period_label"]
+            assert "sim_day" in period["period_label"]
+
+    def test_day_mode_one_period_per_day(self, tmp_path):
+        """period_unit='day' → 每段 = 1 sim_day。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 6):  # 5 days
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="day")
+        # 5 days = 5 segments
+        assert len(result["periods"]) == 5
+        # Each segment is 1 day wide
+        for i, period in enumerate(result["periods"]):
+            assert period["sim_day_range"]["max"] - period["sim_day_range"]["min"] == 0
+        # Day labels use "Day N" format
+        assert result["periods"][0]["period_label"].startswith("Day 1")
+        assert result["periods"][-1]["period_label"].startswith("Day 5")
+
+    def test_week_mode_seven_days_per_segment(self, tmp_path):
+        """period_unit='week' → 每段 = 7 sim_days。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 22):  # 21 days = 3 weeks
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="week")
+        # 21 days / 7 = 3 weeks
+        assert len(result["periods"]) == 3
+        for period in result["periods"]:
+            assert period["sim_day_range"]["max"] - period["sim_day_range"]["min"] == 6
+        # Week labels
+        assert result["periods"][0]["period_label"].startswith("Week 1")
+        assert result["periods"][2]["period_label"].startswith("Week 3")
+
+    def test_month_mode_thirty_days_per_segment(self, tmp_path):
+        """period_unit='month' → 每段 = 30 sim_days。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 61):  # 60 days = 2 months
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="month")
+        assert len(result["periods"]) == 2
+        for period in result["periods"]:
+            assert period["sim_day_range"]["max"] - period["sim_day_range"]["min"] == 29
+        # Month labels
+        assert result["periods"][0]["period_label"].startswith("Month 1")
+        assert result["periods"][1]["period_label"].startswith("Month 2")
+
+    def test_day_mode_max_30_periods(self, tmp_path):
+        """period_unit='day' → n_periods max = 30。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        with pytest.raises(ValueError, match="must be <= 30"):
+            p.get_cohort_retention_by_period(period_unit="day", n_periods=31)
+
+    def test_week_mode_max_52_periods(self, tmp_path):
+        """period_unit='week' → n_periods max = 52。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        with pytest.raises(ValueError, match="must be <= 52"):
+            p.get_cohort_retention_by_period(period_unit="week", n_periods=53)
+
+    def test_month_mode_max_12_periods(self, tmp_path):
+        """period_unit='month' → n_periods max = 12。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        with pytest.raises(ValueError, match="must be <= 12"):
+            p.get_cohort_retention_by_period(period_unit="month", n_periods=13)
+
+    def test_quartile_max_still_10(self, tmp_path):
+        """Backward-compat: quartile 仍 max 10 periods。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        with pytest.raises(ValueError, match="must be <= 10"):
+            p.get_cohort_retention_by_period(period_unit="quartile", n_periods=11)
+
+    def test_invalid_period_unit_raises(self, tmp_path):
+        """Unknown period_unit → ValueError。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        with pytest.raises(ValueError, match="period_unit must be one of"):
+            p.get_cohort_retention_by_period(period_unit="year")
+
+    def test_period_unit_returned_in_response(self, tmp_path):
+        """Response 包含 period_unit 字段 (iter #24 contract)。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        for d in range(1, 8):
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        for unit in ["quartile", "day", "week", "month"]:
+            result = p.get_cohort_retention_by_period(period_unit=unit)
+            assert "period_unit" in result
+            assert result["period_unit"] == unit
+
+    def test_short_dataset_graceful(self, tmp_path):
+        """数据 少时 → 少 period, trend 仍计算. (2 days = 1 week segment)"""
+        p = Persistence(str(tmp_path / "p.db"))
+        # Only 2 cycles
+        for d in range(1, 3):
+            self._seed(p, d, [(f"SUP{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="week", n_periods=10)
+        # auto-n = ceil(2/7) = 1 week
+        # n_periods_eff clamped to min(1, 52) = 1 (default n_periods=4 → auto mode)
+        assert result["period_unit"] == "week"
+        # 2 days fit in 1 week segment
+        assert len(result["periods"]) >= 1
+
+    def test_trend_still_works_in_day_mode(self, tmp_path):
+        """trend 字段在 day mode 也工作。"""
+        p = Persistence(str(tmp_path / "p.db"))
+        # Early: repeating supply
+        for d in range(1, 4):
+            self._seed(p, d, [("SUP_REPEAT", "wood")])
+        # Late: one-time supplies
+        for d in range(4, 7):
+            self._seed(p, d, [(f"SUP_D{d}", "wood")])
+        result = p.get_cohort_retention_by_period(period_unit="day")
+        assert "trend" in result
+        assert result["trend"] in ("improving", "declining", "stable", "unknown")
+
+
+class TestAPICohortRetentionByTimeWindow:
+    """API tests for /api/persistence/cohort-retention-by-period?period_unit=... (iter #24)."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path):
+        from unittest.mock import MagicMock
+        from web.backend import main as backend_main
+        from fastapi.testclient import TestClient
+
+        db_path = tmp_path / "api_time_window.db"
+        p = Persistence(str(db_path))
+        # Seed 14 days for week mode test
+        for d in range(1, 15):
+            cid = f"TW-{d}"
+            p.begin_cycle(
+                cid, sim_day=d, sim_hour=10, activity_factor=1.0,
+                n_supply_offers=2, n_demand_requests=0,
+            )
+            p.record_supply(cid, {
+                "supply_id": "SUP_REPEAT", "location": {"lat": 57.7, "lon": 12.9},
+                "material_type": "wood", "available_tons": 10.0,
+            })
+            p.record_supply(cid, {
+                "supply_id": f"SUP_D{d}", "location": {"lat": 57.7, "lon": 12.9},
+                "material_type": "wood", "available_tons": 10.0,
+            })
+            p.commit_cycle(cid, kpi={
+                "n_supply_offers": 2, "n_demand_requests": 0, "n_matches": 0,
+                "total_tons": 0, "total_cost_sek": 0, "total_co2_kg": 0,
+                "total_distance_km": 0, "n_vehicles_used": 0,
+                "n_vehicles_available": 0, "fleet_utilization_pct": 0,
+                "solver_status": "feasible",
+            }, wall_duration_ms=0)
+        fake = MagicMock()
+        fake.persistence = p
+        backend_main.coordinator = fake
+        self.client = TestClient(backend_main.app)
+
+    def test_endpoint_with_period_unit_week(self):
+        """?period_unit=week 返回 200 + week 分段。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=week"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["period_unit"] == "week"
+        # 14 days / 7 = 2 weeks
+        assert len(data["periods"]) == 2
+        # Verify week labels
+        assert data["periods"][0]["period_label"].startswith("Week")
+
+    def test_endpoint_with_period_unit_day(self):
+        """?period_unit=day 返回 200 + day 分段。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=day"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["period_unit"] == "day"
+        assert len(data["periods"]) == 14  # 14 days
+
+    def test_endpoint_with_period_unit_month(self):
+        """?period_unit=month → 14 days fit in 1 month segment。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=month"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["period_unit"] == "month"
+        assert len(data["periods"]) == 1
+
+    def test_endpoint_invalid_period_unit_400(self):
+        """?period_unit=year → 400 with helpful message。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=year"
+        )
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert "period_unit" in detail
+        # error should list valid options
+        for unit in ["quartile", "day", "week", "month"]:
+            assert unit in detail
+
+    def test_endpoint_week_too_many_periods_400(self):
+        """?period_unit=week&n_periods=53 → 400。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=week&n_periods=53"
+        )
+        assert resp.status_code == 400
+        assert "52" in resp.json()["detail"]
+
+    def test_endpoint_default_is_quartile(self):
+        """Backward-compat: 不传 period_unit = quartile。"""
+        resp = self.client.get("/api/persistence/cohort-retention-by-period")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["period_unit"] == "quartile"
+
+    def test_endpoint_period_unit_in_response(self):
+        """Response JSON 包含 period_unit 字段 (iter #24 contract)。"""
+        resp = self.client.get(
+            "/api/persistence/cohort-retention-by-period?period_unit=week"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "period_unit" in data
+        assert data["period_unit"] == "week"

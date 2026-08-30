@@ -1680,21 +1680,30 @@ class Persistence:
             "material_type_filter": material_type,
         }
 
-    def get_cohort_retention_by_period(self, n_periods: int = 4) -> Dict[str, Any]:
+    def get_cohort_retention_by_period(
+        self,
+        n_periods: int = 4,
+        period_unit: str = "quartile",  # iter #24: day | week | month | quartile
+    ) -> Dict[str, Any]:
         """
-        Supply 留存按时段划分 (iter #19) — 早期 vs 后期 retention 对比。
+        Supply 留存按时段划分 (iter #19 + iter #24 时间窗口扩展) — 早期 vs 后期 retention 对比。
 
-        把所有 cycle 按 sim_day 顺序分成 n_periods 段 (默认 4 段 = 四分位),
-        每段独立计算 retention rate, 让用户看 早期 vs 后期 churn 趋势。
+        把所有 cycle 按 sim_day 顺序划分成多个 period, 每段独立计算 retention rate,
+        让用户看 早期 vs 后期 churn 趋势。
 
         Args:
             n_periods: 分多少段 (default 4 = quartiles, max 10)
+                       - quartile: 忽略这个参数, 自动按 sim_day range 等分为 4 段
+                       - day: 每段 = 1 sim_day, n_periods 限定 max=30
+                       - week: 每段 = 7 sim_days, n_periods 限定 max=52
+                       - month: 每段 = 30 sim_days, n_periods 限定 max=12
 
         Returns:
             {
               total_supply_ids: int,
               n_periods: int,
-              period_labels: ["1 (sim_day 1-10)",)", ...],
+              period_unit: "quartile" | "day" | "week" | "month",  # iter #24
+              period_labels: ["Period 1 (sim_day 1-7)", ...],
               periods: [{
                 period_idx: 1,
                 period_label: "...",
@@ -1709,10 +1718,36 @@ class Persistence:
               (比较 first vs last period retention_rate_pct, ±5% 阈值)
             }
         """
+        # iter #24: validate period_unit
+        valid_units = ("quartile", "day", "week", "month")
+        if period_unit not in valid_units:
+            raise ValueError(
+                f"period_unit must be one of {valid_units}, got '{period_unit}'"
+            )
+
+        # iter #24: clamp n_periods based on unit
+        max_periods_map = {
+            "quartile": 10,
+            "day": 30,    # 30 days ≈ 1 month
+            "week": 52,   # 52 weeks = 1 year
+            "month": 12,  # 12 months = 1 year
+        }
+        max_n = max_periods_map[period_unit]
         if n_periods < 1:
             raise ValueError("n_periods must be >= 1")
-        if n_periods > 10:
-            raise ValueError("n_periods must be <= 10")
+        if n_periods > max_n:
+            raise ValueError(
+                f"n_periods must be <= {max_n} for period_unit='{period_unit}', got {n_periods}"
+            )
+
+        # iter #24: fixed segment sizes for non-quartile units
+        days_per_segment_map = {
+            "quartile": None,  # computed dynamically
+            "day": 1,
+            "week": 7,
+            "month": 30,
+        }
+        days_per_segment = days_per_segment_map[period_unit]
 
         with self._conn() as conn:
             # Get min/max sim_day from supply_offers (the table we care about)
@@ -1727,27 +1762,73 @@ class Persistence:
             max_day = range_row["max_day"]
             n_cycles = range_row["n_cycles"] or 0
 
-            if min_day is None or max_day is None or n_cycles < n_periods:
+            if min_day is None or max_day is None or n_cycles < 1:
                 return {
                     "total_supply_ids": range_row["n_supplies"] or 0,
                     "n_periods": n_periods,
+                    "period_unit": period_unit,  # iter #24
                     "period_labels": [],
                     "periods": [],
                     "trend": "unknown",
                 }
 
-            # 分段: 按 n_periods 等分 sim_day range
-            total_days = max_day - min_day + 1
-            days_per_period = max(1, total_days // n_periods)
-            period_labels = []
-            for i in range(n_periods):
-                p_start = min_day + i * days_per_period
-                p_end = min_day + (i + 1) * days_per_period - 1 if i < n_periods - 1 else max_day
-                period_labels.append({
-                    "period_idx": i + 1,
-                    "sim_day_min": p_start,
-                    "sim_day_max": p_end,
-                })
+            # iter #24: determine segment boundaries based on unit
+            period_labels: list = []
+            if period_unit == "quartile":
+                # original logic: equal split
+                total_days = max_day - min_day + 1
+                days_per_period = max(1, total_days // n_periods)
+                for i in range(n_periods):
+                    p_start = min_day + i * days_per_period
+                    p_end = (
+                        min_day + (i + 1) * days_per_period - 1
+                        if i < n_periods - 1 else max_day
+                    )
+                    period_labels.append({
+                        "period_idx": i + 1,
+                        "sim_day_min": p_start,
+                        "sim_day_max": p_end,
+                    })
+            else:
+                # iter #24: fixed segment size (day/week/month)
+                # n_periods 表示要返回多少个 period (从 min_day 开始向后数)
+                # 如果 n_periods=0 (未指定), 自动算
+                if period_unit == "day":
+                    auto_n = min(max_day - min_day + 1, max_n)
+                    n_periods_eff = auto_n if n_periods == 4 else n_periods
+                elif period_unit == "week":
+                    auto_n = min((max_day - min_day + 1 + 6) // 7, max_n)
+                    n_periods_eff = auto_n if n_periods == 4 else n_periods
+                else:  # month
+                    auto_n = min((max_day - min_day + 1 + 29) // 30, max_n)
+                    n_periods_eff = auto_n if n_periods == 4 else n_periods
+                # clamp to max_n
+                n_periods_eff = min(n_periods_eff, max_n)
+
+                for i in range(n_periods_eff):
+                    p_start = min_day + i * days_per_segment
+                    p_end = min_day + (i + 1) * days_per_segment - 1
+                    # don't exceed max_day
+                    p_end = min(p_end, max_day)
+                    if p_start > max_day:
+                        break
+                    period_labels.append({
+                        "period_idx": i + 1,
+                        "sim_day_min": p_start,
+                        "sim_day_max": p_end,
+                    })
+                # update n_periods to reflect actual segments generated
+                n_periods = len(period_labels)
+
+                if n_cycles < n_periods:
+                    return {
+                        "total_supply_ids": range_row["n_supplies"] or 0,
+                        "n_periods": n_periods,
+                        "period_unit": period_unit,
+                        "period_labels": [],
+                        "periods": [],
+                        "trend": "unknown",
+                    }
 
             periods_data = []
             for p in period_labels:
@@ -1767,9 +1848,19 @@ class Persistence:
                 ret_pct = round(n_rep / n_ids * 100, 1) if n_ids > 0 else 0.0
                 one_pct = round(n_one / n_ids * 100, 1) if n_ids > 0 else 0.0
 
+                # iter #24: period_label uses unit-aware format
+                if period_unit == "day":
+                    label = f"Day {p['period_idx']} (sim_day {p['sim_day_min']})"
+                elif period_unit == "week":
+                    label = f"Week {p['period_idx']} (sim_day {p['sim_day_min']}-{p['sim_day_max']})"
+                elif period_unit == "month":
+                    label = f"Month {p['period_idx']} (sim_day {p['sim_day_min']}-{p['sim_day_max']})"
+                else:
+                    label = f"Period {p['period_idx']} (sim_day {p['sim_day_min']}-{p['sim_day_max']})"
+
                 periods_data.append({
                     "period_idx": p["period_idx"],
-                    "period_label": f"Period {p['period_idx']} (sim_day {p['sim_day_min']}-{p['sim_day_max']})",
+                    "period_label": label,
                     "sim_day_range": {"min": p["sim_day_min"], "max": p["sim_day_max"]},
                     "n_supply_ids": n_ids,
                     "n_one_time": n_one,
@@ -1794,10 +1885,8 @@ class Persistence:
         return {
             "total_supply_ids": range_row["n_supplies"] or 0,
             "n_periods": n_periods,
-            "period_labels": [
-                f"Period {i+1} (sim_day {min_day + i*days_per_period}-{min_day + (i+1)*days_per_period - 1 if i < n_periods-1 else max_day})"
-                for i in range(n_periods)
-            ],
+            "period_unit": period_unit,  # iter #24
+            "period_labels": [p["period_label"] for p in periods_data],
             "periods": periods_data,
             "trend": trend,
         }

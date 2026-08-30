@@ -2451,34 +2451,58 @@ async def get_supply_cohort_retention(material_type: Optional[str] = None):
 
 
 @app.get("/api/persistence/cohort-retention-by-period")
-async def get_cohort_retention_by_period(n_periods: int = 4):
+async def get_cohort_retention_by_period(
+    n_periods: int = 4,
+    period_unit: str = "quartile",
+):
     """
-    Supply 留存按时段划分 (iter #19) — 早期 vs 后期 retention 对比。
+    Supply 留存按时段划分 (iter #19 + iter #24 时间窗口扩展) — 早期 vs 后期 retention 对比。
 
-    将所有 cycle 按 sim_day 顺序分成 n_periods 段 (默认 4 段 = 四分位),
-    每段独立计算 retention rate, 让用户看 早期 vs 后期 churn 趋势。
+    将所有 cycle 按 sim_day 顺序划分成多个 period, 每段独立计算 retention rate,
+    让用户看 早期 vs 后期 churn 趋势。
 
-    Query:
-    - n_periods: 分多少段 (default 4, range 1-10)
+    Query (iter #24 加 period_unit):
+    - n_periods: 分多少段 (default 4)
+      - quartile: range 1-10
+      - day:      range 1-30
+      - week:     range 1-52
+      - month:    range 1-12
+    - period_unit: 划分单位 (default 'quartile')
+      - quartile: equal-split by sim_day range (原 iter #19 行为)
+      - day:      每段 = 1 sim_day
+      - week:     每段 = 7 sim_days
+      - month:    每段 = 30 sim_days
 
     Returns:
         {
-          total_supply_ids, n_periods, period_labels,
-          periods: [{period_idx, period_label, sim_day_range,
-                     n_supply_ids, n_one_time, n_repeating,
-                     retention_rate_pct, one_time_pct}, ...],
+          total_supply_ids, n_periods, period_unit,  # period_unit iter #24
+          period_labels, periods: [...],
           trend: "improving" | "declining" | "stable" | "unknown"
         }
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    if n_periods < 1 or n_periods > 10:
+
+    # iter #24: validate period_unit early (return 400 not 500)
+    valid_units = ("quartile", "day", "week", "month")
+    if period_unit not in valid_units:
         raise HTTPException(
             status_code=400,
-            detail=f"n_periods must be 1-10, got {n_periods}",
+            detail=f"period_unit must be one of {list(valid_units)}, got '{period_unit}'",
         )
+
+    # iter #24: per-unit max validation
+    max_periods_map = {"quartile": 10, "day": 30, "week": 52, "month": 12}
+    max_n = max_periods_map[period_unit]
+    if n_periods < 1 or n_periods > max_n:
+        raise HTTPException(
+            status_code=400,
+            detail=f"n_periods must be 1-{max_n} for period_unit='{period_unit}', got {n_periods}",
+        )
+
     return coordinator.persistence.get_cohort_retention_by_period(
         n_periods=n_periods,
+        period_unit=period_unit,
     )
 
 
