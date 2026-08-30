@@ -121,6 +121,7 @@ check_endpoint "/api/admin/perf-stats" 200 GET "/api/admin/perf-stats"
 check_endpoint "/api/admin/llm-stats" 200 GET "/api/admin/llm-stats?recent=5"
 check_endpoint "/api/admin/db-export" 200 GET "/api/admin/db-export?table=cycles"
 check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table=cycles&fmt=ndjson"
+check_endpoint "/api/admin/db-export parquet" 200 GET "/api/admin/db-export?table=cycles&fmt=parquet"
 check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus"
 
 # ---- Persistence endpoints ----

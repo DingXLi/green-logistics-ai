@@ -45,6 +45,8 @@ const CohortRetentionByPeriod = lazy(() => import('./CohortRetentionByPeriod').t
 const PerfStats = lazy(() => import('./PerfStats').then(m => ({ default: m.PerfStats })))
 // iter #22: LLM token usage + cost tracking
 const LLMStats = lazy(() => import('./LLMStats').then(m => ({ default: m.LLMStats })))
+// iter #23: DB export menu (CSV / JSON / NDJSON / Parquet)
+const ExportButton = lazy(() => import('./ExportButton').then(m => ({ default: m.ExportButton })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -633,6 +635,8 @@ export default function Dashboard() {
       {activeTab === 'network' && (
         <Suspense fallback={<LoadingSpinner label="Loading network…" />}>
           <FacilitiesList />
+          {/* iter #23: DB export menu (csv / json / ndjson / parquet) */}
+          <ExportButton />
         </Suspense>
       )}
 
