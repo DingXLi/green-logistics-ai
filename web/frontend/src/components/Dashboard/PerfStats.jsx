@@ -1,5 +1,5 @@
 /**
- * PerfStats - API performance monitoring dashboard (iter #22)
+ * PerfStats - API performance monitoring dashboard (iter #22 + iter #25 URL state)
  *
  * 数据源: GET /api/admin/perf-stats?top=10
  *
@@ -11,10 +11,14 @@
  *
  * 自动 refresh 每 15s
  *
+ * URL state (iter #25): ?perf_top=20
+ * - 可分享: 用户配置 top=N 后, URL 自动反映
+ *
  * 用途: production observability — 哪个 endpoint 慢 / 哪个错误率高?
  */
 
 import { useState, useEffect } from 'react'
+import { useUrlState } from '../../hooks/useUrlState'
 import {
   ResponsiveContainer,
   BarChart,
@@ -69,10 +73,12 @@ export function PerfStats() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // iter #25: URL-synced top N
+  const [topN] = useUrlState('perf_top', 10, 'int')
 
   const fetchStats = async () => {
     try {
-      const resp = await fetch(`${API_BASE}/admin/perf-stats?top=10`)
+      const resp = await fetch(`${API_BASE}/admin/perf-stats?top=${topN}`)
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`)
       }

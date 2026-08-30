@@ -1,5 +1,5 @@
 /**
- * LLMStats - LLM token usage + cost dashboard (iter #22)
+ * LLMStats - LLM token usage + cost dashboard (iter #22 + iter #25 URL state)
  *
  * 数据源: GET /api/admin/llm-stats?recent=20
  *
@@ -11,10 +11,13 @@
  *
  * 自动 refresh 每 30s
  *
+ * URL state (iter #25): ?llm_recent=50
+ *
  * 用途: 监控 Gemini API 调用, 控制成本, 调试 LLM-driven 决策
  */
 
 import { useState, useEffect } from 'react'
+import { useUrlState } from '../../hooks/useUrlState'
 import {
   ResponsiveContainer,
   PieChart,
@@ -72,10 +75,12 @@ export function LLMStats() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // iter #25: URL-synced recent count
+  const [recentN] = useUrlState('llm_recent', 20, 'int')
 
   const fetchStats = async () => {
     try {
-      const resp = await fetch(`${API_BASE}/admin/llm-stats?recent=20`)
+      const resp = await fetch(`${API_BASE}/admin/llm-stats?recent=${recentN}`)
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`)
       }
