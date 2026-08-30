@@ -2661,7 +2661,20 @@ async def export_db_data(
             headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
         )
     else:  # parquet (iter #23, columnar analytics-friendly)
-        parquet_bytes = _rows_to_parquet_bytes(rows)
+        try:
+            parquet_bytes = _rows_to_parquet_bytes(rows)
+        except ImportError as e:
+            # pyarrow not installed (HF Space 镜像未安装)
+            raise HTTPException(
+                status_code=501,
+                detail=f"Parquet export requires pyarrow. Install with: pip install pyarrow>=15.0.0 ({e})",
+            )
+        except Exception as e:
+            logger.error(f"Parquet export failed for table={table} limit={limit}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Parquet serialization failed: {type(e).__name__}: {str(e)[:200]}",
+            )
         filename = f"green_logistics_{table}_{limit}.parquet"
         if gzip:
             return _maybe_gzip(parquet_bytes, True, filename)
