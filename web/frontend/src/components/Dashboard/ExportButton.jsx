@@ -1,5 +1,5 @@
 /**
- * ExportButton - DB export menu (iter #23)
+ * ExportButton - DB export menu (iter #23 + iter #25 URL state)
  *
  * 数据源: GET /api/admin/db-export?table=X&fmt=Y
  *
@@ -15,10 +15,15 @@
  *
  * 默认 limit: 1000 (前端的常见 case; HF 上 10000 row API default)
  *
+ * URL state (iter #25): ?export_table=cycles&export_fmt=parquet&export_limit=10000
+ * - 可分享: 用户粘贴 URL 给同事, 自动恢复 export 配置
+ * - 可收藏: bookmark 当前 export 配置
+ *
  * 用途: 让 ops / dev 快速下载数据 → 本地 pandas / DuckDB 分析
  */
 
 import { useState } from 'react'
+import { useUrlState } from '../../hooks/useUrlState'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
 
@@ -40,10 +45,11 @@ const FORMATS = [
 const LIMITS = [100, 1000, 10000, 50000]
 
 export function ExportButton() {
-  const [table, setTable] = useState('cycles')
-  const [fmt, setFmt] = useState('csv')
-  const [limit, setLimit] = useState(1000)
-  const [gzip, setGzip] = useState(false)
+  // iter #25: URL-synced export config (deep linkable)
+  const [table, setTable] = useUrlState('export_table', 'cycles')
+  const [fmt, setFmt] = useUrlState('export_fmt', 'csv')
+  const [limit, setLimit] = useUrlState('export_limit', 1000, 'int')
+  const [gzip, setGzip] = useUrlState('export_gzip', false, 'bool')
   const [downloading, setDownloading] = useState(false)
   const [lastResult, setLastResult] = useState(null)
 
