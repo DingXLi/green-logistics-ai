@@ -131,6 +131,8 @@ check_endpoint "/api/persistence/supply-aggregates" 200 GET "/api/persistence/su
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
+check_endpoint "/api/persistence/cohort-retention-by-period" 200 GET "/api/persistence/cohort-retention-by-period"
+check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 200 GET "/api/persistence/cohort-retention-by-period?period_unit=week"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 
 # ---- Optimization endpoints ----
