@@ -22,6 +22,7 @@ import {
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { useSharedWebSocket } from '../../hooks/useSharedWebSocket'
 import { useDashboardSummary } from '../../hooks/useDashboardSummary'
+import { useUrlState } from '../../hooks/useUrlState'
 import { LiveCycleIndicator } from './LiveCycleIndicator'
 
 // iter #5: code-splitting — lazy load 重型 tab 组件
@@ -314,37 +315,39 @@ export default function Dashboard() {
   const [wsEfficiency, setWsEfficiency] = useState(null)
   // iter #8: 从 WS 推送拿 fleet metrics (util, vehicles, distance)
   const [wsFleet, setWsFleet] = useState(null)
-  const [activeTab, setActiveTabRaw] = useState(() => {
-    // iter #6: 从 URL hash 初始化 (如 #network), 默认 overview
-    // iter #11: 加 'history' tab
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.replace('#', '');
-      if (['overview', 'scenarios', 'network', 'history'].includes(hash)) {
-        return hash;
-      }
-    }
-    return 'overview';
-  });  // 'overview' | 'scenarios' | 'network' | 'history'
+  // iter #25: URL query param ?tab=overview (deep linkable, shareable)
+  // Backward-compat: still read URL hash for old links (e.g., #network)
+  const VALID_TABS = ['overview', 'scenarios', 'network', 'performance', 'history']
+  const [activeTab, setActiveTabRaw] = useUrlState('tab', 'overview')
+  const setActiveTab = setActiveTabRaw  // alias
 
-  // setActiveTab 同时写 URL hash, 让 tab 可分享/收藏
-  const setActiveTab = (tab) => {
-    setActiveTabRaw(tab);
-    if (typeof window !== 'undefined') {
-      window.location.hash = tab;
-    }
-  };
-
-  // 监听 hashchange (浏览器 back/forward 按钮, 外部链接)
+  // Validate activeTab is in known set
   useEffect(() => {
+    if (!VALID_TABS.includes(activeTab)) {
+      // fallback to overview if invalid value in URL
+      setActiveTabRaw('overview')
+    }
+  }, [activeTab, setActiveTabRaw])
+
+  // iter #25: also accept legacy hash format (#network) → migrate to ?tab=network
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash.replace('#', '')
+    if (VALID_TABS.includes(hash)) {
+      // Migrate old hash format to query param
+      window.history.replaceState({}, '', `?tab=${hash}${window.location.hash}`)
+      setActiveTabRaw(hash)
+    }
+    // Listen for hashchange (legacy support)
     const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (['overview', 'scenarios', 'network', 'history'].includes(hash)) {
-        setActiveTabRaw(hash);
+      const newHash = window.location.hash.replace('#', '')
+      if (VALID_TABS.includes(newHash)) {
+        setActiveTabRaw(newHash)
       }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [setActiveTabRaw])
 
   // iter #12: useDashboardSummary hook 一次性拿聚合数据 (替代独立 fetch /persistence/summary)
   const { data: summaryBundle, refetch: refetchSummary } = useDashboardSummary({

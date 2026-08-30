@@ -1,20 +1,23 @@
 /**
- * CohortRetentionByPeriod - 按时段看 retention 趋势 (iter #20)
+ * CohortRetentionByPeriod - 按时段看 retention 趋势 (iter #20 + iter #24 unit + iter #25 deep link)
  *
- * 数据源: GET /api/persistence/cohort-retention-by-period?n_periods=4
+ * 数据源: GET /api/persistence/cohort-retention-by-period?n_periods=4&period_unit=quartile
  *
  * 显示:
- * - 4 个 period (默认 quartile) 的 retention rate 对比
+ * - period_unit (iter #24): quartile / day / week / month
+ * - n_periods: 可配置 (1-30/52/12/10 per unit)
  * - trend badge: improving / declining / stable / unknown
  * - bar visualization (recharts) 显示每段 retention_rate_pct
  * - 每段详细 KPI (n_supply_ids / n_one_time / n_repeating / one_time_pct)
  *
- * 用途:
- * - 看 retention 是否随时间 改善 / 退化 / 稳定
- * - 早期 vs 后期 churn 趋势对比
+ * URL state (iter #25): ?period_unit=week&n_periods=8
+ * - 可分享: 用户粘贴 URL 给同事, 自动恢复 cohort view 配置
+ * - 可收藏: bookmark 当前 view 不用再选
+ * - back/forward 工作
  */
 
 import { useState, useEffect } from 'react'
+import { useUrlState } from '../../hooks/useUrlState'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
@@ -41,8 +44,9 @@ export function CohortRetentionByPeriod() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [nPeriods, setNPeriods] = useState(4)
-  const [periodUnit, setPeriodUnit] = useState('quartile')  // iter #24
+  // iter #25: URL-synced state for deep linking
+  const [periodUnit, setPeriodUnit] = useUrlState('period_unit', 'quartile')  // iter #24 + iter #25
+  const [nPeriods, setNPeriods] = useUrlState('n_periods', 4, 'int')  // iter #25
   const [expandedPeriod, setExpandedPeriod] = useState(null)
 
   useEffect(() => {
