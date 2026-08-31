@@ -650,6 +650,167 @@ class Persistence:
             out.append(d)
         return out
 
+    def forecast_next_n_sim_days(
+        self,
+        horizon: int = 7,
+        history_n: int = 14,
+        metrics: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Predict future KPI trends using linear regression on history (iter #26).
+
+        给一个 horizon (默认 7 sim_days), 对每个 metric 跑线性回归:
+        - 用最近 history_n 个 sim_days 的历史 (默认 14)
+        - 拟合: y = slope * sim_day + intercept
+        - 预测未来 horizon 个 sim_day 的值
+        - 95% confidence interval (mean ± 1.96 * residual_std)
+
+        Args:
+            horizon: 预测未来多少个 sim_day (default 7, max 30)
+            history_n: 用多少历史 sim_day 拟合 (default 14, max 90)
+            metrics: 预测哪些 metric (default = 所有 4 个)
+                - "cost_sek" (总成本 SEK)
+                - "co2_kg" (总 CO2 kg)
+                - "util_pct" (车队利用率 %)
+                - "matches" (总匹配数)
+
+        Returns:
+            {
+              horizon: int,
+              history_n: int,
+              last_sim_day: int (最后已知 sim_day),
+              forecast_sim_days: [last+1, ..., last+horizon],
+              metrics: {
+                "cost_sek": {
+                  history: [{sim_day, value, is_forecast: false}, ...],
+                  forecast: [{sim_day, value, is_forecast: true,
+                              lower_95, upper_95, residual_std}, ...],
+                  trend: "up" | "down" | "flat",
+                  slope_per_day: float,
+                  r_squared: float,  # 拟合优度
+                  mean_value: float,
+                },
+                ...
+              }
+            }
+
+        错误处理:
+        - < 2 history points → 返空 metrics dict
+        - 非法 metric → 跳过 (silent)
+        - history < history_n 拟合仍工作 (用全部)
+        """
+        # iter #26: validation
+        if horizon < 1 or horizon > 30:
+            raise ValueError(f"horizon must be 1-30, got {horizon}")
+        if history_n < 2 or history_n > 90:
+            raise ValueError(f"history_n must be 2-90, got {history_n}")
+
+        if metrics is None:
+            metrics = ["cost_sek", "co2_kg", "util_pct", "matches"]
+
+        # iter #26: import numpy (lazy — not always needed)
+        try:
+            import numpy as np
+        except ImportError:
+            raise ImportError(
+                "numpy required for forecast. Install with: pip install numpy"
+            )
+
+        # 拿 KPI 时间序列
+        kpi_rows = self.get_kpi_timeseries()
+        if len(kpi_rows) < 2:
+            # Not enough data to forecast
+            return {
+                "horizon": horizon,
+                "history_n": history_n,
+                "last_sim_day": kpi_rows[-1]["sim_day"] if kpi_rows else None,
+                "forecast_sim_days": [],
+                "metrics": {},
+                "note": "need at least 2 historical sim_days for forecast",
+            }
+
+        # Take last history_n points (most recent)
+        history = kpi_rows[-history_n:]
+        sim_days = np.array([r["sim_day"] for r in history], dtype=float)
+        last_sim_day = int(sim_days[-1])
+
+        # Build forecast sim_days array
+        forecast_sim_days = list(range(last_sim_day + 1, last_sim_day + horizon + 1))
+        forecast_x = np.array(forecast_sim_days, dtype=float)
+
+        # iter #26: for each metric, fit linear regression + forecast
+        result_metrics = {}
+        for metric in metrics:
+            if metric not in ("cost_sek", "co2_kg", "util_pct", "matches"):
+                continue
+            values = np.array([r.get(metric, 0) or 0 for r in history], dtype=float)
+
+            # Linear regression: y = slope * x + intercept
+            slope, intercept = np.polyfit(sim_days, values, 1)
+
+            # Compute R² (拟合优度)
+            y_pred_hist = slope * sim_days + intercept
+            ss_res = float(np.sum((values - y_pred_hist) ** 2))
+            ss_tot = float(np.sum((values - np.mean(values)) ** 2))
+            r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 1.0
+
+            # Compute residual std (for confidence interval)
+            residuals = values - y_pred_hist
+            residual_std = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else 0.0
+            # 95% CI: ±1.96 * std
+            ci_half = 1.96 * residual_std
+
+            # Determine trend
+            # use 1-week (7 day) projected change as threshold
+            week_change = slope * 7
+            if abs(week_change) < 0.05 * abs(intercept) if intercept else abs(week_change) < 1:
+                trend = "flat"
+            elif week_change > 0:
+                trend = "up"
+            else:
+                trend = "down"
+
+            # Build history output (with is_forecast flag for consistency)
+            history_out = [
+                {
+                    "sim_day": int(r["sim_day"]),
+                    "value": float(r.get(metric, 0) or 0),
+                    "is_forecast": False,
+                }
+                for r in history
+            ]
+
+            # Build forecast output
+            forecast_values = slope * forecast_x + intercept
+            forecast_out = []
+            for i, sd in enumerate(forecast_sim_days):
+                val = float(forecast_values[i])
+                forecast_out.append({
+                    "sim_day": sd,
+                    "value": round(val, 2),
+                    "is_forecast": True,
+                    "lower_95": round(val - ci_half, 2),
+                    "upper_95": round(val + ci_half, 2),
+                })
+
+            result_metrics[metric] = {
+                "history": history_out,
+                "forecast": forecast_out,
+                "trend": trend,
+                "slope_per_day": round(float(slope), 4),
+                "r_squared": round(r_squared, 4),
+                "residual_std": round(residual_std, 2),
+                "mean_value": round(float(np.mean(values)), 2),
+            }
+
+        return {
+            "horizon": horizon,
+            "history_n": history_n,
+            "last_sim_day": last_sim_day,
+            "forecast_sim_days": forecast_sim_days,
+            "metrics": result_metrics,
+        }
+
     def get_summary(self) -> Dict[str, Any]:
         """全局统计 summary (含 LLM 决策统计)"""
         with self._conn() as conn:

@@ -2099,6 +2099,69 @@ async def get_seasonal_timeseries():
     return coordinator.persistence.get_seasonal_timeseries()
 
 
+@app.get("/api/persistence/forecast")
+async def get_forecast(
+    horizon: int = 7,
+    history_n: int = 14,
+    metrics: Optional[str] = None,
+):
+    """
+    KPI forecast (iter #26) — 线性回归预测未来 N 个 sim_day。
+
+    对每个 metric 用最近 history_n 个 sim_day 拟合线性回归, 预测 horizon 个未来 sim_day。
+    返回 95% confidence interval + trend + R²。
+
+    Query:
+    - horizon: 预测未来多少 sim_day (default 7, range 1-30)
+    - history_n: 用多少历史 sim_day 拟合 (default 14, range 2-90)
+    - metrics: 逗号分隔的 metric 列表 (default = cost_sek,co2_kg,util_pct,matches)
+        可选: cost_sek / co2_kg / util_pct / matches
+
+    Returns:
+        {
+          horizon, history_n, last_sim_day, forecast_sim_days,
+          metrics: {
+            "cost_sek": {
+              history: [{sim_day, value, is_forecast: false}, ...],
+              forecast: [{sim_day, value, is_forecast: true, lower_95, upper_95}, ...],
+              trend: "up" | "down" | "flat",
+              slope_per_day, r_squared, residual_std, mean_value,
+            },
+            ...
+          }
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    if horizon < 1 or horizon > 30:
+        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
+    if history_n < 2 or history_n > 90:
+        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+
+    metrics_list = None
+    if metrics:
+        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
+        invalid = [m for m in metrics_list if m not in valid_metrics]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
+            )
+
+    try:
+        return coordinator.persistence.forecast_next_n_sim_days(
+            horizon=horizon,
+            history_n=history_n,
+            metrics=metrics_list,
+        )
+    except ImportError as e:
+        raise HTTPException(status_code=501, detail=f"Forecast requires numpy: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/summary")
 async def get_persistence_summary():
     """全局统计汇总"""
