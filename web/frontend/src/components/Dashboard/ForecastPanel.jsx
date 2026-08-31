@@ -1,5 +1,5 @@
 /**
- * ForecastPanel - KPI forecast dashboard (iter #26)
+ * ForecastPanel - KPI forecast dashboard (iter #26 + iter #28)
  *
  * 数据源: GET /api/persistence/forecast
  *
@@ -8,10 +8,12 @@
  * - 4 个 metric card (cost_sek / co2_kg / util_pct / matches):
  *   - 当前 trend (up / down / flat) + slope_per_day + R²
  *   - 预测值 (next horizon sim_days) + 95% CI
+ *   - method badge (iter #28): linear / moving_average / exponential_smoothing
  * - Recharts LineChart: history + forecast + 95% CI band
- * - 参数 control: horizon (1-30), history_n (2-90)
+ * - 参数 control: horizon (1-30), history_n (2-90), method (iter #28)
  *
- * URL state (iter #25): ?forecast_horizon=7&forecast_history_n=14&forecast_metric=cost_sek
+ * URL state (iter #25 + iter #28):
+ *   ?forecast_horizon=7&forecast_history_n=14&forecast_method=linear
  *
  * 自动 refresh 每 60s
  *
@@ -19,6 +21,7 @@
  * - 7 天成本预测 (预算规划)
  * - CO2 排放趋势预测 (环境报告)
  * - 车队利用率预测 (容量规划)
+ * - 不同预测方法对比 (iter #28)
  */
 
 import { useState, useEffect } from 'react'
@@ -57,6 +60,13 @@ const TREND_ICONS = {
 const HORIZON_OPTIONS = [3, 7, 14, 21, 30]
 const HISTORY_OPTIONS = [7, 14, 21, 30, 60, 90]
 
+// iter #28: forecast method options
+const METHOD_OPTIONS = [
+  { key: 'linear', label: '📈 Linear', desc: 'Best for trending data' },
+  { key: 'moving_average', label: '➡️ Moving Avg', desc: 'Best for stable data' },
+  { key: 'exponential_smoothing', label: '🌀 Exp. Smoothing', desc: 'Recent values weighted more' },
+]
+
 function KpiCard({ label, value, unit, accent }) {
   return (
     <div className="kpi-card" style={{ borderTop: `3px solid ${accent}` }}>
@@ -94,6 +104,12 @@ function MetricCard({ metric, data }) {
           {trend.icon} {trend.label}
         </span>
       </div>
+
+      {data.method && (
+        <div className="forecast-method-badge" title={`Forecast method: ${data.method}`}>
+          🔬 {data.method}
+        </div>
+      )}
 
       <div className="forecast-metric-stats">
         <div className="forecast-stat">
@@ -227,12 +243,14 @@ export function ForecastPanel() {
   const [error, setError] = useState(null)
 
   // iter #25: URL-synced params
+  // iter #28: method selector
   const [horizon] = useUrlState('forecast_horizon', 7, 'int')
   const [historyN] = useUrlState('forecast_history_n', 14, 'int')
+  const [method] = useUrlState('forecast_method', 'linear', 'str')
 
   const fetchForecast = async () => {
     try {
-      const url = `${API_BASE}/persistence/forecast?horizon=${horizon}&history_n=${historyN}`
+      const url = `${API_BASE}/persistence/forecast?horizon=${horizon}&history_n=${historyN}&method=${method}`
       const resp = await fetch(url)
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
@@ -251,13 +269,13 @@ export function ForecastPanel() {
     fetchForecast()
     const interval = setInterval(fetchForecast, REFRESH_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [horizon, historyN])
+  }, [horizon, historyN, method])
 
   if (loading) return <LoadingSpinner label="Loading forecast…" />
   if (error) {
     return (
       <div className="chart-card">
-        <h3>🔮 KPI Forecast (iter #26)</h3>
+        <h3>🔮 KPI Forecast (iter #28)</h3>
         <div className="error-banner">⚠️ {error}</div>
       </div>
     )
@@ -266,13 +284,14 @@ export function ForecastPanel() {
 
   const { last_sim_day, forecast_sim_days, metrics = {} } = data
   const metricKeys = Object.keys(metrics)
+  const methodConfig = METHOD_OPTIONS.find(m => m.key === method) || METHOD_OPTIONS[0]
 
   return (
     <div className="chart-card">
       <div className="chart-card-header">
-        <h3>🔮 KPI Forecast (iter #26)</h3>
+        <h3>🔮 KPI Forecast (iter #28)</h3>
         <span className="chart-card-sub">
-          Linear regression on last {historyN} sim_days · {horizon}-day horizon
+          {methodConfig.label} on last {historyN} sim_days · {horizon}-day horizon
         </span>
       </div>
 
@@ -287,6 +306,38 @@ export function ForecastPanel() {
           unit=""
           accent="#22c55e"
         />
+      </div>
+
+      {/* iter #28: Method selector */}
+      <div className="forecast-method-selector" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <span className="forecast-control-label" style={{ alignSelf: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+          Method:
+        </span>
+        {METHOD_OPTIONS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            className={`forecast-method-btn ${method === m.key ? 'active' : ''}`}
+            onClick={() => {
+              const newUrl = new URL(window.location.href)
+              newUrl.searchParams.set('forecast_method', m.key)
+              window.history.pushState({}, '', newUrl.toString())
+              window.dispatchEvent(new Event('popstate'))
+            }}
+            title={m.desc}
+            style={{
+              padding: '0.4rem 0.8rem',
+              borderRadius: '4px',
+              border: '1px solid #475569',
+              background: method === m.key ? '#3b82f6' : '#1e293b',
+              color: method === m.key ? '#fff' : '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {data.note && (
