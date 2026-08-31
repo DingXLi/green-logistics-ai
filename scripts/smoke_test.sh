@@ -24,12 +24,22 @@
 # Exit codes:
 #   0 = all checks passed
 #   1 = at least one endpoint failed
+#
+# Prereqs (iter #27): check_json_field 需要 jq (apt-get install jq)。
+# macOS: brew install jq
+# HF Space deploy 也需要 curl + bash (默认都有)。
 
 set -u
 
 BASE="${HF_BASE:-http://localhost:8000}"
 COOKIE_JAR="$(mktemp)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
+
+# iter #27: 检查 jq 可用性
+if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ jq not found. Install: sudo apt-get install jq  (or brew install jq on macOS)"
+    exit 2
+fi
 
 # Colors (auto-disabled if no TTY)
 if [[ -t 1 ]]; then
