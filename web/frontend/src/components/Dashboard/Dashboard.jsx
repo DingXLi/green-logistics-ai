@@ -50,6 +50,8 @@ const LLMStats = lazy(() => import('./LLMStats').then(m => ({ default: m.LLMStat
 const ExportButton = lazy(() => import('./ExportButton').then(m => ({ default: m.ExportButton })))
 // iter #26: KPI forecast (linear regression on history)
 const ForecastPanel = lazy(() => import('./ForecastPanel').then(m => ({ default: m.ForecastPanel })))
+// iter #28: LLM cost time-series chart
+const LlmCostTimeseriesChart = lazy(() => import('./LlmCostTimeseriesChart').then(m => ({ default: m.LlmCostTimeseriesChart })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -655,6 +657,8 @@ export default function Dashboard() {
           <PerfStats />
           {/* iter #22: LLM token usage + cost tracking */}
           <LLMStats />
+          {/* iter #28: LLM cost time-series chart (per sim_day) */}
+          <LlmCostTimeseriesChart />
         </Suspense>
       )}
 
