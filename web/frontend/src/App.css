@@ -1697,6 +1697,17 @@ td.no-matches {
   color: #475569;
 }
 
+/* iter #27: per-endpoint error badge */
+.perf-error-badge {
+  background: #dc2626;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: help;
+}
+
 .empty-state {
   padding: 2rem;
   text-align: center;

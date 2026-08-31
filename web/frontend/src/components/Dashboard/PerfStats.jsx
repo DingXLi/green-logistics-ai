@@ -1,13 +1,14 @@
 /**
- * PerfStats - API performance monitoring dashboard (iter #22 + iter #25 URL state)
+ * PerfStats - API performance monitoring dashboard (iter #22 + iter #25 URL state + iter #27 errors)
  *
  * 数据源: GET /api/admin/perf-stats?top=10
  *
  * 显示:
  * - 顶部 4 个 KPI: total_requests / total_errors / error_rate_pct / avg_ms
  * - Top 10 最慢 endpoint (avg_ms DESC)
- *   - endpoint / n_calls / avg / min / max / p50 / p95 / p99 / last_ms
+ *   - endpoint / n_calls / avg / min / max / p50 / p95 / p99 / last_ms / n_errors (iter #27)
  * - 颜色编码: error_rate 红 / p95 > 1000ms 红 / 500ms < p95 < 1000ms 橙 / < 500ms 绿
+ *   - n_errors > 0 → 红色 badge (iter #27)
  *
  * 自动 refresh 每 15s
  *
@@ -212,6 +213,7 @@ export function PerfStats() {
                 <th>Min</th>
                 <th>Max</th>
                 <th>Last</th>
+                <th>Errors (5xx)</th>
               </tr>
             </thead>
             <tbody>
@@ -234,6 +236,15 @@ export function PerfStats() {
                   <td>{formatMs(ep.min_ms)}</td>
                   <td>{formatMs(ep.max_ms)}</td>
                   <td>{formatMs(ep.last_ms)}</td>
+                  <td>
+                    {(ep.n_errors ?? 0) > 0 ? (
+                      <span className="perf-error-badge" title={`${(ep.error_rate_pct ?? 0).toFixed(2)}% error rate`}>
+                        {ep.n_errors}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#475569' }}>0</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
