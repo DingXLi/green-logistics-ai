@@ -182,6 +182,10 @@ check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distan
 
 # ---- Seasonal / external ----
 check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
+# iter #28: LLM cost timeseries
+check_endpoint "/api/persistence/llm-cost-timeseries" 200 GET "/api/persistence/llm-cost-timeseries"
+check_endpoint "/api/persistence/llm-cost-timeseries?since_sim_day=0" 200 GET "/api/persistence/llm-cost-timeseries?since_sim_day=0"
+check_endpoint "/api/persistence/llm-cost-timeseries invalid range" 400 GET "/api/persistence/llm-cost-timeseries?since_sim_day=10&until_sim_day=5"
 
 # ---- JSON field validation (use python instead of jq for portability) ----
 check_python_field() {

@@ -2193,6 +2193,50 @@ async def get_seasonal_timeseries():
     return coordinator.persistence.get_seasonal_timeseries()
 
 
+@app.get("/api/persistence/llm-cost-timeseries")
+async def get_llm_cost_timeseries(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    LLM cost 时间序列 (iter #28) — 按 sim_day 聚合 llm_decisions 表。
+
+    Returns: [{sim_day, n_decisions, llm_n, fallback_n, avg_multiplier,
+               avg_confidence, llm_success_rate_pct}, ...]
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    用途:
+    - Dashboard LLM 使用趋势图
+    - 检测 LLM fallback 频率异常
+    - 未来可接 forecast endpoint 预测 LLM cost
+
+    Note: llm_decisions 表不存精确 cost_usd; 真实 cost 看 /api/admin/llm-stats
+    (in-memory LLMTracker)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    if until_sim_day is not None and until_sim_day < 0:
+        raise HTTPException(status_code=400, detail="until_sim_day must be >= 0")
+    if since_sim_day is not None and until_sim_day is not None and since_sim_day > until_sim_day:
+        raise HTTPException(
+            status_code=400,
+            detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+        )
+    return {
+        "since_sim_day": since_sim_day,
+        "until_sim_day": until_sim_day,
+        "rows": coordinator.persistence.get_llm_cost_timeseries(
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+        ),
+    }
+
+
 @app.get("/api/persistence/forecast")
 async def get_forecast(
     horizon: int = 7,
@@ -2373,7 +2417,7 @@ async def get_forecast_multi(
         comparison: Dict[str, Any] = {}
         for metric in metric_keys:
             forecasts_per_method: Dict[str, List[Dict[str, Any]]] = {}
-            history_out = []
+            history_out: List[Dict[str, Any]] = []
             for method in methods_list:
                 metric_data = per_method_results[method]["metrics"].get(metric, {})
                 if not history_out and metric_data.get("history"):

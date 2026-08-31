@@ -510,6 +510,43 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_llm_cost_timeseries(self, since_sim_day: Optional[int] = None,
+                                 until_sim_day: Optional[int] = None) -> List[Dict[str, Any]]:
+        """iter #28: LLM cost 时间序列 (按 sim_day 聚合, from llm_decisions table)。
+
+        Returns: [{sim_day, n_decisions, llm_n, fallback_n, source, total_calls,
+                   avg_confidence, avg_multiplier, ...}, ...]
+
+        Note: llm_decisions 表不直接存 cost_usd — 近似用 n_decisions 作为 proxy
+        (iter #22 LLM tracker 有精确 cost, 但那是 in-memory; 此 endpoint 从 DB 拿)
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT sim_day,
+                          COUNT(*) as n_decisions,
+                          SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) as llm_n,
+                          SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END) as fallback_n,
+                          ROUND(AVG(multiplier), 3) as avg_multiplier,
+                          ROUND(AVG(confidence), 3) as avg_confidence,
+                          ROUND(AVG(CASE WHEN source='llm' THEN 1 ELSE 0 END) * 100, 2) as llm_success_rate_pct
+                   FROM llm_decisions
+                   {where_sql}
+                   GROUP BY sim_day
+                   ORDER BY sim_day""",
+                params,
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     # ------------------------------------------------------------
     # 查询（论文 / dashboard 用）
     # ------------------------------------------------------------
