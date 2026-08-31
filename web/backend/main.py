@@ -172,6 +172,8 @@ _PERF_BUFFER: Dict[str, _deque] = {}
 # 总请求数 + 总错误数
 _PERF_TOTAL = 0
 _PERF_ERRORS = 0
+# iter #27: per-endpoint error count (5xx only)
+_PERF_ERRORS_BY_KEY: Dict[str, int] = {}
 
 
 @app.middleware("http")
@@ -194,6 +196,7 @@ async def perf_middleware(request: Request, call_next):
             _PERF_TOTAL += 1
             if response.status_code >= 500:
                 _PERF_ERRORS += 1
+                _PERF_ERRORS_BY_KEY[key] = _PERF_ERRORS_BY_KEY.get(key, 0) + 1
             buf = _PERF_BUFFER.setdefault(key, _deque(maxlen=100))
             buf.append(elapsed_ms)
         return response
@@ -202,6 +205,7 @@ async def perf_middleware(request: Request, call_next):
         with _PERF_LOCK:
             _PERF_TOTAL += 1
             _PERF_ERRORS += 1
+            _PERF_ERRORS_BY_KEY[key] = _PERF_ERRORS_BY_KEY.get(key, 0) + 1
             buf = _PERF_BUFFER.setdefault(key, _deque(maxlen=100))
             buf.append(elapsed_ms)
         raise
@@ -3049,13 +3053,15 @@ async def get_perf_stats(top: int = 10):
     - total_requests: 总请求数 (包括 4xx/5xx)
     - total_errors: 5xx 错误数
     - error_rate_pct: error_rate
-    - endpoints: [{endpoint, n_calls, avg_ms, min_ms, max_ms,
+    - endpoints: [{endpoint, n_calls, n_errors, error_rate_pct, avg_ms, min_ms, max_ms,
                    p50_ms, p95_ms, p99_ms, last_ms}, ...]
       按 avg_ms DESC 排序 (top N 最慢)
+    iter #27: 每个 endpoint 加 n_errors + error_rate_pct 字段
     """
     with _PERF_LOCK:
         total = _PERF_TOTAL
         errors = _PERF_ERRORS
+        errors_by_key = dict(_PERF_ERRORS_BY_KEY)
         endpoints = []
         for key, buf in _PERF_BUFFER.items():
             if not buf:
@@ -3066,9 +3072,12 @@ async def get_perf_stats(top: int = 10):
             p50 = sorted_buf[n // 2]
             p95_idx = min(n - 1, int(n * 0.95))
             p99_idx = min(n - 1, int(n * 0.99))
+            ep_errors = errors_by_key.get(key, 0)
             endpoints.append({
                 "endpoint": key,
                 "n_calls": n,
+                "n_errors": ep_errors,
+                "error_rate_pct": round(ep_errors / n * 100, 2) if n > 0 else 0.0,
                 "avg_ms": round(avg, 2),
                 "min_ms": round(sorted_buf[0], 2),
                 "max_ms": round(sorted_buf[-1], 2),
@@ -3095,6 +3104,7 @@ async def reset_perf_stats():
         _PERF_BUFFER.clear()
         _PERF_TOTAL = 0
         _PERF_ERRORS = 0
+        _PERF_ERRORS_BY_KEY.clear()
     return {"reset": True}
 
 

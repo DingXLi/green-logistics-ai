@@ -118,6 +118,8 @@ check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats"
 check_endpoint "/api/admin/db-info" 200 GET "/api/admin/db-info"
 check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance"
 check_endpoint "/api/admin/perf-stats" 200 GET "/api/admin/perf-stats"
+# iter #27: per-endpoint error tracking field
+check_json_field "/api/admin/perf-stats has total_errors field" GET "/api/admin/perf-stats" ".total_errors" "0"
 check_endpoint "/api/admin/llm-stats" 200 GET "/api/admin/llm-stats?recent=5"
 check_endpoint "/api/admin/db-export" 200 GET "/api/admin/db-export?table=cycles"
 check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table=cycles&fmt=ndjson"
