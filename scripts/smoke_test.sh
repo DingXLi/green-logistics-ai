@@ -137,6 +137,13 @@ check_endpoint "/api/persistence/forecast" 200 GET "/api/persistence/forecast?ho
 check_endpoint "/api/persistence/forecast?metrics=cost_sek" 200 GET "/api/persistence/forecast?metrics=cost_sek&horizon=3"
 check_endpoint "/api/persistence/forecast invalid horizon" 400 GET "/api/persistence/forecast?horizon=0"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
+# iter #27: parquet exports (consistency with /admin/db-export)
+check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
+check_endpoint "/api/persistence/export/supplies.parquet" 200 GET "/api/persistence/export/supplies.parquet?limit=10"
+check_endpoint "/api/persistence/export/matches.parquet" 200 GET "/api/persistence/export/matches.parquet?limit=10"
+check_endpoint "/api/persistence/export/routes.parquet" 200 GET "/api/persistence/export/routes.parquet?limit=10"
+# iter #27: WS origin allowlist metadata
+check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats"
 
 # ---- Optimization endpoints ----
 check_endpoint "/api/optimize/last" 200 GET "/api/optimize/last"
