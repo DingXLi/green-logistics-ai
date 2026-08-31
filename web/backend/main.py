@@ -2489,6 +2489,29 @@ def _build_parquet_response(rows: List[Dict[str, Any]], table: str, limit: int):
     )
 
 
+def _build_json_response(rows: List[Dict[str, Any]], table: str, limit: int):
+    """iter #27: list of dicts → JSON response (pretty-printed array)."""
+    filename = f"green_logistics_{table}_{limit}.json"
+    return JSONResponse(
+        content=rows,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _build_ndjson_response(rows: List[Dict[str, Any]], table: str, limit: int):
+    """iter #27: list of dicts → NDJSON (line-delimited JSON)."""
+    ndjson_str = "\n".join(json.dumps(r, default=str) for r in rows)
+    filename = f"green_logistics_{table}_{limit}.ndjson"
+    return FastAPIResponse(
+        content=ndjson_str,
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ============================================
+# iter #27: Parquet endpoints (4)
+# ============================================
 @app.get("/api/persistence/export/cycles.parquet")
 async def export_cycles_parquet(limit: int = 1000):
     """Export cycles as Apache Parquet (iter #27)。"""
@@ -2527,6 +2550,89 @@ async def export_routes_parquet(limit: int = 10000):
     limit = max(1, min(50000, limit))
     rows = coordinator.persistence.export_routes_rows(limit=limit)
     return _build_parquet_response(rows, "routes", limit)
+
+
+# ============================================
+# iter #27: JSON + NDJSON endpoints (4 + 4 = 8)
+# ============================================
+@app.get("/api/persistence/export/cycles.json")
+async def export_cycles_json(limit: int = 1000):
+    """Export cycles as pretty JSON array (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(10000, limit))
+    rows = coordinator.persistence.export_cycles_rows(limit=limit)
+    return _build_json_response(rows, "cycles", limit)
+
+
+@app.get("/api/persistence/export/supplies.json")
+async def export_supplies_json(limit: int = 10000):
+    """Export supply_offers as pretty JSON array (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_supplies_rows(limit=limit)
+    return _build_json_response(rows, "supplies", limit)
+
+
+@app.get("/api/persistence/export/matches.json")
+async def export_matches_json(limit: int = 10000):
+    """Export matches as pretty JSON array (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_matches_rows(limit=limit)
+    return _build_json_response(rows, "matches", limit)
+
+
+@app.get("/api/persistence/export/routes.json")
+async def export_routes_json(limit: int = 10000):
+    """Export routes as pretty JSON array (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_routes_rows(limit=limit)
+    return _build_json_response(rows, "routes", limit)
+
+
+@app.get("/api/persistence/export/cycles.ndjson")
+async def export_cycles_ndjson(limit: int = 1000):
+    """Export cycles as NDJSON (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(10000, limit))
+    rows = coordinator.persistence.export_cycles_rows(limit=limit)
+    return _build_ndjson_response(rows, "cycles", limit)
+
+
+@app.get("/api/persistence/export/supplies.ndjson")
+async def export_supplies_ndjson(limit: int = 10000):
+    """Export supply_offers as NDJSON (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_supplies_rows(limit=limit)
+    return _build_ndjson_response(rows, "supplies", limit)
+
+
+@app.get("/api/persistence/export/matches.ndjson")
+async def export_matches_ndjson(limit: int = 10000):
+    """Export matches as NDJSON (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_matches_rows(limit=limit)
+    return _build_ndjson_response(rows, "matches", limit)
+
+
+@app.get("/api/persistence/export/routes.ndjson")
+async def export_routes_ndjson(limit: int = 10000):
+    """Export routes as NDJSON (iter #27)."""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_routes_rows(limit=limit)
+    return _build_ndjson_response(rows, "routes", limit)
 
 
 @app.get("/api/persistence/match-distance-stats")

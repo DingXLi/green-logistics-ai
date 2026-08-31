@@ -142,6 +142,15 @@ check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistenc
 check_endpoint "/api/persistence/export/supplies.parquet" 200 GET "/api/persistence/export/supplies.parquet?limit=10"
 check_endpoint "/api/persistence/export/matches.parquet" 200 GET "/api/persistence/export/matches.parquet?limit=10"
 check_endpoint "/api/persistence/export/routes.parquet" 200 GET "/api/persistence/export/routes.parquet?limit=10"
+# iter #27: json + ndjson (consistency)
+check_endpoint "/api/persistence/export/cycles.json" 200 GET "/api/persistence/export/cycles.json?limit=10"
+check_endpoint "/api/persistence/export/supplies.json" 200 GET "/api/persistence/export/supplies.json?limit=10"
+check_endpoint "/api/persistence/export/matches.json" 200 GET "/api/persistence/export/matches.json?limit=10"
+check_endpoint "/api/persistence/export/routes.json" 200 GET "/api/persistence/export/routes.json?limit=10"
+check_endpoint "/api/persistence/export/cycles.ndjson" 200 GET "/api/persistence/export/cycles.ndjson?limit=10"
+check_endpoint "/api/persistence/export/supplies.ndjson" 200 GET "/api/persistence/export/supplies.ndjson?limit=10"
+check_endpoint "/api/persistence/export/matches.ndjson" 200 GET "/api/persistence/export/matches.ndjson?limit=10"
+check_endpoint "/api/persistence/export/routes.ndjson" 200 GET "/api/persistence/export/routes.ndjson?limit=10"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats"
 
