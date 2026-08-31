@@ -186,6 +186,10 @@ check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
 check_endpoint "/api/persistence/llm-cost-timeseries" 200 GET "/api/persistence/llm-cost-timeseries"
 check_endpoint "/api/persistence/llm-cost-timeseries?since_sim_day=0" 200 GET "/api/persistence/llm-cost-timeseries?since_sim_day=0"
 check_endpoint "/api/persistence/llm-cost-timeseries invalid range" 400 GET "/api/persistence/llm-cost-timeseries?since_sim_day=10&until_sim_day=5"
+# iter #29: LLM cost forecast
+check_endpoint "/api/persistence/llm-cost-forecast" 200 GET "/api/persistence/llm-cost-forecast?horizon=3"
+check_endpoint "/api/persistence/llm-cost-forecast method=ma" 200 GET "/api/persistence/llm-cost-forecast?horizon=3&method=moving_average"
+check_endpoint "/api/persistence/llm-cost-forecast invalid method" 400 GET "/api/persistence/llm-cost-forecast?horizon=3&method=invalid"
 
 # ---- JSON field validation (use python instead of jq for portability) ----
 check_python_field() {
