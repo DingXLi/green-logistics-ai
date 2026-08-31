@@ -2237,6 +2237,61 @@ async def get_llm_cost_timeseries(
     }
 
 
+@app.get("/api/persistence/llm-cost-forecast")
+async def get_llm_cost_forecast(
+    horizon: int = 7,
+    history_n: int = 14,
+    method: str = "linear",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    LLM usage/cost forecast (iter #29) — 预测未来 LLM decisions。
+
+    预测 5 个 usage 指标: n_decisions / llm_n / fallback_n /
+    avg_multiplier / avg_confidence。精确 cost_usd 仍以 /api/admin/llm-stats 为准。
+
+    Query:
+    - horizon: 预测未来多少 sim_day (default 7, range 1-30)
+    - history_n: 历史 sim_day 数 (default 14, range 2-90)
+    - method: linear / moving_average / exponential_smoothing
+    - since_sim_day / until_sim_day: 过滤历史窗口
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if horizon < 1 or horizon > 30:
+        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
+    if history_n < 2 or history_n > 90:
+        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+    valid_methods = ("linear", "moving_average", "exponential_smoothing")
+    if method not in valid_methods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method!r}, valid: {list(valid_methods)}",
+        )
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    if until_sim_day is not None and until_sim_day < 0:
+        raise HTTPException(status_code=400, detail="until_sim_day must be >= 0")
+    if since_sim_day is not None and until_sim_day is not None and since_sim_day > until_sim_day:
+        raise HTTPException(
+            status_code=400,
+            detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+        )
+    try:
+        return coordinator.persistence.forecast_llm_cost(
+            horizon=horizon,
+            history_n=history_n,
+            method=method,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+        )
+    except ImportError as e:
+        raise HTTPException(status_code=501, detail=f"LLM cost forecast requires numpy: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/forecast")
 async def get_forecast(
     horizon: int = 7,

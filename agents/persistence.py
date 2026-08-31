@@ -547,6 +547,96 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def forecast_llm_cost(
+        self,
+        horizon: int = 7,
+        history_n: int = 14,
+        method: str = "linear",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """iter #29: 预测 LLM usage/cost 时间序列。
+
+        预测 5 个字段: n_decisions, llm_n, fallback_n,
+        avg_multiplier, avg_confidence. 使用与 KPI forecast 相同的
+        linear / moving_average / exponential_smoothing 方法。
+
+        Note: 这是 usage forecast, 不是美元 cost forecast。精确 cost 仍以
+        /api/admin/llm-stats 的 total_cost_usd 为准。
+        """
+        if horizon < 1 or horizon > 30:
+            raise ValueError(f"horizon must be 1-30, got {horizon}")
+        if history_n < 2 or history_n > 90:
+            raise ValueError(f"history_n must be 2-90, got {history_n}")
+        rows = self.get_llm_cost_timeseries(
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+        )
+        if len(rows) < 2:
+            return {
+                "horizon": horizon,
+                "history_n": history_n,
+                "method": method,
+                "last_sim_day": rows[-1]["sim_day"] if rows else None,
+                "forecast_sim_days": [],
+                "metrics": {},
+                "note": "need at least 2 historical sim_days for LLM cost forecast",
+            }
+
+        try:
+            import numpy as np
+        except ImportError as e:
+            raise ImportError("numpy required for LLM cost forecast") from e
+
+        history = rows[-history_n:]
+        sim_days = np.array([r["sim_day"] for r in history], dtype=float)
+        forecast_sim_days = list(range(int(sim_days[-1]) + 1, int(sim_days[-1]) + horizon + 1))
+        valid_methods = ("linear", "moving_average", "exponential_smoothing")
+        if method not in valid_methods:
+            raise ValueError(f"method must be one of {valid_methods}, got {method!r}")
+
+        metric_names = ("n_decisions", "llm_n", "fallback_n", "avg_multiplier", "avg_confidence")
+        metrics: Dict[str, Any] = {}
+        for metric_name in metric_names:
+            values = np.array([r.get(metric_name, 0) or 0 for r in history], dtype=float)
+            if method == "linear":
+                fit = self._fit_linear(sim_days, values)
+            elif method == "moving_average":
+                fit = self._fit_moving_average(sim_days, values)
+            else:
+                fit = self._fit_exponential_smoothing(sim_days, values)
+            forecast_values = fit["forecast_values_fn"](np.array(forecast_sim_days, dtype=float))
+            forecast = []
+            for sim_day, value in zip(forecast_sim_days, forecast_values):
+                ci_half = fit["ci_half"]
+                forecast.append({
+                    "sim_day": sim_day,
+                    "value": round(float(value), 2),
+                    "lower_95": round(float(value) - ci_half, 2),
+                    "upper_95": round(float(value) + ci_half, 2),
+                    "is_forecast": True,
+                })
+            metrics[metric_name] = {
+                "history": [{"sim_day": r["sim_day"], "value": r.get(metric_name, 0) or 0,
+                             "is_forecast": False} for r in history],
+                "forecast": forecast,
+                "trend": fit["trend"],
+                "method": method,
+                "r_squared": round(fit["r_squared"], 4),
+                "residual_std": round(fit["residual_std"], 2),
+                "mean_value": round(float(np.mean(values)), 2),
+                **fit["method_meta"],
+            }
+
+        return {
+            "horizon": horizon,
+            "history_n": history_n,
+            "method": method,
+            "last_sim_day": int(sim_days[-1]),
+            "forecast_sim_days": forecast_sim_days,
+            "metrics": metrics,
+        }
+
     # ------------------------------------------------------------
     # 查询（论文 / dashboard 用）
     # ------------------------------------------------------------
