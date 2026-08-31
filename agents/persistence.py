@@ -1346,6 +1346,63 @@ class Persistence:
             writer.writerow(dict(r))
         return buf.getvalue()
 
+    # ============================================
+    # iter #27: Native row exports (for parquet / json / ndjson)
+    # 避免 CSV 解析 round-trip — 直接返 list of dicts
+    # ============================================
+    def export_cycles_rows(self, limit: int = 1000) -> List[Dict[str, Any]]:
+        """iter #27: 返回 cycles 行的 list of dicts (无 CSV parsing 开销)。"""
+        rows = self.get_cycle_history(limit=limit)
+        return [dict(r) for r in rows]
+
+    def export_supplies_rows(self, limit: int = 10000) -> List[Dict[str, Any]]:
+        """iter #27: 返回 supply_offers 行的 list of dicts。"""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT s.cycle_id, s.supply_id, s.material_type,
+                          s.location_lat, s.location_lon,
+                          s.available_tons, s.moisture_percent, s.quality_score,
+                          c.sim_day, c.sim_hour
+                   FROM supply_offers s
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                   ORDER BY c.sim_day DESC, s.supply_id
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def export_matches_rows(self, limit: int = 10000) -> List[Dict[str, Any]]:
+        """iter #27: 返回 matches 行的 list of dicts。"""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT m.cycle_id, m.supply_id, m.demand_id, m.material_type,
+                          m.tons, m.distance_km, m.estimated_profit_sek,
+                          c.sim_day
+                   FROM matches m
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                   ORDER BY c.sim_day DESC, m.id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def export_routes_rows(self, limit: int = 10000) -> List[Dict[str, Any]]:
+        """iter #27: 返回 routes 行的 list of dicts。"""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT r.cycle_id, r.vehicle_id,
+                          r.distance_km, r.duration_hours,
+                          r.cost_sek, r.co2_kg,
+                          COALESCE(json_array_length(r.stops_json), 0) AS stops_count,
+                          c.sim_day
+                   FROM routes r
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                   ORDER BY c.sim_day DESC, r.id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def get_match_distance_stats(self) -> Dict[str, Any]:
         """
         Match 距离统计 (iter #15) — 从 matches 表聚合 distance_km 指标。

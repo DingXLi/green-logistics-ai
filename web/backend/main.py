@@ -2459,6 +2459,76 @@ async def export_routes_csv(limit: int = 10000, include_metadata: bool = True):
     )
 
 
+# ============================================
+# iter #27: Parquet format for /api/persistence/export/*
+# 复用 _rows_to_parquet_bytes helper (iter #23)
+# 新增: 4 个 parquet endpoint + 4 个 json endpoint (consistency)
+# ============================================
+def _build_parquet_response(rows: List[Dict[str, Any]], table: str, limit: int):
+    """Common helper: list of dicts → parquet binary response.
+    Returns 501 if pyarrow not installed; 500 with detail on serialization error.
+    """
+    try:
+        parquet_bytes = _rows_to_parquet_bytes(rows)
+    except ImportError as e:
+        raise HTTPException(
+            status_code=501,
+            detail=f"Parquet export requires pyarrow. Install: pip install pyarrow>=15.0.0 ({e})",
+        )
+    except Exception as e:
+        logger.error(f"Parquet serialization failed for {table}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Parquet serialization failed: {type(e).__name__}: {str(e)[:200]}",
+        )
+    filename = f"green_logistics_{table}_{limit}.parquet"
+    return FastAPIResponse(
+        content=parquet_bytes,
+        media_type=PARQUET_MIMETYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/persistence/export/cycles.parquet")
+async def export_cycles_parquet(limit: int = 1000):
+    """Export cycles as Apache Parquet (iter #27)。"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(10000, limit))
+    rows = coordinator.persistence.export_cycles_rows(limit=limit)
+    return _build_parquet_response(rows, "cycles", limit)
+
+
+@app.get("/api/persistence/export/supplies.parquet")
+async def export_supplies_parquet(limit: int = 10000):
+    """Export supply_offers as Apache Parquet (iter #27)。"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_supplies_rows(limit=limit)
+    return _build_parquet_response(rows, "supplies", limit)
+
+
+@app.get("/api/persistence/export/matches.parquet")
+async def export_matches_parquet(limit: int = 10000):
+    """Export matches as Apache Parquet (iter #27)。"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_matches_rows(limit=limit)
+    return _build_parquet_response(rows, "matches", limit)
+
+
+@app.get("/api/persistence/export/routes.parquet")
+async def export_routes_parquet(limit: int = 10000):
+    """Export routes as Apache Parquet (iter #27)。"""
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    rows = coordinator.persistence.export_routes_rows(limit=limit)
+    return _build_parquet_response(rows, "routes", limit)
+
+
 @app.get("/api/persistence/match-distance-stats")
 async def get_match_distance_stats():
     """
