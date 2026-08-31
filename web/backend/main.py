@@ -332,6 +332,39 @@ class WebSocketBroadcaster:
 ws_broadcaster = WebSocketBroadcaster()
 
 
+# ============================================
+# iter #27: WebSocket Origin 校验 (security)
+# ============================================
+# GL_WS_ALLOWED_ORIGINS: comma-separated origin allowlist
+#   e.g. "https://lidingx-green-logistics.hf.space,http://localhost:5173"
+# - Default empty string → all origins allowed (backward compatible for dev)
+# - Set on HF Space via env var to lock down production
+# - Browser WS clients always send Origin header; non-browser clients may not
+#   → if Origin absent → allow (backward compat); if Origin present + not in
+#     allowlist → reject with code 1008 (policy violation)
+_WS_ALLOWED_ORIGINS_RAW: str = os.environ.get("GL_WS_ALLOWED_ORIGINS", "")
+
+
+def _get_ws_allowed_origins() -> set:
+    """Return a fresh copy of the WS origin allowlist."""
+    return {o.strip() for o in _WS_ALLOWED_ORIGINS_RAW.split(",") if o.strip()}
+
+
+def is_ws_origin_allowed(origin: str | None) -> bool:
+    """
+    Check if a WS client's Origin is allowed.
+    - If allowlist empty → allow all (dev mode)
+    - If allowlist non-empty and origin absent → allow (non-browser clients)
+    - If allowlist non-empty and origin present → must be in allowlist
+    """
+    allowed = _get_ws_allowed_origins()
+    if not allowed:
+        return True
+    if not origin:
+        return True
+    return origin in allowed
+
+
 async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
     """Coordinator 跑完 cycle 后调用，广播给所有 WS client。"""
     # iter #7: 附带 running efficiency summary (cost/CO2 per ton),
@@ -1090,7 +1123,20 @@ async def ws_cycle_updates(ws: WebSocket):
 
     客户端连接后保持心跳 (server 主动 ping 10s 间隔)。
     断连 / 异常都会被清理。
+
+    iter #27: Origin 校验 — 如果设置了 GL_WS_ALLOWED_ORIGINS env var,
+    只接受 allowlist 里的 origin (防止任意网页连进来打 WebSocket)。
     """
+    # iter #27: Origin 校验
+    client_origin = ws.headers.get("origin")
+    if not is_ws_origin_allowed(client_origin):
+        logger.warning(
+            f"WS rejected: origin={client_origin!r} not in allowlist "
+            f"(allowed={_get_ws_allowed_origins()})"
+        )
+        # code=1008 = policy violation
+        await ws.close(code=1008, reason="Origin not allowed")
+        return
     await ws_broadcaster.connect(ws)
     try:
         # 连接建立后立即推送一条 hello + 当前状态
@@ -1134,7 +1180,14 @@ async def ws_cycle_updates(ws: WebSocket):
 @app.get("/api/ws/stats")
 async def ws_stats():
     """WebSocket 连接统计 (调试用)。"""
-    return ws_broadcaster.stats()
+    stats = ws_broadcaster.stats()
+    # iter #27: also expose origin allowlist info (for debug)
+    allowed = _get_ws_allowed_origins()
+    stats["origin_allowlist_active"] = bool(allowed)
+    stats["origin_allowlist_size"] = len(allowed)
+    if allowed:
+        stats["origin_allowlist_sample"] = sorted(allowed)[:5]
+    return stats
 
 
 @app.get("/api/debug/llm")
