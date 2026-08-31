@@ -2271,6 +2271,148 @@ async def get_forecast(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/forecast/multi")
+async def get_forecast_multi(
+    horizon: int = 7,
+    history_n: int = 14,
+    metrics: Optional[str] = None,
+    methods: Optional[str] = None,
+):
+    """
+    KPI forecast comparison (iter #28) — 同时跑多个 method 返回 comparison。
+
+    用于前端图表叠加显示 (linear vs ma vs es), 让用户看不同方法的预测差别。
+
+    Query:
+    - horizon: 预测未来多少 sim_day (default 7, range 1-30)
+    - history_n: 用多少历史 sim_day 拟合 (default 14, range 2-90)
+    - metrics: 逗号分隔的 metric 列表 (default = cost_sek,co2_kg,util_pct,matches)
+    - methods: 逗号分隔的 method 列表 (default = linear,moving_average,exponential_smoothing)
+        可选: linear / moving_average / exponential_smoothing
+
+    Returns:
+        {
+          horizon, history_n, last_sim_day, forecast_sim_days,
+          methods: ["linear", "moving_average", "exponential_smoothing"],
+          comparison: {
+            "cost_sek": {
+              history: [...],
+              forecasts: {
+                "linear": [{sim_day, value, lower_95, upper_95, is_forecast: true}],
+                "moving_average": [...],
+                "exponential_smoothing": [...],
+              },
+              final_values: {linear: 120, ma: 100, es: 95},  // 最后一天的预测值
+              range_pct: {linear: 5.2, ma: 0.0, es: -1.2},  // 预测变化率 (%)
+            },
+            ...
+          }
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    if horizon < 1 or horizon > 30:
+        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
+    if history_n < 2 or history_n > 90:
+        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+
+    valid_methods_all = ("linear", "moving_average", "exponential_smoothing")
+    methods_list = list(valid_methods_all)
+    if methods:
+        methods_list = [m.strip() for m in methods.split(",") if m.strip()]
+        invalid = [m for m in methods_list if m not in valid_methods_all]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid methods: {invalid}, valid: {list(valid_methods_all)}",
+            )
+
+    metrics_list = None
+    if metrics:
+        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
+        invalid = [m for m in metrics_list if m not in valid_metrics]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
+            )
+
+    try:
+        # Run each method
+        per_method_results: Dict[str, Dict[str, Any]] = {}
+        last_sim_day = None
+        forecast_sim_days: List[int] = []
+        for method in methods_list:
+            r = coordinator.persistence.forecast_next_n_sim_days(
+                horizon=horizon,
+                history_n=history_n,
+                metrics=metrics_list,
+                method=method,
+            )
+            per_method_results[method] = r
+            last_sim_day = r.get("last_sim_day", last_sim_day)
+            forecast_sim_days = r.get("forecast_sim_days", forecast_sim_days)
+
+        # Build comparison structure
+        # Use first method's metric keys as canonical
+        if not per_method_results:
+            return {
+                "horizon": horizon,
+                "history_n": history_n,
+                "methods": [],
+                "last_sim_day": last_sim_day,
+                "forecast_sim_days": forecast_sim_days,
+                "comparison": {},
+            }
+        first_method = methods_list[0]
+        first_result = per_method_results[first_method]
+        metric_keys = list(first_result.get("metrics", {}).keys())
+
+        comparison: Dict[str, Any] = {}
+        for metric in metric_keys:
+            forecasts_per_method: Dict[str, List[Dict[str, Any]]] = {}
+            history_out = []
+            for method in methods_list:
+                metric_data = per_method_results[method]["metrics"].get(metric, {})
+                if not history_out and metric_data.get("history"):
+                    history_out = metric_data["history"]
+                forecasts_per_method[method] = metric_data.get("forecast", [])
+
+            # Compute final values + change %
+            final_values: Dict[str, float] = {}
+            range_pct: Dict[str, float] = {}
+            mean_history = first_result["metrics"][metric].get("mean_value", 0.0)
+            for method, fc_list in forecasts_per_method.items():
+                if not fc_list:
+                    continue
+                last = fc_list[-1]["value"]
+                final_values[method] = last
+                if mean_history and mean_history != 0:
+                    range_pct[method] = round((last - mean_history) / mean_history * 100, 2)
+
+            comparison[metric] = {
+                "history": history_out,
+                "forecasts": forecasts_per_method,
+                "final_values": final_values,
+                "change_from_mean_pct": range_pct,
+            }
+
+        return {
+            "horizon": horizon,
+            "history_n": history_n,
+            "methods": methods_list,
+            "last_sim_day": last_sim_day,
+            "forecast_sim_days": forecast_sim_days,
+            "comparison": comparison,
+        }
+    except ImportError as e:
+        raise HTTPException(status_code=501, detail=f"Forecast requires numpy: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/summary")
 async def get_persistence_summary():
     """全局统计汇总"""

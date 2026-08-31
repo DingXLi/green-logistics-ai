@@ -148,6 +148,10 @@ check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 20
 check_endpoint "/api/persistence/forecast" 200 GET "/api/persistence/forecast?horizon=7&history_n=14"
 check_endpoint "/api/persistence/forecast?metrics=cost_sek" 200 GET "/api/persistence/forecast?metrics=cost_sek&horizon=3"
 check_endpoint "/api/persistence/forecast invalid horizon" 400 GET "/api/persistence/forecast?horizon=0"
+# iter #28: multi-method forecast endpoint
+check_endpoint "/api/persistence/forecast/multi" 200 GET "/api/persistence/forecast/multi?horizon=3"
+check_endpoint "/api/persistence/forecast/multi?methods=linear" 200 GET "/api/persistence/forecast/multi?horizon=3&methods=linear"
+check_endpoint "/api/persistence/forecast/multi invalid methods" 400 GET "/api/persistence/forecast/multi?horizon=3&methods=invalid"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
