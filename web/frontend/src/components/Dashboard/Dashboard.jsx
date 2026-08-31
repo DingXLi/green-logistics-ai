@@ -48,6 +48,8 @@ const PerfStats = lazy(() => import('./PerfStats').then(m => ({ default: m.PerfS
 const LLMStats = lazy(() => import('./LLMStats').then(m => ({ default: m.LLMStats })))
 // iter #23: DB export menu (CSV / JSON / NDJSON / Parquet)
 const ExportButton = lazy(() => import('./ExportButton').then(m => ({ default: m.ExportButton })))
+// iter #26: KPI forecast (linear regression on history)
+const ForecastPanel = lazy(() => import('./ForecastPanel').then(m => ({ default: m.ForecastPanel })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 
@@ -616,6 +618,10 @@ export default function Dashboard() {
           {/* iter #20: Cohort retention by period (trend) */}
           <Suspense fallback={<LoadingSpinner label="Loading cohort retention…" />}>
             <CohortRetentionByPeriod />
+          </Suspense>
+          {/* iter #26: KPI forecast (next N days prediction) */}
+          <Suspense fallback={<LoadingSpinner label="Loading forecast…" />}>
+            <ForecastPanel />
           </Suspense>
         </>
       )}
