@@ -2198,11 +2198,12 @@ async def get_forecast(
     horizon: int = 7,
     history_n: int = 14,
     metrics: Optional[str] = None,
+    method: str = "linear",
 ):
     """
-    KPI forecast (iter #26) — 线性回归预测未来 N 个 sim_day。
+    KPI forecast (iter #26 + iter #28) — 预测未来 N 个 sim_day。
 
-    对每个 metric 用最近 history_n 个 sim_day 拟合线性回归, 预测 horizon 个未来 sim_day。
+    对每个 metric 用最近 history_n 个 sim_day 拟合, 预测 horizon 个未来 sim_day。
     返回 95% confidence interval + trend + R²。
 
     Query:
@@ -2210,16 +2211,22 @@ async def get_forecast(
     - history_n: 用多少历史 sim_day 拟合 (default 14, range 2-90)
     - metrics: 逗号分隔的 metric 列表 (default = cost_sek,co2_kg,util_pct,matches)
         可选: cost_sek / co2_kg / util_pct / matches
+    - method (iter #28): 预测方法 (default = linear)
+        - linear: 线性回归 (适合趋势性数据)
+        - moving_average: 全期均值 (适合平稳数据)
+        - exponential_smoothing: 指数平滑 alpha=0.3 (近期值更重要)
 
     Returns:
         {
-          horizon, history_n, last_sim_day, forecast_sim_days,
+          horizon, history_n, method, last_sim_day, forecast_sim_days,
           metrics: {
             "cost_sek": {
               history: [{sim_day, value, is_forecast: false}, ...],
               forecast: [{sim_day, value, is_forecast: true, lower_95, upper_95}, ...],
               trend: "up" | "down" | "flat",
+              method: "linear" | "moving_average" | "exponential_smoothing",
               slope_per_day, r_squared, residual_std, mean_value,
+              method_meta: {intercept} / {window_mean, window_n} / {alpha, final_level}
             },
             ...
           }
@@ -2232,6 +2239,13 @@ async def get_forecast(
         raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
     if history_n < 2 or history_n > 90:
         raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+
+    valid_methods = ("linear", "moving_average", "exponential_smoothing")
+    if method not in valid_methods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method!r}, valid: {list(valid_methods)}",
+        )
 
     metrics_list = None
     if metrics:
@@ -2249,6 +2263,7 @@ async def get_forecast(
             horizon=horizon,
             history_n=history_n,
             metrics=metrics_list,
+            method=method,
         )
     except ImportError as e:
         raise HTTPException(status_code=501, detail=f"Forecast requires numpy: {e}")

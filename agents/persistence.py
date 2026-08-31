@@ -655,15 +655,15 @@ class Persistence:
         horizon: int = 7,
         history_n: int = 14,
         metrics: Optional[List[str]] = None,
+        method: str = "linear",
     ) -> Dict[str, Any]:
         """
-        Predict future KPI trends using linear regression on history (iter #26).
+        Predict future KPI trends using linear regression on history (iter #26 + iter #28).
 
-        给一个 horizon (默认 7 sim_days), 对每个 metric 跑线性回归:
-        - 用最近 history_n 个 sim_days 的历史 (默认 14)
-        - 拟合: y = slope * sim_day + intercept
-        - 预测未来 horizon 个 sim_day 的值
-        - 95% confidence interval (mean ± 1.96 * residual_std)
+        给一个 horizon (默认 7 sim_days), 对每个 metric 用选定 method 拟合:
+        - "linear" (default): y = slope * sim_day + intercept (iter #26)
+        - "moving_average": 未来 horizon 步都 = last_window_mean (简单平滑)
+        - "exponential_smoothing": alpha-weighted, future = smoothed value (iter #28)
 
         Args:
             horizon: 预测未来多少个 sim_day (default 7, max 30)
@@ -673,6 +673,10 @@ class Persistence:
                 - "co2_kg" (总 CO2 kg)
                 - "util_pct" (车队利用率 %)
                 - "matches" (总匹配数)
+            method (iter #28): "linear" / "moving_average" / "exponential_smoothing"
+                - linear: 拟合直线, 适合趋势性数据
+                - moving_average: 简单平滑, 适合无趋势噪响数据
+                - exponential_smoothing: 加权平滑, 适合近期更重要的数据
 
         Returns:
             {
@@ -738,37 +742,34 @@ class Persistence:
         forecast_sim_days = list(range(last_sim_day + 1, last_sim_day + horizon + 1))
         forecast_x = np.array(forecast_sim_days, dtype=float)
 
-        # iter #26: for each metric, fit linear regression + forecast
+        # iter #28: dispatch on method
+        valid_methods = ("linear", "moving_average", "exponential_smoothing")
+        if method not in valid_methods:
+            raise ValueError(
+                f"method must be one of {valid_methods}, got {method!r}"
+            )
+
+        # iter #26: for each metric, fit + forecast
         result_metrics = {}
         for metric in metrics:
             if metric not in ("cost_sek", "co2_kg", "util_pct", "matches"):
                 continue
             values = np.array([r.get(metric, 0) or 0 for r in history], dtype=float)
 
-            # Linear regression: y = slope * x + intercept
-            slope, intercept = np.polyfit(sim_days, values, 1)
+            # iter #28: dispatch to method-specific fitter
+            if method == "linear":
+                fit = self._fit_linear(sim_days, values)
+            elif method == "moving_average":
+                fit = self._fit_moving_average(sim_days, values)
+            else:  # exponential_smoothing
+                fit = self._fit_exponential_smoothing(sim_days, values)
 
-            # Compute R² (拟合优度)
-            y_pred_hist = slope * sim_days + intercept
-            ss_res = float(np.sum((values - y_pred_hist) ** 2))
-            ss_tot = float(np.sum((values - np.mean(values)) ** 2))
-            r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 1.0
-
-            # Compute residual std (for confidence interval)
-            residuals = values - y_pred_hist
-            residual_std = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else 0.0
-            # 95% CI: ±1.96 * std
-            ci_half = 1.96 * residual_std
-
-            # Determine trend
-            # use 1-week (7 day) projected change as threshold
-            week_change = slope * 7
-            if abs(week_change) < 0.05 * abs(intercept) if intercept else abs(week_change) < 1:
-                trend = "flat"
-            elif week_change > 0:
-                trend = "up"
-            else:
-                trend = "down"
+            slope = fit["slope"]
+            forecast_values = fit["forecast_values_fn"](forecast_x)
+            ci_half = fit["ci_half"]
+            r_squared = fit["r_squared"]
+            trend = fit["trend"]
+            method_meta = fit["method_meta"]
 
             # Build history output (with is_forecast flag for consistency)
             history_out = [
@@ -781,7 +782,6 @@ class Persistence:
             ]
 
             # Build forecast output
-            forecast_values = slope * forecast_x + intercept
             forecast_out = []
             for i, sd in enumerate(forecast_sim_days):
                 val = float(forecast_values[i])
@@ -797,18 +797,109 @@ class Persistence:
                 "history": history_out,
                 "forecast": forecast_out,
                 "trend": trend,
+                "method": method,
                 "slope_per_day": round(float(slope), 4),
                 "r_squared": round(r_squared, 4),
-                "residual_std": round(residual_std, 2),
+                "residual_std": round(fit["residual_std"], 2),
                 "mean_value": round(float(np.mean(values)), 2),
+                **method_meta,
             }
 
         return {
             "horizon": horizon,
             "history_n": history_n,
+            "method": method,
             "last_sim_day": last_sim_day,
             "forecast_sim_days": forecast_sim_days,
             "metrics": result_metrics,
+        }
+
+    # ============================================
+    # iter #28: forecast method fitters
+    # Each returns: {slope, forecast_values_fn, ci_half, r_squared,
+    #                trend, residual_std, method_meta}
+    # ============================================
+    def _fit_linear(self, sim_days, values):
+        """Linear regression (iter #26 default). y = slope * x + intercept."""
+        import numpy as np
+        slope, intercept = np.polyfit(sim_days, values, 1)
+        # Compute R²
+        y_pred_hist = slope * sim_days + intercept
+        ss_res = float(np.sum((values - y_pred_hist) ** 2))
+        ss_tot = float(np.sum((values - np.mean(values)) ** 2))
+        r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 1.0
+        # Residual std
+        residuals = values - y_pred_hist
+        residual_std = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else 0.0
+        ci_half = 1.96 * residual_std
+        # Trend
+        week_change = slope * 7
+        if abs(week_change) < 0.05 * abs(intercept) if intercept else abs(week_change) < 1:
+            trend = "flat"
+        elif week_change > 0:
+            trend = "up"
+        else:
+            trend = "down"
+        return {
+            "slope": float(slope),
+            "forecast_values_fn": lambda x: slope * x + intercept,
+            "ci_half": ci_half,
+            "r_squared": r_squared,
+            "trend": trend,
+            "residual_std": residual_std,
+            "method_meta": {"intercept": round(float(intercept), 4)},
+        }
+
+    def _fit_moving_average(self, sim_days, values):
+        """Moving average (iter #28). Forecast = mean of all values, flat line."""
+        import numpy as np
+        window_mean = float(np.mean(values))
+        window_std = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+        ci_half = 1.96 * window_std
+        # No trend (flat) by definition
+        return {
+            "slope": 0.0,
+            "forecast_values_fn": lambda x: np.full_like(x, window_mean, dtype=float),
+            "ci_half": ci_half,
+            "r_squared": 0.0,  # Not applicable for moving average
+            "trend": "flat",
+            "residual_std": window_std,
+            "method_meta": {"window_mean": round(window_mean, 2), "window_n": int(len(values))},
+        }
+
+    def _fit_exponential_smoothing(self, sim_days, values):
+        """Exponential smoothing (iter #28, simple SES, alpha=0.3).
+
+        forecast = final smoothed level (constant for all future points)
+        适合近期值更重要 / 不需趋势外推 的场景
+        """
+        import numpy as np
+        alpha = 0.3  # smoothing constant (0-1, 越小越平滑)
+        # Compute SES for history
+        n = len(values)
+        if n == 0:
+            smoothed_levels = np.array([0.0])
+        else:
+            smoothed_levels = np.zeros(n)
+            smoothed_levels[0] = float(values[0])
+            for i in range(1, n):
+                smoothed_levels[i] = alpha * float(values[i]) + (1 - alpha) * smoothed_levels[i - 1]
+        final_level = float(smoothed_levels[-1])
+        # Residual std based on one-step-ahead errors
+        one_step_errors = []
+        for i in range(1, n):
+            pred = smoothed_levels[i - 1]
+            one_step_errors.append(float(values[i]) - pred)
+        residual_std = float(np.std(one_step_errors, ddof=1)) if len(one_step_errors) > 1 else 0.0
+        ci_half = 1.96 * residual_std
+        return {
+            "slope": 0.0,
+            "forecast_values_fn": lambda x: np.full_like(x, final_level, dtype=float),
+            "ci_half": ci_half,
+            "r_squared": 0.0,
+            "trend": "flat",
+            "residual_std": residual_std,
+            "method_meta": {"alpha": alpha, "final_level": round(final_level, 2)},
         }
 
     def get_summary(self) -> Dict[str, Any]:
