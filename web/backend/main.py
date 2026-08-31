@@ -281,11 +281,17 @@ class WebSocketBroadcaster:
     - broadcast() 是 fire-and-forget (asyncio.gather return_exceptions=True)
       发送失败会被下一轮 try/except 接住，不影响业务逻辑
     - Connected client 列表是动态的 (心跳 / 断开会自动清理)
+    - iter #27: 跟踪 broadcast 统计 (总数 / 成功 / 失败 / 上次时间)
     """
 
     def __init__(self) -> None:
         self._clients: Set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        # iter #27: broadcast statistics
+        self._total_broadcasts: int = 0  # 调用 broadcast() 的总次数
+        self._total_sends: int = 0       # 总发送尝试 (per-client)
+        self._total_send_failures: int = 0  # 失败发送
+        self._last_broadcast_at: Optional[str] = None  # ISO timestamp
 
     async def connect(self, ws: WebSocket) -> None:
         await ws.accept()
@@ -306,6 +312,10 @@ class WebSocketBroadcaster:
         # snapshot + gather 避免 disconnect 时的 race
         async with self._lock:
             targets = list(self._clients)
+            # iter #27: track broadcast metadata
+            self._total_broadcasts += 1
+            self._total_sends += len(targets)
+            self._last_broadcast_at = datetime.now().isoformat()
         results = await asyncio.gather(
             *[self._safe_send(ws, msg) for ws in targets],
             return_exceptions=True,
@@ -317,6 +327,7 @@ class WebSocketBroadcaster:
                 dead.append(ws)
         if dead:
             async with self._lock:
+                self._total_send_failures += len(dead)
                 for ws in dead:
                     self._clients.discard(ws)
                 if dead:
@@ -330,7 +341,26 @@ class WebSocketBroadcaster:
             raise RuntimeError(f"send failed: {e}") from e
 
     def stats(self) -> Dict[str, Any]:
-        return {"connected_clients": len(self._clients)}
+        """iter #27: 详细的 broadcast 统计。"""
+        return {
+            "connected_clients": len(self._clients),
+            "total_broadcasts": self._total_broadcasts,
+            "total_sends": self._total_sends,
+            "total_send_failures": self._total_send_failures,
+            "success_rate_pct": (
+                round((self._total_sends - self._total_send_failures)
+                      / self._total_sends * 100, 2)
+                if self._total_sends > 0 else 100.0
+            ),
+            "last_broadcast_at": self._last_broadcast_at,
+        }
+
+    def reset_stats(self) -> None:
+        """iter #27: 重置 broadcast 统计 (测试 / 调试用)。"""
+        self._total_broadcasts = 0
+        self._total_sends = 0
+        self._total_send_failures = 0
+        self._last_broadcast_at = None
 
 
 ws_broadcaster = WebSocketBroadcaster()
@@ -1192,6 +1222,13 @@ async def ws_stats():
     if allowed:
         stats["origin_allowlist_sample"] = sorted(allowed)[:5]
     return stats
+
+
+@app.post("/api/ws/stats/reset")
+async def ws_stats_reset():
+    """iter #27: 重置 WebSocket broadcast 统计 (仅测试 / 调试用)。"""
+    ws_broadcaster.reset_stats()
+    return {"reset": True, "stats": ws_broadcaster.stats()}
 
 
 @app.get("/api/debug/llm")
