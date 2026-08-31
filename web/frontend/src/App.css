@@ -1066,6 +1066,21 @@ body {
 }
 
 /* ============================================
+   WS LLM cost badge (iter #29)
+   ============================================ */
+.ws-llm-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ============================================
    Monthly Efficiency Chart (iter #9)
    ============================================ */
 .seasonal-summary-grid {

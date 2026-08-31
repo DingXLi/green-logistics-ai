@@ -317,6 +317,8 @@ export default function Dashboard() {
   const [useRealRoads, setUseRealRoads] = useState(true)
   // iter #7: 从 WS 推送拿 efficiency summary (cost/CO2 per ton)
   const [wsEfficiency, setWsEfficiency] = useState(null)
+  // iter #29: 从 WS 推送拿 LLM usage/cost summary
+  const [wsLlm, setWsLlm] = useState(null)
   // iter #8: 从 WS 推送拿 fleet metrics (util, vehicles, distance)
   const [wsFleet, setWsFleet] = useState(null)
   // iter #25: URL query param ?tab=overview (deep linkable, shareable)
@@ -361,10 +363,11 @@ export default function Dashboard() {
 
   const fetchAll = useCallback(async () => {
     try {
-      // iter #12: 并行 fetch 减少为 2 个 (kpi-timeseries + pareto); summary 走 hook
-      const [tsRes, paretoRes] = await Promise.all([
+      // iter #12: 并行 fetch (kpi-timeseries + pareto + LLM stats)
+      const [tsRes, paretoRes, llmRes] = await Promise.all([
         fetch(`${API_BASE}/persistence/kpi-timeseries`),
         fetch(`${API_BASE}/optimize/pareto`).catch(() => null),
+        fetch(`${API_BASE}/admin/llm-stats?recent=1`).catch(() => null),
       ])
       const ts = await tsRes.json()
       let pa = []
@@ -374,6 +377,16 @@ export default function Dashboard() {
         setParetoMeta({
           distance_source: paData.distance_source || 'unknown',
           use_real_roads: paData.use_real_roads !== false,
+        })
+      }
+      if (llmRes && llmRes.ok) {
+        const llmData = await llmRes.json()
+        setWsLlm({
+          total_calls: llmData.total_calls || 0,
+          total_errors: llmData.total_errors || 0,
+          total_tokens: llmData.total_tokens || 0,
+          total_cost_usd: llmData.total_cost_usd || 0,
+          error_rate_pct: llmData.error_rate_pct || 0,
         })
       }
       setTimeseries(ts)
@@ -414,6 +427,10 @@ export default function Dashboard() {
       // iter #7: 直接用 WS 推送的 efficiency summary, 不需要额外 fetch
       if (msg.data?.efficiency) {
         setWsEfficiency(msg.data.efficiency)
+      }
+      // iter #29: WS 推送 LLM usage/cost
+      if (msg.data?.llm) {
+        setWsLlm(msg.data.llm)
       }
       // iter #8: WS 推送的 fleet metrics
       if (msg.data?.fleet) {
@@ -481,6 +498,12 @@ export default function Dashboard() {
               📊 {wsEfficiency.cost_per_ton_sek != null ? `${wsEfficiency.cost_per_ton_sek.toFixed(1)} SEK/t` : '—'}
               {' · '}
               {wsEfficiency.co2_per_ton_kg != null ? `${wsEfficiency.co2_per_ton_kg.toFixed(2)} kgCO₂/t` : '—'}
+            </span>
+          )}
+          {/* iter #29: WS 推送 LLM usage/cost */}
+          {wsLlm && wsLlm.total_calls > 0 && (
+            <span className="ws-llm-badge" title="Live LLM usage/cost from WebSocket">
+              🤖 {wsLlm.total_calls} calls · ${(wsLlm.total_cost_usd || 0).toFixed(4)} · {wsLlm.total_tokens.toLocaleString()} tok
             </span>
           )}
           {/* iter #8: WS 推送的 fleet metrics */}

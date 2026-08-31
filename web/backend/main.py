@@ -418,6 +418,22 @@ async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
     except Exception as e:
         logger.debug(f"WS broadcast efficiency summary failed (ignore): {e}")
 
+    # iter #29: 附带 LLM usage/cost summary (from in-memory LLMTracker)
+    # 精确 cost 看 /api/admin/llm-stats; WS 只传轻量 summary
+    llm_summary: Dict[str, Any] = {}
+    try:
+        from agents.llm_tracker import get_llm_tracker
+        llm_stats = get_llm_tracker().get_stats()
+        llm_summary = {
+            "total_calls": llm_stats.get("total_calls", 0),
+            "total_errors": llm_stats.get("total_errors", 0),
+            "total_tokens": llm_stats.get("total_tokens", 0),
+            "total_cost_usd": llm_stats.get("total_cost_usd", 0.0),
+            "error_rate_pct": llm_stats.get("error_rate_pct", 0.0),
+        }
+    except Exception as e:
+        logger.debug(f"WS broadcast LLM summary failed (ignore): {e}")
+
     # iter #8: 附带 fleet metrics (n_vehicles, util, distance_to_depot)
     # 让前端实时显示车队状态, 不需要额外 fetch /api/fleet
     fleet_metrics: Dict[str, Any] = {}
@@ -451,6 +467,7 @@ async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
             "sim_day": cycle_result.get("sim_day"),
             "sim_hour": cycle_result.get("sim_hour"),
             "efficiency": eff_summary,
+            "llm": llm_summary,
             "fleet": fleet_metrics,
             "distance_source": cycle_result.get("distance_source", "unknown"),
         },
