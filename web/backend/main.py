@@ -2387,6 +2387,143 @@ async def get_forecast(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/forecast-confidence")
+async def get_forecast_confidence(
+    horizon: int = 7,
+    history_n: int = 14,
+    metrics: Optional[str] = None,
+    methods: Optional[str] = None,
+):
+    """Forecast confidence/ensemble summary (iter #30).
+
+    Runs multiple forecast methods and returns:
+    - per-method predictions and quality scores
+    - ensemble mean + standard deviation + 95% interval
+    - dispersion_pct (higher = methods disagree)
+    - best_method (highest R² for linear / lowest residual_std otherwise)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if horizon < 1 or horizon > 30:
+        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
+    if history_n < 2 or history_n > 90:
+        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+
+    valid_methods_all = ("linear", "moving_average", "exponential_smoothing")
+    methods_list = list(valid_methods_all)
+    if methods:
+        methods_list = [m.strip() for m in methods.split(",") if m.strip()]
+        invalid = [m for m in methods_list if m not in valid_methods_all]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid methods: {invalid}, valid: {list(valid_methods_all)}",
+            )
+    metrics_list = None
+    if metrics:
+        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
+        invalid = [m for m in metrics_list if m not in valid_metrics]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
+            )
+
+    try:
+        method_results: Dict[str, Dict[str, Any]] = {}
+        for method in methods_list:
+            method_results[method] = coordinator.persistence.forecast_next_n_sim_days(
+                horizon=horizon,
+                history_n=history_n,
+                metrics=metrics_list,
+                method=method,
+            )
+        if not method_results:
+            return {"horizon": horizon, "history_n": history_n, "methods": [],
+                    "last_sim_day": None, "forecast_sim_days": [],
+                    "confidence": {}, "note": "no forecast methods requested"}
+
+        first_result = next(iter(method_results.values()))
+        metric_keys = list(first_result.get("metrics", {}).keys())
+        confidence: Dict[str, Any] = {}
+        for metric in metric_keys:
+            histories: List[List[Dict[str, Any]]] = [
+                result.get("metrics", {}).get(metric, {}).get("history", [])
+                for result in method_results.values()
+            ]
+            history: List[Dict[str, Any]] = next((h for h in histories if h), [])
+            forecast_by_method = {
+                method: result.get("metrics", {}).get(metric, {}).get("forecast", [])
+                for method, result in method_results.items()
+            }
+            sim_days = [p.get("sim_day") for p in next((v for v in forecast_by_method.values() if v), [])]
+            ensemble = []
+            per_method_quality = {}
+            for method, points in forecast_by_method.items():
+                metric_data = method_results[method].get("metrics", {}).get(metric, {})
+                r2 = metric_data.get("r_squared", 0.0)
+                residual = metric_data.get("residual_std", 0.0)
+                per_method_quality[method] = {
+                    "r_squared": r2,
+                    "residual_std": residual,
+                }
+            for i, sim_day in enumerate(sim_days):
+                values = []
+                for method in methods_list:
+                    points = forecast_by_method.get(method, [])
+                    if i < len(points) and points[i].get("value") is not None:
+                        values.append(float(points[i]["value"]))
+                if not values:
+                    continue
+                mean_value = sum(values) / len(values)
+                if len(values) > 1:
+                    std_value = (sum((v - mean_value) ** 2 for v in values) / (len(values) - 1)) ** 0.5
+                else:
+                    std_value = 0.0
+                ci_half = 1.96 * std_value
+                dispersion = (std_value / abs(mean_value) * 100) if mean_value else 0.0
+                ensemble.append({
+                    "sim_day": sim_day,
+                    "mean": round(mean_value, 2),
+                    "stddev": round(std_value, 2),
+                    "lower_95": round(mean_value - ci_half, 2),
+                    "upper_95": round(mean_value + ci_half, 2),
+                    "dispersion_pct": round(dispersion, 2),
+                    "n_methods": len(values),
+                })
+            # For non-linear methods, lower residual_std is the useful score; for
+            # linear, prefer R². Choose deterministically (method order on ties).
+            best_method = methods_list[0]
+            best_score = -float("inf")
+            for method in methods_list:
+                quality = per_method_quality.get(method, {})
+                score = quality.get("r_squared", 0.0) if method == "linear" else -quality.get("residual_std", float("inf"))
+                if score > best_score:
+                    best_method = method
+                    best_score = score
+            confidence[metric] = {
+                "history": history,
+                "forecast": ensemble,
+                "per_method_quality": per_method_quality,
+                "best_method": best_method,
+                "n_methods": len(methods_list),
+            }
+
+        return {
+            "horizon": horizon,
+            "history_n": history_n,
+            "methods": methods_list,
+            "last_sim_day": first_result.get("last_sim_day"),
+            "forecast_sim_days": first_result.get("forecast_sim_days", []),
+            "confidence": confidence,
+        }
+    except ImportError as e:
+        raise HTTPException(status_code=501, detail=f"Forecast requires numpy: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/forecast/multi")
 async def get_forecast_multi(
     horizon: int = 7,

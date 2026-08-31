@@ -152,6 +152,10 @@ check_endpoint "/api/persistence/forecast invalid horizon" 400 GET "/api/persist
 check_endpoint "/api/persistence/forecast/multi" 200 GET "/api/persistence/forecast/multi?horizon=3"
 check_endpoint "/api/persistence/forecast/multi?methods=linear" 200 GET "/api/persistence/forecast/multi?horizon=3&methods=linear"
 check_endpoint "/api/persistence/forecast/multi invalid methods" 400 GET "/api/persistence/forecast/multi?horizon=3&methods=invalid"
+# iter #30: forecast confidence / ensemble
+check_endpoint "/api/persistence/forecast-confidence" 200 GET "/api/persistence/forecast-confidence?horizon=3"
+check_endpoint "/api/persistence/forecast-confidence methods" 200 GET "/api/persistence/forecast-confidence?horizon=3&methods=linear,moving_average"
+check_endpoint "/api/persistence/forecast-confidence invalid methods" 400 GET "/api/persistence/forecast-confidence?horizon=3&methods=invalid"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"

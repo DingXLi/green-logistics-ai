@@ -188,6 +188,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/llm-cost-forecast` | LLM usage/cost forecast with 3 methods (iter #29) |
 | GET    | `/api/persistence/forecast?method=linear\|moving_average\|exponential_smoothing` | KPI forecast with method (iter #28) |
 | GET    | `/api/persistence/forecast/multi?methods=linear,ma,es` | Multi-method forecast comparison (iter #28) |
+| GET    | `/api/persistence/forecast-confidence` | Ensemble forecast confidence + method dispersion (iter #30) |
 | GET    | `/api/persistence/monthly-efficiency-trend` | Per-month efficiency trend |
 | GET    | `/api/persistence/cycle-history` | Past cycles with filters (iter #11) |
 | GET    | `/api/persistence/cycle-detail/{id}` | Single cycle full breakdown (iter #11) |
