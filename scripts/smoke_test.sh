@@ -133,6 +133,9 @@ check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cy
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
 check_endpoint "/api/persistence/cohort-retention-by-period" 200 GET "/api/persistence/cohort-retention-by-period"
 check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 200 GET "/api/persistence/cohort-retention-by-period?period_unit=week"
+check_endpoint "/api/persistence/forecast" 200 GET "/api/persistence/forecast?horizon=7&history_n=14"
+check_endpoint "/api/persistence/forecast?metrics=cost_sek" 200 GET "/api/persistence/forecast?metrics=cost_sek&horizon=3"
+check_endpoint "/api/persistence/forecast invalid horizon" 400 GET "/api/persistence/forecast?horizon=0"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 
 # ---- Optimization endpoints ----
