@@ -185,6 +185,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/fleet-timeseries` | Per-sim_day fleet series |
 | GET    | `/api/persistence/seasonal-timeseries` | Per-month seasonal series |
 | GET    | `/api/persistence/llm-cost-timeseries` | Per-sim_day LLM usage series (iter #28) |
+| GET    | `/api/persistence/llm-cost-forecast` | LLM usage/cost forecast with 3 methods (iter #29) |
 | GET    | `/api/persistence/forecast?method=linear\|moving_average\|exponential_smoothing` | KPI forecast with method (iter #28) |
 | GET    | `/api/persistence/forecast/multi?methods=linear,ma,es` | Multi-method forecast comparison (iter #28) |
 | GET    | `/api/persistence/monthly-efficiency-trend` | Per-month efficiency trend |
