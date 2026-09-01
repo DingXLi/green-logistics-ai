@@ -4,7 +4,7 @@ Green Logistics AI - Web Backend
 FastAPI 应用提供 REST API
 """
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response as FastAPIResponse, JSONResponse
 from pydantic import BaseModel, field_validator
@@ -520,6 +520,65 @@ def _get_ws_max_per_ip() -> int:
         return max(v, 0)
     except (TypeError, ValueError):
         return 10
+
+
+# ============================================
+# iter #33: Admin token auth (WebSocket stats + future admin endpoints)
+# ============================================
+# GL_ADMIN_TOKEN: 设置后, 需要 Bearer / X-Admin-Token header 才能访问敏感 endpoint
+#   - 空 (默认): 不启用 auth (向后兼容 dev / 本地)
+#   - 生产环境推荐设置一个长随机 token (e.g. openssl rand -hex 32)
+#   - 仅用于 admin/debug endpoint, 不用于业务 endpoint
+_GL_ADMIN_TOKEN: str = os.environ.get("GL_ADMIN_TOKEN", "")
+
+
+def _get_admin_token() -> str:
+    """Return the configured admin token (fresh read, 支持运行时修改 env var)."""
+    return os.environ.get("GL_ADMIN_TOKEN", "")
+
+
+def _extract_admin_token(authorization: Optional[str], x_admin_token: Optional[str]) -> Optional[str]:
+    """
+    从 request headers 提取 admin token。
+
+    支持两种方式 (任一即可):
+    - Authorization: Bearer <token>
+    - X-Admin-Token: <token>
+
+    返回 token 字符串 (不含 "Bearer " 前缀), 或 None (没提供)。
+    """
+    if authorization:
+        parts = authorization.split(None, 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1].strip()
+        # 允许直接传 token (不强制 Bearer 前缀, 方便调试)
+        return authorization.strip()
+    if x_admin_token:
+        return x_admin_token.strip()
+    return None
+
+
+def _check_admin_token(authorization: Optional[str], x_admin_token: Optional[str]) -> bool:
+    """
+    验证 admin token 是否匹配 GL_ADMIN_TOKEN。
+
+    Returns:
+        True - 访问被允许
+        False - 拒绝 (401)
+    """
+    configured = _get_admin_token()
+    if not configured:
+        # 没配置 token → 不启用 auth (dev 模式)
+        return True
+    provided = _extract_admin_token(authorization, x_admin_token)
+    if not provided:
+        return False
+    # 用 secrets.compare_digest 避免 timing attack
+    import secrets
+    try:
+        return secrets.compare_digest(provided, configured)
+    except (TypeError, ValueError):
+        return False
 
 
 async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
@@ -1365,8 +1424,24 @@ async def ws_cycle_updates(ws: WebSocket):
 
 
 @app.get("/api/ws/stats")
-async def ws_stats():
-    """WebSocket 连接统计 (调试用)。"""
+async def ws_stats(
+    authorization: Optional[str] = Header(default=None),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+):
+    """
+    WebSocket 连接统计 (调试用)。
+
+    iter #33: GL_ADMIN_TOKEN 设置后, 需要 admin token 才能访问 (防 IP 分布 / 连接
+    计时等敏感信息泄漏)。支持两种方式:
+    - Authorization: Bearer <token>
+    - X-Admin-Token: <token>
+    """
+    if not _check_admin_token(authorization, x_admin_token):
+        raise HTTPException(
+            status_code=401,
+            detail="Admin token required (set GL_ADMIN_TOKEN and pass via Authorization: Bearer or X-Admin-Token header)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     stats = ws_broadcaster.stats()
     # iter #27: also expose origin allowlist info (for debug)
     allowed = _get_ws_allowed_origins()
@@ -1374,12 +1449,26 @@ async def ws_stats():
     stats["origin_allowlist_size"] = len(allowed)
     if allowed:
         stats["origin_allowlist_sample"] = sorted(allowed)[:5]
+    # iter #33: 告诉客户端 auth 是否启用 (避免静默禁用)
+    stats["admin_token_configured"] = bool(_get_admin_token())
     return stats
 
 
 @app.post("/api/ws/stats/reset")
-async def ws_stats_reset():
-    """iter #27: 重置 WebSocket broadcast 统计 (仅测试 / 调试用)。"""
+async def ws_stats_reset(
+    authorization: Optional[str] = Header(default=None),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+):
+    """
+    iter #27: 重置 WebSocket broadcast 统计 (仅测试 / 调试用)。
+    iter #33: 需要 admin token (同 ws_stats)。
+    """
+    if not _check_admin_token(authorization, x_admin_token):
+        raise HTTPException(
+            status_code=401,
+            detail="Admin token required (set GL_ADMIN_TOKEN and pass via Authorization: Bearer or X-Admin-Token header)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     ws_broadcaster.reset_stats()
     return {"reset": True, "stats": ws_broadcaster.stats()}
 
