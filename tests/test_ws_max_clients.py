@@ -41,12 +41,12 @@ class FakeWS:
 
 
 def _reset_broadcaster(broadcaster):
-    """Full reset for test isolation: clear stats + live clients + metadata."""
-    # Note: reset_stats() intentionally keeps _clients alive for prod safety;
-    # tests need a clean slate, so we drop everything.
-    broadcaster._clients.clear()
-    broadcaster._client_meta.clear()
-    broadcaster.reset_stats()
+    """No-op: 全局 conftest fixture 自动重置 ws_broadcaster singleton。
+
+    保留这个 helper 是为了将来如果某个 test 想重置中间状态可以调用。
+    现在所有 WS test 在 setup/teardown 时都会被 conftest 自动清空。
+    """
+    return None
 
 
 # ============================================

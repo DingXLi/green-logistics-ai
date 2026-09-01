@@ -35,6 +35,12 @@ BASE="${HF_BASE:-http://localhost:8000}"
 COOKIE_JAR="$(mktemp)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
+# iter #33: 如果设置了 GL_ADMIN_TOKEN, 自动附加到 admin endpoint
+ADMIN_HEADER_ARGS=()
+if [[ -n "${GL_ADMIN_TOKEN:-}" ]]; then
+    ADMIN_HEADER_ARGS=(-H "X-Admin-Token: ${GL_ADMIN_TOKEN}")
+fi
+
 # iter #27: 检查 jq 可用性
 if ! command -v jq >/dev/null 2>&1; then
     echo "❌ jq not found. Install: sudo apt-get install jq  (or brew install jq on macOS)"
@@ -75,7 +81,7 @@ check_endpoint() {
     else
         http_code=$(curl -s -o /dev/null -w "%{http_code}" \
             -X GET -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-            "$url" 2>/dev/null)
+            "$@" "$url" 2>/dev/null)
     fi
 
     if [[ "$http_code" == "$expected_status" ]]; then
@@ -172,7 +178,7 @@ check_endpoint "/api/persistence/export/supplies.ndjson" 200 GET "/api/persisten
 check_endpoint "/api/persistence/export/matches.ndjson" 200 GET "/api/persistence/export/matches.ndjson?limit=10"
 check_endpoint "/api/persistence/export/routes.ndjson" 200 GET "/api/persistence/export/routes.ndjson?limit=10"
 # iter #27: WS origin allowlist metadata
-check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats"
+check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 
 # ---- Optimization endpoints ----
 check_endpoint "/api/optimize/last" 200 GET "/api/optimize/last"

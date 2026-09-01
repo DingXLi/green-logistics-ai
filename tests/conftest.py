@@ -39,3 +39,54 @@ for _sub in ("agents", "optimization", "data", "synthetic", "web"):
     _sub_path = _PROJECT_ROOT / _sub
     if _sub_path.is_dir() and str(_sub_path) not in sys.path:
         sys.path.insert(0, str(_sub_path))
+
+
+# ============================================
+# iter #33: Auto-cleanup fixture for module-level WebSocketBroadcaster singleton
+# ============================================
+# 问题: ws_broadcaster 是 module-level singleton (web/backend/main.py),
+# 多个 WS test 文件共享同一实例。如果某个 test 只 connect() 不 disconnect(),
+# _clients set 会积累, 后续 test 的 stats() 计数错误。
+#
+# 解决方案: 在每个 WS 相关 test 前自动清空 _clients + _client_meta + reset_stats()。
+# 只对 WS 相关文件生效 (性能优化, 避免每个 test 都加载 web.backend.main)。
+#
+# 注: reset_stats() 本身不清 _clients 是生产设计 (不应丢活动连接) — 这里用
+# 直接访问 _clients.clear() 是 test-only 的 workaround。
+def pytest_collection_modifyitems(config, items):
+    """收集阶段不需要做什么; 真正的 fixture 定义在下面。"""
+    pass
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_ws_broadcaster_singleton(request):
+    """
+    自动 fixture: 对所有 WS 相关测试文件, 在每个 test 前后重置 broadcaster。
+    避免 module-level singleton 状态泄漏。
+    """
+    # 只对 WS 相关测试文件生效
+    if "test_ws" not in str(request.fspath):
+        yield
+        return
+
+    # 尝试导入 broadcaster; 如果 web.backend 未安装则跳过
+    try:
+        from web.backend.main import ws_broadcaster
+    except (ImportError, Exception):
+        yield
+        return
+
+    # Setup: 完全清空 (含 live _clients)
+    ws_broadcaster._clients.clear()
+    ws_broadcaster._client_meta.clear()
+    ws_broadcaster.reset_stats()
+
+    yield
+
+    # Teardown: 也清空, 避免影响后续测试文件
+    ws_broadcaster._clients.clear()
+    ws_broadcaster._client_meta.clear()
+    ws_broadcaster.reset_stats()
