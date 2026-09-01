@@ -158,7 +158,7 @@ green-logistics-ai/
 7. **SMHI Weather Integration** - Real Swedish weather data via SMHI's open API
 8. **External Economic Signals** - Eurostat construction / industrial production indices affect cycle KPIs
 9. **Realistic IoT Telemetry** - GPS paths, rush-hour speed, load-emission correlation, moisture sensors
-10. **WebSocket Live Updates** - Dashboard streams cycle_update events with fleet / efficiency / distance_source metrics. Optional **Origin allowlist** via `GL_WS_ALLOWED_ORIGINS` env var (iter #27 security). **Max-client guard** via `GL_WS_MAX_CLIENTS` (default 50) + per-IP limit `GL_WS_MAX_PER_IP` (default 10) (iter #32). **Admin auth** for `/api/ws/stats*` via `GL_ADMIN_TOKEN` (iter #33) — supports `Authorization: Bearer <token>` or `X-Admin-Token: <token>`, with timing-safe compare.
+10. **WebSocket Live Updates** - Dashboard streams cycle_update events with fleet / efficiency / distance_source metrics. Optional **Origin allowlist** via `GL_WS_ALLOWED_ORIGINS` env var (iter #27 security). **Max-client guard** via `GL_WS_MAX_CLIENTS` (default 50) + per-IP limit `GL_WS_MAX_PER_IP` (default 10) (iter #32). **Admin auth** for `/api/ws/stats*` and all `/api/admin/*` + `/api/debug/*` via `GL_ADMIN_TOKEN` (iter #33, iter #34) — supports `Authorization: Bearer <token>` or `X-Admin-Token: <token>`, with timing-safe compare.
 11. **LLM-Driven Decisions** - Optional Gemini integration for demand/supply prediction; deterministic fallback when API key absent
 12. **Background Scheduler** - Cron-style scheduler (start/stop/restart via API); warmup cycle on first start
 13. **Persistence + Analytics** - SQLite-backed cycle storage; 10+ aggregation endpoints (KPI / fleet / monthly / seasonal / Pareto history)
@@ -205,8 +205,8 @@ green-logistics-ai/
 | GET    | `/api/persistence/export/supplies.parquet` | Download supplies as Apache Parquet (iter #27) |
 | GET    | `/api/persistence/export/matches.parquet` | Download matches as Apache Parquet (iter #27) |
 | GET    | `/api/persistence/export/routes.parquet` | Download routes as Apache Parquet (iter #27) |
-| GET    | `/api/admin/db-stats` | SQLite DB size, table counts, indexes (iter #15) |
-| POST   | `/api/admin/db-maintenance` | VACUUM + ANALYZE (iter #16) |
+| GET    | `/api/admin/db-stats` | SQLite DB size, table counts, indexes (iter #15). Admin auth via `GL_ADMIN_TOKEN` (iter #34). |
+| POST   | `/api/admin/db-maintenance` | VACUUM + ANALYZE (iter #16). Admin auth via `GL_ADMIN_TOKEN` (iter #34). |
 | GET    | `/api/facilities/distance-matrix` | N×N facility distance matrix (iter #15) |
 | POST   | `/api/optimize/batch` | Parallel multi-scenario optimization (iter #13) |
 | GET    | `/api/health/deep` | Multi-subsystem health check (iter #14) |

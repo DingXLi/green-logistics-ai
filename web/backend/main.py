@@ -581,6 +581,33 @@ def _check_admin_token(authorization: Optional[str], x_admin_token: Optional[str
         return False
 
 
+# ============================================
+# iter #34: FastAPI 依赖封装 (复用 iter #33 逻辑到所有 admin/debug endpoint)
+# ============================================
+from fastapi import Depends
+
+
+async def require_admin(
+    authorization: Optional[str] = Header(default=None),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+) -> None:
+    """
+    FastAPI dependency: 验证 admin token。如果 GL_ADMIN_TOKEN 未设置则跳过。
+
+    用法: ``async def endpoint(_: None = Depends(require_admin)):``
+    拒绝时抛 HTTPException(401, WWW-Authenticate: Bearer)。
+    """
+    if not _check_admin_token(authorization, x_admin_token):
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "Admin token required (set GL_ADMIN_TOKEN and pass via "
+                "Authorization: Bearer or X-Admin-Token header)"
+            ),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
     """Coordinator 跑完 cycle 后调用，广播给所有 WS client。"""
     # iter #7: 附带 running efficiency summary (cost/CO2 per ton),
@@ -1424,10 +1451,7 @@ async def ws_cycle_updates(ws: WebSocket):
 
 
 @app.get("/api/ws/stats")
-async def ws_stats(
-    authorization: Optional[str] = Header(default=None),
-    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
-):
+async def ws_stats(_: None = Depends(require_admin)):
     """
     WebSocket 连接统计 (调试用)。
 
@@ -1436,12 +1460,6 @@ async def ws_stats(
     - Authorization: Bearer <token>
     - X-Admin-Token: <token>
     """
-    if not _check_admin_token(authorization, x_admin_token):
-        raise HTTPException(
-            status_code=401,
-            detail="Admin token required (set GL_ADMIN_TOKEN and pass via Authorization: Bearer or X-Admin-Token header)",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
     stats = ws_broadcaster.stats()
     # iter #27: also expose origin allowlist info (for debug)
     allowed = _get_ws_allowed_origins()
@@ -1455,26 +1473,17 @@ async def ws_stats(
 
 
 @app.post("/api/ws/stats/reset")
-async def ws_stats_reset(
-    authorization: Optional[str] = Header(default=None),
-    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
-):
+async def ws_stats_reset(_: None = Depends(require_admin)):
     """
     iter #27: 重置 WebSocket broadcast 统计 (仅测试 / 调试用)。
     iter #33: 需要 admin token (同 ws_stats)。
     """
-    if not _check_admin_token(authorization, x_admin_token):
-        raise HTTPException(
-            status_code=401,
-            detail="Admin token required (set GL_ADMIN_TOKEN and pass via Authorization: Bearer or X-Admin-Token header)",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
     ws_broadcaster.reset_stats()
     return {"reset": True, "stats": ws_broadcaster.stats()}
 
 
 @app.get("/api/debug/llm")
-async def debug_llm():
+async def debug_llm(_: None = Depends(require_admin)):
     """诊断 LLM 配置 (env var + model + 试一次调用)"""
     from agents.llm_config import get_llm_config
     api_key = os.environ.get("GOOGLE_API_KEY", "")
@@ -3521,7 +3530,7 @@ async def get_cycle_kpi_summary(
 
 
 @app.post("/api/admin/db-maintenance")
-async def post_db_maintenance():
+async def post_db_maintenance(_: None = Depends(require_admin)):
     """
     DB 维护 (iter #16) — VACUUM + ANALYZE。
 
@@ -3544,6 +3553,7 @@ async def export_db_data(
     limit: int = 10000,
     since_sim_day: Optional[int] = None,
     gzip: bool = False,
+    _: None = Depends(require_admin),
 ):
     """
     Unified DB export endpoint (iter #18 + iter #19 gzip + iter #23 parquet) — table + format export。
@@ -3678,7 +3688,7 @@ async def export_db_data(
 
 
 @app.get("/api/admin/db-stats")
-async def get_db_stats():
+async def get_db_stats(_: None = Depends(require_admin)):
     """
     DB 统计 endpoint (iter #15) — SQLite DB 大小 + 表行数 + 索引 + 时间范围。
 
@@ -3695,7 +3705,7 @@ async def get_db_stats():
 
 
 @app.get("/api/admin/db-info")
-async def get_db_info():
+async def get_db_info(_: None = Depends(require_admin)):
     """
     DB 完整 info (iter #20) — audit / debugging / ops 详细信息。
 
@@ -3717,7 +3727,7 @@ async def get_db_info():
 
 
 @app.get("/api/admin/perf-stats")
-async def get_perf_stats(top: int = 10):
+async def get_perf_stats(top: int = 10, _: None = Depends(require_admin)):
     """
     Performance stats (iter #21) — endpoint 响应时间聚合。
 
@@ -3769,7 +3779,7 @@ async def get_perf_stats(top: int = 10):
 
 
 @app.post("/api/admin/perf-stats/reset")
-async def reset_perf_stats():
+async def reset_perf_stats(_: None = Depends(require_admin)):
     """Reset perf stats buffer (iter #21)。仅在测试用。"""
     global _PERF_TOTAL, _PERF_ERRORS
     with _PERF_LOCK:
@@ -3785,7 +3795,7 @@ async def reset_perf_stats():
 # ============================================================
 
 @app.get("/api/admin/llm-stats")
-async def get_llm_stats(recent: int = 50):
+async def get_llm_stats(recent: int = 50, _: None = Depends(require_admin)):
     """
     LLM call 聚合统计 (iter #22) — token usage + 估算 cost。
 
@@ -3813,7 +3823,7 @@ async def get_llm_stats(recent: int = 50):
 
 
 @app.post("/api/admin/llm-stats/reset")
-async def reset_llm_stats():
+async def reset_llm_stats(_: None = Depends(require_admin)):
     """Reset LLM tracker (iter #22)。仅测试用。"""
     from agents.llm_tracker import get_llm_tracker
     get_llm_tracker().reset()
