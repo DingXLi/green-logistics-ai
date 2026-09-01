@@ -164,6 +164,10 @@ check_endpoint "/api/persistence/forecast/multi invalid methods" 400 GET "/api/p
 check_endpoint "/api/persistence/forecast-confidence" 200 GET "/api/persistence/forecast-confidence?horizon=3"
 check_endpoint "/api/persistence/forecast-confidence methods" 200 GET "/api/persistence/forecast-confidence?horizon=3&methods=linear,moving_average"
 check_endpoint "/api/persistence/forecast-confidence invalid methods" 400 GET "/api/persistence/forecast-confidence?horizon=3&methods=invalid"
+# iter #35: forecast method auto-resolution + persistence endpoints
+check_endpoint "/api/persistence/forecast?method=auto" 200 GET "/api/persistence/forecast?method=auto&metrics=cost_sek&horizon=3"
+check_endpoint "/api/persistence/forecast invalid method" 400 GET "/api/persistence/forecast?method=bogus"
+check_endpoint "/api/persistence/forecast-method-prefs" 200 GET "/api/persistence/forecast-method-prefs"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
