@@ -62,11 +62,15 @@ jobs:
 
     - name: Test with pytest + coverage (iter #14)
       run: |
-        pip install pytest pytest-asyncio pytest-cov
-        # 跳过 OR-Tools 慢测试 (test_pareto_front ~15s) 和 需要 LLM 的测试
+        pip install pytest pytest-asyncio pytest-cov pytest-timeout
+        # 跳过 OR-Tools 慢测试 (test_pareto_front ~15s) 和需要 LLM 的测试
+        # pytest-timeout gives every test a hard wall-clock budget; prevents a single
+        # hanging optimization from blocking the entire CI matrix indefinitely.
         pytest tests/ \
           --ignore=tests/test_llm_integration.py \
           -k "not test_pareto_front" \
+          --timeout=90 \
+          --timeout-method=thread \
           --cov=agents --cov=optimization --cov=data --cov=web/backend \
           --cov-report=term-missing \
           --cov-report=xml:coverage.xml \
@@ -87,9 +91,9 @@ jobs:
 
     - name: Test LLM integration (with API key)
       run: |
-        pip install pytest pytest-asyncio
+        pip install pytest pytest-asyncio pytest-timeout
         if [ -n "$GOOGLE_API_KEY" ]; then
-          pytest tests/test_llm_integration.py -v --tb=short
+          pytest tests/test_llm_integration.py --timeout=90 --timeout-method=thread -v --tb=short
         else
           echo "GOOGLE_API_KEY not set - skipping LLM integration tests"
         fi
