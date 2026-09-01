@@ -94,18 +94,19 @@ check_endpoint() {
     fi
 }
 
-# check_json_field <name> <method> <path> <jq_filter> <expected_value>
+# check_json_field <name> <method> <path> <jq_filter> <expected_value> [extra args...]
 check_json_field() {
     local name="$1"
     local method="$2"
     local path="$3"
     local jq_filter="$4"
     local expected="$5"
+    shift 5
     local url="${BASE}${path}"
     local actual
 
     actual=$(curl -s -X "$method" -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-        "$url" 2>/dev/null | jq -r "$jq_filter" 2>/dev/null)
+        "$@" "$url" 2>/dev/null | jq -r "$jq_filter" 2>/dev/null)
 
     if [[ "$actual" == "$expected" ]]; then
         echo -e "  ${GREEN}✓${NC} $name [$jq_filter == $expected]"
@@ -130,17 +131,18 @@ check_endpoint "/health basic" 200 GET "/health"
 check_endpoint "/api/health/deep" 200 GET "/api/health/deep"
 
 # ---- Admin / DB ----
-check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats"
-check_endpoint "/api/admin/db-info" 200 GET "/api/admin/db-info"
-check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance"
-check_endpoint "/api/admin/perf-stats" 200 GET "/api/admin/perf-stats"
+# iter #34: GL_ADMIN_TOKEN 设置时, 所有 admin endpoint 都需要 X-Admin-Token header
+check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-info" 200 GET "/api/admin/db-info" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/perf-stats" 200 GET "/api/admin/perf-stats" "${ADMIN_HEADER_ARGS[@]}"
 # iter #27: per-endpoint error tracking field
-check_json_field "/api/admin/perf-stats has total_errors field" GET "/api/admin/perf-stats" ".total_errors" "0"
-check_endpoint "/api/admin/llm-stats" 200 GET "/api/admin/llm-stats?recent=5"
-check_endpoint "/api/admin/db-export" 200 GET "/api/admin/db-export?table=cycles"
-check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table=cycles&fmt=ndjson"
-check_endpoint "/api/admin/db-export parquet" 200 GET "/api/admin/db-export?table=cycles&fmt=parquet"
-check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus"
+check_json_field "/api/admin/perf-stats has total_errors field" GET "/api/admin/perf-stats" ".total_errors" "0" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/llm-stats" 200 GET "/api/admin/llm-stats?recent=5" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-export" 200 GET "/api/admin/db-export?table=cycles" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table=cycles&fmt=ndjson" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-export parquet" 200 GET "/api/admin/db-export?table=cycles&fmt=parquet" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus" "${ADMIN_HEADER_ARGS[@]}"
 
 # ---- Persistence endpoints ----
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
@@ -208,11 +210,12 @@ check_python_field() {
     local path="$3"
     local py_expr="$4"
     local expected="$5"
+    shift 5
     local url="${BASE}${path}"
     local actual
 
     actual=$(curl -s -X "$method" -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-        "$url" 2>/dev/null | python3 -c "
+        "$@" "$url" 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -238,7 +241,7 @@ check_python_field "/health has status" GET "/health" \
 
 # /api/admin/db-stats should have db_size_bytes (a number)
 check_python_field "/api/admin/db-stats has db_size_bytes" GET "/api/admin/db-stats" \
-    "type(data.get('db_size_bytes', None)).__name__" "int"
+    "type(data.get('db_size_bytes', None)).__name__" "int" "${ADMIN_HEADER_ARGS[@]}"
 
 # /api/persistence/cycle-kpi-summary should have total_cycles (a number)
 check_python_field "/api/persistence/cycle-kpi-summary has total_cycles" GET "/api/persistence/cycle-kpi-summary" \
