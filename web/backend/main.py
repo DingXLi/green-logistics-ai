@@ -2590,7 +2590,7 @@ async def get_forecast(
     if history_n < 2 or history_n > 90:
         raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
 
-    valid_methods = ("linear", "moving_average", "exponential_smoothing")
+    valid_methods = ("linear", "moving_average", "exponential_smoothing", "auto")
     if method not in valid_methods:
         raise HTTPException(
             status_code=400,
@@ -2607,6 +2607,15 @@ async def get_forecast(
                 status_code=400,
                 detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
             )
+
+    # iter #35: method=auto → 使用各 metric 持久化的最佳 method
+    if method == "auto":
+        # 没指定 metrics → 默认全部 metric
+        targets = metrics_list or list(valid_metrics)
+        method = coordinator.persistence.get_best_method(targets[0]) or "linear"
+        # 注: 只支持单一 method, 如果多 metric 有不同最佳 method, 只能取第一个
+        # (这种情况推荐用 /api/persistence/forecast/multi 看对比, 或
+        # 用 /api/persistence/forecast-confidence 自动选取)
 
     try:
         return coordinator.persistence.forecast_next_n_sim_days(
@@ -2744,6 +2753,21 @@ async def get_forecast_confidence(
                 "n_methods": len(methods_list),
             }
 
+        # iter #35: 持久化每个 metric 的最佳 method (fire-and-forget)
+        # 不抛异常, 失败只记 debug log — 不能因为 pref save 失败影响 forecast 返回
+        for metric, conf in confidence.items():
+            best = conf["best_method"]
+            r2 = conf["per_method_quality"].get(best, {}).get("r_squared")
+            try:
+                coordinator.persistence.save_method_pref(
+                    metric=metric,
+                    method=best,
+                    r_squared=r2,
+                    history_n=history_n,
+                )
+            except Exception as e:
+                logger.debug(f"save_method_pref failed (ignore): {e}")
+
         return {
             "horizon": horizon,
             "history_n": history_n,
@@ -2756,6 +2780,44 @@ async def get_forecast_confidence(
         raise HTTPException(status_code=501, detail=f"Forecast requires numpy: {e}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/persistence/forecast-method-prefs")
+async def get_forecast_method_prefs(_: None = Depends(require_admin)):
+    """
+    iter #35: 查看所有 metric 的最佳 method 偏好 (admin only).
+
+    返回 {prefs: [{metric, best_method, r_squared, history_n, n_samples, updated_at}, ...]}.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    prefs = coordinator.persistence.get_method_prefs()
+    return {
+        "prefs": prefs,
+        "count": len(prefs),
+        "metrics_covered": [p["metric"] for p in prefs],
+    }
+
+
+@app.delete("/api/persistence/forecast-method-prefs")
+async def clear_forecast_method_prefs(
+    metric: Optional[str] = None,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #35: 清除 method prefs (admin only).
+
+    Query:
+    - metric (optional): 只清除指定 metric; 不传则清除全部
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if metric:
+        deleted = coordinator.persistence.delete_method_pref(metric)
+        return {"deleted": deleted, "scope": "metric", "metric": metric}
+    else:
+        n = coordinator.persistence.clear_method_prefs()
+        return {"deleted": n, "scope": "all"}
 
 
 @app.get("/api/persistence/forecast/multi")

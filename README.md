@@ -186,9 +186,11 @@ green-logistics-ai/
 | GET    | `/api/persistence/seasonal-timeseries` | Per-month seasonal series |
 | GET    | `/api/persistence/llm-cost-timeseries` | Per-sim_day LLM usage series (iter #28) |
 | GET    | `/api/persistence/llm-cost-forecast` | LLM usage/cost forecast with 3 methods (iter #29) |
-| GET    | `/api/persistence/forecast?method=linear\|moving_average\|exponential_smoothing` | KPI forecast with method (iter #28) |
+| GET    | `/api/persistence/forecast?method=linear\|moving_average\|exponential_smoothing\|auto` | KPI forecast with method (iter #28). `method=auto` uses the per-metric best method persisted from `forecast-confidence` calls (iter #35). |
 | GET    | `/api/persistence/forecast/multi?methods=linear,ma,es` | Multi-method forecast comparison (iter #28) |
-| GET    | `/api/persistence/forecast-confidence` | Ensemble forecast confidence + method dispersion (iter #30) |
+| GET    | `/api/persistence/forecast-confidence` | Ensemble forecast confidence + method dispersion (iter #30). Auto-persists best_method per metric (iter #35). |
+| GET    | `/api/persistence/forecast-method-prefs` | View all metric→best_method preferences (admin, iter #35) |
+| DELETE | `/api/persistence/forecast-method-prefs` | Clear all or specific metric's preference (admin, iter #35) |
 | GET    | `/api/persistence/monthly-efficiency-trend` | Per-month efficiency trend |
 | GET    | `/api/persistence/cycle-history` | Past cycles with filters (iter #11) |
 | GET    | `/api/persistence/cycle-detail/{id}` | Single cycle full breakdown (iter #11) |
