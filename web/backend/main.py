@@ -282,6 +282,9 @@ class WebSocketBroadcaster:
       发送失败会被下一轮 try/except 接住，不影响业务逻辑
     - Connected client 列表是动态的 (心跳 / 断开会自动清理)
     - iter #27: 跟踪 broadcast 统计 (总数 / 成功 / 失败 / 上次时间)
+    - iter #32: max-client guard (全局 + per-IP) + 连接 metrics
+      (peak / total accepted / total rejected / 当前 IP 分布 /
+      每个 client 连接时长累计)
     """
 
     def __init__(self) -> None:
@@ -292,17 +295,85 @@ class WebSocketBroadcaster:
         self._total_sends: int = 0       # 总发送尝试 (per-client)
         self._total_send_failures: int = 0  # 失败发送
         self._last_broadcast_at: Optional[str] = None  # ISO timestamp
+        # iter #32: connection metrics
+        self._peak_clients: int = 0  # 历史最高并发连接数
+        self._total_connections_accepted: int = 0  # 累计接受连接数
+        self._total_connections_rejected: int = 0  # 累计拒绝连接数 (满 / per-IP 超限)
+        self._total_connection_seconds: float = 0.0  # 累计已断开 client 的存活秒数
+        # iter #32: per-client metadata {ws: {client_id, ip, connect_time}}
+        self._client_meta: Dict[WebSocket, Dict[str, Any]] = {}
 
-    async def connect(self, ws: WebSocket) -> None:
-        await ws.accept()
+    async def connect(
+        self,
+        ws: WebSocket,
+        *,
+        client_ip: Optional[str] = None,
+    ) -> bool:
+        """
+        接受新 client 连接。
+
+        Returns:
+            True  - 接受成功
+            False - 拒绝 (max_clients 或 per-IP 超限); caller 应主动 ws.close(code=1013)
+
+        iter #32: 增加 client_ip 用于 per-IP 限流; 返回 bool 表示是否接受。
+        """
+        max_clients = _get_ws_max_clients()
+        max_per_ip = _get_ws_max_per_ip()
+
         async with self._lock:
+            # 全局 max 限流
+            if max_clients > 0 and len(self._clients) >= max_clients:
+                self._total_connections_rejected += 1
+                logger.warning(
+                    f"WS rejected: at capacity "
+                    f"({len(self._clients)}/{max_clients}, "
+                    f"total_rejected={self._total_connections_rejected})"
+                )
+                return False
+            # per-IP 限流
+            if max_per_ip > 0 and client_ip:
+                ip_count = sum(
+                    1 for meta in self._client_meta.values()
+                    if meta.get("ip") == client_ip
+                )
+                if ip_count >= max_per_ip:
+                    self._total_connections_rejected += 1
+                    logger.warning(
+                        f"WS rejected: per-IP limit hit "
+                        f"(ip={client_ip}, count={ip_count}/{max_per_ip}, "
+                        f"total_rejected={self._total_connections_rejected})"
+                    )
+                    return False
+
+            await ws.accept()
             self._clients.add(ws)
-        logger.info(f"WS client connected: {id(ws)} (total={len(self._clients)})")
+            now = datetime.now()
+            client_id = f"ws-{id(ws) & 0xffff:04x}-{int(now.timestamp() * 1000) % 100000}"
+            self._client_meta[ws] = {
+                "client_id": client_id,
+                "ip": client_ip or "unknown",
+                "connect_time": now,
+            }
+            self._total_connections_accepted += 1
+            current = len(self._clients)
+            if current > self._peak_clients:
+                self._peak_clients = current
+
+        logger.info(
+            f"WS client connected: {client_id} ip={client_ip} "
+            f"(total={current}, peak={self._peak_clients})"
+        )
+        return True
 
     async def disconnect(self, ws: WebSocket) -> None:
         async with self._lock:
             self._clients.discard(ws)
-        logger.info(f"WS client disconnected: {id(ws)} (total={len(self._clients)})")
+            meta = self._client_meta.pop(ws, None)
+            if meta and "connect_time" in meta:
+                duration = (datetime.now() - meta["connect_time"]).total_seconds()
+                self._total_connection_seconds += duration
+        logger.info(f"WS client disconnected: total={len(self._clients)}")
 
     async def broadcast(self, payload: Dict[str, Any]) -> None:
         """广播 JSON 给所有 client。失败不抛出（一个 client 坏不拖累整体）。"""
@@ -341,7 +412,17 @@ class WebSocketBroadcaster:
             raise RuntimeError(f"send failed: {e}") from e
 
     def stats(self) -> Dict[str, Any]:
-        """iter #27: 详细的 broadcast 统计。"""
+        """iter #27: 详细的 broadcast 统计; iter #32: + connection metrics。"""
+        # per-IP 当前计数 (snapshot of currently-connected clients)
+        ip_counts: Dict[str, int] = {}
+        for meta in self._client_meta.values():
+            ip = meta.get("ip", "unknown")
+            ip_counts[ip] = ip_counts.get(ip, 0) + 1
+        # 平均连接时长 (秒) — 基于已断开 client; 当前连接不算
+        avg_duration = (
+            round(self._total_connection_seconds / self._total_connections_accepted, 3)
+            if self._total_connections_accepted > 0 else 0.0
+        )
         return {
             "connected_clients": len(self._clients),
             "total_broadcasts": self._total_broadcasts,
@@ -353,14 +434,29 @@ class WebSocketBroadcaster:
                 if self._total_sends > 0 else 100.0
             ),
             "last_broadcast_at": self._last_broadcast_at,
+            # iter #32: connection metrics
+            "max_clients": _get_ws_max_clients(),
+            "max_per_ip": _get_ws_max_per_ip(),
+            "peak_clients": self._peak_clients,
+            "total_connections_accepted": self._total_connections_accepted,
+            "total_connections_rejected": self._total_connections_rejected,
+            "total_connection_seconds": round(self._total_connection_seconds, 3),
+            "avg_connection_seconds": avg_duration,
+            "current_ip_distribution": ip_counts,
         }
 
     def reset_stats(self) -> None:
-        """iter #27: 重置 broadcast 统计 (测试 / 调试用)。"""
+        """iter #27: 重置 broadcast 统计 (测试 / 调试用); iter #32: + connection metrics。"""
         self._total_broadcasts = 0
         self._total_sends = 0
         self._total_send_failures = 0
         self._last_broadcast_at = None
+        # iter #32
+        self._peak_clients = 0
+        self._total_connections_accepted = 0
+        self._total_connections_rejected = 0
+        self._total_connection_seconds = 0.0
+        # 注意: _client_meta 不重置 — 当前连接的 client 不应该被重置清掉
 
 
 ws_broadcaster = WebSocketBroadcaster()
@@ -397,6 +493,33 @@ def is_ws_origin_allowed(origin: str | None) -> bool:
     if not origin:
         return True
     return origin in allowed
+
+
+# ============================================
+# iter #32: WebSocket max-client guard
+# ============================================
+# GL_WS_MAX_CLIENTS: 全局并发连接数上限
+#   - 默认 50 (足够前端 dashboard + 调试)
+#   - 0 = 无限 (不推荐)
+# GL_WS_MAX_PER_IP: 同一 IP 并发连接数上限 (防单个 tab 反复重连 / 防滥用)
+#   - 默认 10
+#   - 0 = 无限
+def _get_ws_max_clients() -> int:
+    raw = os.environ.get("GL_WS_MAX_CLIENTS", "50")
+    try:
+        v = int(raw)
+        return max(v, 0)
+    except (TypeError, ValueError):
+        return 50
+
+
+def _get_ws_max_per_ip() -> int:
+    raw = os.environ.get("GL_WS_MAX_PER_IP", "10")
+    try:
+        v = int(raw)
+        return max(v, 0)
+    except (TypeError, ValueError):
+        return 10
 
 
 async def _broadcast_cycle_update(cycle_result: Dict[str, Any]) -> None:
@@ -1188,7 +1311,20 @@ async def ws_cycle_updates(ws: WebSocket):
         # code=1008 = policy violation
         await ws.close(code=1008, reason="Origin not allowed")
         return
-    await ws_broadcaster.connect(ws)
+    # iter #32: max-client guard (全局 + per-IP)
+    # 提取 client IP (uvicorn 传 x-forwarded-for / 直接 socket)
+    client_ip: Optional[str] = None
+    if ws.client and ws.client.host:
+        client_ip = ws.client.host
+    # x-forwarded-for (如果被反代)
+    xff = ws.headers.get("x-forwarded-for")
+    if xff:
+        client_ip = xff.split(",")[0].strip()
+    accepted = await ws_broadcaster.connect(ws, client_ip=client_ip)
+    if not accepted:
+        # code=1013 = try again later (server is at capacity)
+        await ws.close(code=1013, reason="Server at capacity")
+        return
     try:
         # 连接建立后立即推送一条 hello + 当前状态
         await ws.send_text(json.dumps({

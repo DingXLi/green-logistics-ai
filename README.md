@@ -158,7 +158,7 @@ green-logistics-ai/
 7. **SMHI Weather Integration** - Real Swedish weather data via SMHI's open API
 8. **External Economic Signals** - Eurostat construction / industrial production indices affect cycle KPIs
 9. **Realistic IoT Telemetry** - GPS paths, rush-hour speed, load-emission correlation, moisture sensors
-10. **WebSocket Live Updates** - Dashboard streams cycle_update events with fleet / efficiency / distance_source metrics. Optional **Origin allowlist** via `GL_WS_ALLOWED_ORIGINS` env var (iter #27 security).
+10. **WebSocket Live Updates** - Dashboard streams cycle_update events with fleet / efficiency / distance_source metrics. Optional **Origin allowlist** via `GL_WS_ALLOWED_ORIGINS` env var (iter #27 security). **Max-client guard** via `GL_WS_MAX_CLIENTS` (default 50) + per-IP limit `GL_WS_MAX_PER_IP` (default 10) (iter #32).
 11. **LLM-Driven Decisions** - Optional Gemini integration for demand/supply prediction; deterministic fallback when API key absent
 12. **Background Scheduler** - Cron-style scheduler (start/stop/restart via API); warmup cycle on first start
 13. **Persistence + Analytics** - SQLite-backed cycle storage; 10+ aggregation endpoints (KPI / fleet / monthly / seasonal / Pareto history)
@@ -213,7 +213,7 @@ green-logistics-ai/
 | GET    | `/api/scheduler/status` | Background scheduler status |
 | POST   | `/api/scheduler/control` | start / stop / restart scheduler |
 | WS     | `/ws` | WebSocket: cycle_update + fleet metrics (iter #27 origin allowlist) |
-| GET    | `/api/ws/stats` | WebSocket connection stats + allowlist metadata (iter #27) |
+| GET    | `/api/ws/stats` | WebSocket connection stats (peak / accepted / rejected / IP distribution / avg duration) + allowlist metadata (iter #27, iter #32) |
 | GET    | `/docs` | Swagger UI |
 
 ### Deployment
