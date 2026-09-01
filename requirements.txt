@@ -47,6 +47,7 @@ rich>=13.7.0               # Terminal formatting
 pytest>=8.0.0              # Testing framework
 pytest-asyncio>=0.23.0     # Async testing
 pytest-cov>=4.1.0          # Coverage
+pytest-timeout>=2.3.0      # Per-test CI timeout / hang protection
 
 # --- Development ---
 black>=24.0.0              # Code formatting
