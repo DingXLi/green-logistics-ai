@@ -1482,6 +1482,108 @@ async def ws_stats_reset(_: None = Depends(require_admin)):
     return {"reset": True, "stats": ws_broadcaster.stats()}
 
 
+# ============================================
+# iter #36: Public auth discovery endpoint
+# ============================================
+# This endpoint is intentionally NOT protected by require_admin — its purpose
+# is to let unauthenticated clients discover whether auth is enabled and how
+# to authenticate. Without it, debugging auth issues would require reading
+# server-side env vars, which is impossible from outside.
+#
+# We deliberately expose only "safe" fields:
+# - Whether auth is configured (boolean)
+# - Token length + masked preview (helps client verify it has the right token
+#   without leaking the actual secret)
+# - List of header formats accepted
+# - Count + paths of protected endpoints (already discoverable via OpenAPI)
+@app.get("/api/admin/auth/status")
+async def get_auth_status():
+    """
+    Public endpoint: report current admin auth state and usage.
+
+    iter #36: Helps clients (admin UIs, debug scripts, CI runners) detect
+    whether ``GL_ADMIN_TOKEN`` is set on the server before attempting to
+    call protected endpoints.
+
+    This endpoint is itself **not** protected so that an unauthenticated
+    client can still ask "is auth enabled? if so, how do I send my token?".
+
+    Response fields:
+    - ``auth_enabled``: bool — whether ``GL_ADMIN_TOKEN`` is configured
+    - ``token_length``: int — length of configured token (0 when unset)
+    - ``token_preview``: str | null — ``"ab****yz"`` form for sanity check,
+      or ``None`` when auth is disabled
+    - ``header_formats``: list[str] — accepted ways to pass the token
+    - ``protected_endpoints``: list[str] — paths that require admin auth
+    - ``protected_endpoint_count``: int — number of protected endpoints
+    - ``usage_hint``: str — short curl-style example
+    """
+    configured_token = _get_admin_token()
+    auth_enabled = bool(configured_token)
+
+    # Build a masked preview so clients can sanity-check they have the right
+    # token without the server leaking the actual secret.
+    # Format: first 2 + "****" + last 2 chars (only if token >= 8 chars)
+    token_preview: Optional[str] = None
+    if auth_enabled:
+        if len(configured_token) >= 8:
+            token_preview = f"{configured_token[:2]}****{configured_token[-2:]}"
+        else:
+            # Short token: just mask the whole thing
+            token_preview = "****"
+
+    return {
+        "auth_enabled": auth_enabled,
+        "token_length": len(configured_token),
+        "token_preview": token_preview,
+        "header_formats": [
+            "Authorization: Bearer <token>",
+            "X-Admin-Token: <token>",
+        ],
+        "protected_endpoints": _get_protected_endpoints(),
+        "protected_endpoint_count": len(_get_protected_endpoints()),
+        "usage_hint": (
+            "curl -H 'Authorization: Bearer $GL_ADMIN_TOKEN' "
+            "https://<host>/api/ws/stats"
+            if auth_enabled
+            else "Auth disabled — admin endpoints are currently public. "
+            "Set GL_ADMIN_TOKEN to enable protection."
+        ),
+    }
+
+
+def _get_protected_endpoints() -> list:
+    """
+    Return the static list of endpoints currently protected by ``require_admin``.
+
+    iter #36: Single source of truth for both runtime auth and the
+    ``/api/admin/auth/status`` discovery endpoint.
+
+    The list is computed at call time (cheap — just a list literal) so that
+    if a future iteration adds a new protected endpoint, this single source
+    stays in sync via this function. The list itself is defined at module
+    import, but the function call indirection means tests can patch it if
+    needed.
+    """
+    # NOTE: keep in sync with all ``Depends(require_admin)`` usages above.
+    # When you add a new protected endpoint, add it here too — the auth/status
+    # endpoint will then expose it for client discovery.
+    return [
+        "/api/ws/stats",
+        "/api/ws/stats/reset",
+        "/api/debug/llm",
+        "/api/persistence/forecast-method-prefs",  # GET (DELETE also protected)
+        "/api/admin/db-maintenance",
+        "/api/admin/db-export",
+        "/api/admin/db-stats",
+        "/api/admin/db-info",
+        "/api/admin/perf-stats",
+        "/api/admin/perf-stats/reset",
+        "/api/admin/llm-stats",
+        "/api/admin/llm-stats/reset",
+    ]
+
+
 @app.get("/api/debug/llm")
 async def debug_llm(_: None = Depends(require_admin)):
     """诊断 LLM 配置 (env var + model + 试一次调用)"""

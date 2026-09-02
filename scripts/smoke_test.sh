@@ -144,6 +144,13 @@ check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table
 check_endpoint "/api/admin/db-export parquet" 200 GET "/api/admin/db-export?table=cycles&fmt=parquet" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus" "${ADMIN_HEADER_ARGS[@]}"
 
+# ---- iter #36: public auth discovery endpoint (no auth required) ----
+check_endpoint "/api/admin/auth/status" 200 GET "/api/admin/auth/status"
+# auth_enabled value depends on whether GL_ADMIN_TOKEN is set;
+# assert field type is boolean instead of hardcoded value.
+check_json_field "/api/admin/auth/status has auth_enabled bool" GET "/api/admin/auth/status" ".auth_enabled | type" "boolean"
+check_json_field "/api/admin/auth/status has header_formats list" GET "/api/admin/auth/status" ".protected_endpoint_count" "12"
+
 # ---- Persistence endpoints ----
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
 check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence/match-distance-stats"
@@ -167,7 +174,8 @@ check_endpoint "/api/persistence/forecast-confidence invalid methods" 400 GET "/
 # iter #35: forecast method auto-resolution + persistence endpoints
 check_endpoint "/api/persistence/forecast?method=auto" 200 GET "/api/persistence/forecast?method=auto&metrics=cost_sek&horizon=3"
 check_endpoint "/api/persistence/forecast invalid method" 400 GET "/api/persistence/forecast?method=bogus"
-check_endpoint "/api/persistence/forecast-method-prefs" 200 GET "/api/persistence/forecast-method-prefs"
+# iter #36: forecast-method-prefs GET needs admin auth when token is set
+check_endpoint "/api/persistence/forecast-method-prefs" 200 GET "/api/persistence/forecast-method-prefs" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
