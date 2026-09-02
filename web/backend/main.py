@@ -1581,6 +1581,8 @@ def _get_protected_endpoints() -> list:
         "/api/admin/perf-stats/reset",
         "/api/admin/llm-stats",
         "/api/admin/llm-stats/reset",
+        # iter #37: seasonal perturbation endpoints (CRUD)
+        "/api/admin/seasonal-perturbations",
     ]
 
 
@@ -1815,6 +1817,16 @@ async def get_seasonal_factors(sim_day: Optional[int] = None):
         "current_month": current_month,
         "factors_by_month": factors_by_month,
         "current_factors": current_factors,
+        # iter #37: include active perturbations so the frontend can show
+        # shock indicators (e.g. "weather event active: -30% all materials").
+        # Pulled from coordinator.persistence (single source of truth);
+        # works even when no admin token is set.
+        "active_perturbations": (
+            coordinator.persistence.get_active_perturbations(int(sim_day))
+            if (sim_day is not None and coordinator is not None
+                and coordinator.persistence is not None)
+            else []
+        ),
     }
 
 
@@ -2920,6 +2932,137 @@ async def clear_forecast_method_prefs(
     else:
         n = coordinator.persistence.clear_method_prefs()
         return {"deleted": n, "scope": "all"}
+
+
+# ============================================
+# iter #37: Seasonal perturbation endpoints (admin)
+# ============================================
+# Allow operators to model one-off shocks (holiday spike, weather event,
+# plant shutdown) that overlay the static SEASONAL_FACTORS table for a
+# specific sim_day window. Coordinator reads these each cycle and
+# multiplies them into the supply/demand multipliers.
+#
+# Schema is owned by ``agents/persistence.py``; logic in
+# ``data/seasonal_perturbation.py`` (multiplicative semantics + bounds).
+@app.get("/api/admin/seasonal-perturbations")
+async def list_seasonal_perturbations(
+    active_only: bool = True,
+    sim_day: Optional[int] = None,
+    material_type: Optional[str] = None,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #37: List seasonal perturbations.
+
+    Query:
+    - active_only (default true): filter to active=1
+    - sim_day: when provided, returns only perturbations whose window
+              covers this day (and material filter, if given)
+    - material_type: when provided, filters by material (wildcard '*'
+                     matches any)
+
+    Response:
+    {
+        "perturbations": [...],
+        "count": int,
+        "active_count": int
+    }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    if sim_day is not None:
+        rows = coordinator.persistence.get_active_perturbations(
+            int(sim_day), material_type
+        )
+        all_count = len(rows)
+    else:
+        rows = coordinator.persistence.list_seasonal_perturbations(active_only=active_only)
+        all_count = len(rows)
+
+    return {
+        "perturbations": rows,
+        "count": all_count,
+        "active_count": len([r for r in rows if r.get("active", 1)]),
+    }
+
+
+@app.post("/api/admin/seasonal-perturbations")
+async def add_seasonal_perturbation(
+    label: str,
+    start_sim_day: int,
+    end_sim_day: int,
+    material_type: str = "*",
+    multiplier: float = 1.0,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #37: Insert a new perturbation rule.
+
+    Body (query params):
+    - label: human-readable description (e.g. "Christmas paper surge")
+    - start_sim_day / end_sim_day: inclusive window (0-indexed)
+    - material_type: specific material name, or '*' for all materials
+    - multiplier: applied to base seasonal factor (e.g. 0.7 = -30%)
+
+    Validation enforced in persistence layer; bad input -> HTTP 400.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    try:
+        row = coordinator.persistence.add_seasonal_perturbation(
+            label=label,
+            start_sim_day=start_sim_day,
+            end_sim_day=end_sim_day,
+            material_type=material_type,
+            multiplier=multiplier,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    logger.info(
+        f"[perturb] added id={row['id']} label='{label}' "
+        f"days=[{start_sim_day},{end_sim_day}] mat={material_type} x{multiplier}"
+    )
+    return {"created": row, "count": 1}
+
+
+@app.delete("/api/admin/seasonal-perturbations/{perturbation_id}")
+async def delete_seasonal_perturbation(
+    perturbation_id: int,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #37: Hard-delete a single perturbation.
+
+    Returns 404 if not found, 200 with {"deleted": true|false} otherwise.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    deleted = coordinator.persistence.delete_seasonal_perturbation(perturbation_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404, detail=f"perturbation id={perturbation_id} not found"
+        )
+    return {"deleted": True, "id": perturbation_id}
+
+
+@app.post("/api/admin/seasonal-perturbations/{perturbation_id}/deactivate")
+async def deactivate_seasonal_perturbation(
+    perturbation_id: int,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #37: Soft-delete (set active=0). Audit-friendly: row stays in DB
+    so historical analysis can still see "perturbation X was active on day Y".
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    updated = coordinator.persistence.deactivate_seasonal_perturbation(perturbation_id)
+    if not updated:
+        raise HTTPException(
+            status_code=404, detail=f"perturbation id={perturbation_id} not found"
+        )
+    return {"deactivated": True, "id": perturbation_id}
 
 
 @app.get("/api/persistence/forecast/multi")
