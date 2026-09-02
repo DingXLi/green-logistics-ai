@@ -196,6 +196,11 @@ check_endpoint "/api/persistence/forecast?method=auto" 200 GET "/api/persistence
 check_endpoint "/api/persistence/forecast invalid method" 400 GET "/api/persistence/forecast?method=bogus"
 # iter #36: forecast-method-prefs GET needs admin auth when token is set
 check_endpoint "/api/persistence/forecast-method-prefs" 200 GET "/api/persistence/forecast-method-prefs" "${ADMIN_HEADER_ARGS[@]}"
+
+# ---- iter #38: perturbation impact analytics (public) ----
+check_endpoint "/api/persistence/perturbation-impact" 200 GET "/api/persistence/perturbation-impact?limit=5"
+check_json_field "/api/persistence/perturbation-impact has cycles array" GET "/api/persistence/perturbation-impact" ".cycles | type" "array"
+check_json_field "/api/persistence/perturbation-impact has summary" GET "/api/persistence/perturbation-impact" ".summary.n_cycles_total | type" "number"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
