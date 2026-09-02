@@ -56,6 +56,8 @@ const ForecastConfidencePanel = lazy(() => import('./ForecastConfidencePanel').t
 const ForecastMethodPrefs = lazy(() => import('./ForecastMethodPrefs').then(m => ({ default: m.ForecastMethodPrefs })))
 // iter #37: seasonal perturbation panel (admin shocks overlay baseline factors)
 const SeasonalPerturbationPanel = lazy(() => import('./SeasonalPerturbationPanel').then(m => ({ default: m.SeasonalPerturbationPanel })))
+// iter #38: perturbation impact analytics (base vs effective seasonal factor)
+const PerturbationImpactPanel = lazy(() => import('./PerturbationImpactPanel').then(m => ({ default: m.PerturbationImpactPanel })))
 // iter #28: LLM cost time-series chart
 const LlmCostTimeseriesChart = lazy(() => import('./LlmCostTimeseriesChart').then(m => ({ default: m.LlmCostTimeseriesChart })))
 // iter #29: LLM usage/cost forecast panel
@@ -658,6 +660,7 @@ export default function Dashboard() {
             <ForecastMethodPrefs />
             <ForecastConfidencePanel />
             <SeasonalPerturbationPanel />
+            <PerturbationImpactPanel />
           </Suspense>
         </>
       )}
