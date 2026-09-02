@@ -226,6 +226,15 @@ check_endpoint "/api/optimize/batch" 200 POST "/api/optimize/batch" \
     -d '{"scenarios":[{"name":"baseline","n_points":3,"time_limit_seconds":3,"co2_price":0,"use_real_roads":false}]}'
 check_endpoint "/api/optimize/pareto" 200 GET "/api/optimize/pareto?n_points=3"
 
+# ---- iter #40: simulation runner (POST /api/simulate/run) ----
+# Use dry_run=true to avoid polluting production DB; 1 day is fast enough
+# for smoke validation. Response shape: status / cycles_completed / kpi_summary.
+check_endpoint "/api/simulate/run?days=1&dry_run=true" 200 POST "/api/simulate/run?days=1&dry_run=true"
+check_json_field "/api/simulate/run has status" POST "/api/simulate/run?days=1&dry_run=true" ".status" "success"
+# invalid days → 400
+check_endpoint "/api/simulate/run?days=0" 400 POST "/api/simulate/run?days=0"
+check_endpoint "/api/simulate/run?days=999" 400 POST "/api/simulate/run?days=999"
+
 # ---- iter #39: carbon scenario analytics (true total cost + breakeven) ----
 check_endpoint "/api/optimize/carbon-scenarios" 200 GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2"
 check_json_field "/api/optimize/carbon-scenarios has breakeven field" GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2" ".breakeven_price_sek_per_kg | type" "number"
