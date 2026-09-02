@@ -169,7 +169,7 @@ check_endpoint "/api/admin/auth/status" 200 GET "/api/admin/auth/status"
 # auth_enabled value depends on whether GL_ADMIN_TOKEN is set;
 # assert field type is boolean instead of hardcoded value.
 check_json_field "/api/admin/auth/status has auth_enabled bool" GET "/api/admin/auth/status" ".auth_enabled | type" "boolean"
-check_json_field "/api/admin/auth/status has header_formats list" GET "/api/admin/auth/status" ".protected_endpoint_count" "12"
+check_json_field "/api/admin/auth/status has header_formats list" GET "/api/admin/auth/status" ".protected_endpoint_count" "13"
 
 # ---- Persistence endpoints ----
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
