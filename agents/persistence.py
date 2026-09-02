@@ -50,7 +50,14 @@ CREATE TABLE IF NOT EXISTS optimization_cycles (
     -- seasonal_factor_avg = 该 cycle 所有 supply 点的 seasonal_multiplier 平均
     -- seasonal_month = (sim_day // 30) % 12 + 1 (1-12)
     seasonal_factor_avg REAL DEFAULT 1.0,
-    seasonal_month INTEGER DEFAULT 1
+    seasonal_month INTEGER DEFAULT 1,
+    -- iter #38: 季节扰动效果分析
+    -- base_seasonal_factor_avg = 同一 cycle 所有 supply 点的 baseline (无扰动) 平均
+    -- seasonal_factor_avg 仍然是 effective 值 (含扰动)
+    -- 两者之差 = 扰动对 supply 的影响
+    base_seasonal_factor_avg REAL DEFAULT 1.0,
+    perturbation_count INTEGER DEFAULT 0,
+    perturbation_total_multiplier REAL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_cycles_day ON optimization_cycles(sim_day);
@@ -65,6 +72,10 @@ CREATE TABLE IF NOT EXISTS supply_offers (
     available_tons REAL,
     moisture_percent REAL,
     quality_score REAL,
+    -- iter #38: 季节扰动效果 (split baseline vs effective for analysis)
+    base_seasonal_multiplier REAL DEFAULT 1.0,
+    seasonal_multiplier REAL DEFAULT 1.0,
+    perturbation_applied INTEGER DEFAULT 0,
     FOREIGN KEY(cycle_id) REFERENCES optimization_cycles(cycle_id)
 );
 
@@ -232,6 +243,48 @@ class Persistence:
                 )
             except Exception:
                 pass
+        # iter #38: perturbation impact tracking columns
+        if "base_seasonal_factor_avg" not in existing:
+            try:
+                conn.execute(
+                    "ALTER TABLE optimization_cycles "
+                    "ADD COLUMN base_seasonal_factor_avg REAL DEFAULT 1.0"
+                )
+            except Exception:
+                pass
+        if "perturbation_count" not in existing:
+            try:
+                conn.execute(
+                    "ALTER TABLE optimization_cycles "
+                    "ADD COLUMN perturbation_count INTEGER DEFAULT 0"
+                )
+            except Exception:
+                pass
+        if "perturbation_total_multiplier" not in existing:
+            try:
+                conn.execute(
+                    "ALTER TABLE optimization_cycles "
+                    "ADD COLUMN perturbation_total_multiplier REAL DEFAULT 1.0"
+                )
+            except Exception:
+                pass
+        # iter #38: supply_offers perturbation tracking
+        supply_existing = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(supply_offers)").fetchall()
+        }
+        for col, sqltype, default in [
+            ("base_seasonal_multiplier", "REAL", "1.0"),
+            ("seasonal_multiplier", "REAL", "1.0"),
+            ("perturbation_applied", "INTEGER", "0"),
+        ]:
+            if col not in supply_existing:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE supply_offers ADD COLUMN {col} {sqltype} DEFAULT {default}"
+                    )
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------
     # 周期级 KPI
@@ -247,24 +300,36 @@ class Persistence:
         n_demand_requests: int = 0,
         seasonal_factor_avg: float = 1.0,
         seasonal_month: int = 1,
+        base_seasonal_factor_avg: float = 1.0,
+        perturbation_count: int = 0,
+        perturbation_total_multiplier: float = 1.0,
     ) -> None:
         """开始一个新周期（先写一行 cycle 记录）
 
         Args:
-            seasonal_factor_avg: 本 cycle 所有 supply 点的 seasonal_multiplier
-                                  平均值 (e.g. 1.4 if summer peak)
+            seasonal_factor_avg: 本 cycle 所有 supply 点的 effective seasonal_multiplier
+                                 平均值 (e.g. 1.4 if summer peak + perturbation)
             seasonal_month: 1-12 对应该 cycle 的月份
+            base_seasonal_factor_avg (iter #38): 同 cycle 所有 supply 点的 baseline
+                                  (无扰动) 平均值, 用于分析 perturbation effect
+            perturbation_count (iter #38): 该 cycle 命中几个 perturbation rule
+            perturbation_total_multiplier (iter #38): 该 cycle 所有 perturbation
+                                  multiplier 之乘积 (e.g. 0.7 * 1.2 = 0.84)
         """
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO optimization_cycles
                    (cycle_id, sim_day, sim_hour, activity_factor,
                     wall_timestamp, n_supply_offers, n_demand_requests,
-                    seasonal_factor_avg, seasonal_month)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    seasonal_factor_avg, seasonal_month,
+                    base_seasonal_factor_avg, perturbation_count,
+                    perturbation_total_multiplier)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (cycle_id, sim_day, sim_hour, activity_factor,
                  datetime.now().isoformat(), n_supply_offers, n_demand_requests,
-                 seasonal_factor_avg, seasonal_month)
+                 seasonal_factor_avg, seasonal_month,
+                 base_seasonal_factor_avg, perturbation_count,
+                 perturbation_total_multiplier)
             )
 
     def commit_cycle(
@@ -313,8 +378,9 @@ class Persistence:
             conn.execute(
                 """INSERT INTO supply_offers
                    (cycle_id, supply_id, location_lat, location_lon,
-                    material_type, available_tons, moisture_percent, quality_score)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    material_type, available_tons, moisture_percent, quality_score,
+                    base_seasonal_multiplier, seasonal_multiplier, perturbation_applied)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     cycle_id,
                     supply.get("agent_id") or supply.get("supply_id"),
@@ -324,6 +390,9 @@ class Persistence:
                     supply.get("available_tons", supply.get("weight_tons", 0)),
                     supply.get("moisture_percent"),
                     supply.get("quality_score"),
+                    float(supply.get("base_seasonal_multiplier", 1.0)),
+                    float(supply.get("seasonal_multiplier", 1.0)),
+                    int(bool(supply.get("perturbation_applied", False))),
                 )
             )
 
@@ -2780,3 +2849,100 @@ class Persistence:
         with self._conn() as conn:
             cur = conn.execute("DELETE FROM seasonal_perturbations")
         return cur.rowcount
+
+    # ====================================================================
+    # iter #38: Perturbation impact analytics
+    # ====================================================================
+    def get_perturbation_impact(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 90,
+    ) -> Dict[str, Any]:
+        """
+        Per-cycle perturbation impact analysis (iter #38).
+
+        Joins per-cycle aggregates with perturbation tracking fields to
+        show how much active shocks moved the seasonal_factor_avg.
+
+        Returns:
+            {
+              "cycles": [{sim_day, base_seasonal_factor_avg,
+                            seasonal_factor_avg, delta,
+                            perturbation_count,
+                            perturbation_total_multiplier,
+                            wall_timestamp}, ...],
+              "summary": {
+                "n_cycles_total": int,
+                "n_cycles_with_perturbation": int,
+                "avg_delta": float | None,
+                "max_delta": float | None,
+                "min_delta": float | None,
+                "max_total_multiplier": float | None,
+                "window_start": int | None,
+                "window_end": int | None,
+              }
+            }
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        # iter #38: ORDER BY id DESC (most-recent-inserted first)
+        # sim_day DESC is misleading because the live sim may cycle back
+        # to low sim_day values after year wrap (sim_day % 360). id is
+        # monotonic per insert and reflects true wall-clock ordering.
+        sql = f"""SELECT sim_day, wall_timestamp,
+                          base_seasonal_factor_avg, seasonal_factor_avg,
+                          perturbation_count, perturbation_total_multiplier
+                   FROM optimization_cycles
+                   {where_sql}
+                   ORDER BY id DESC
+                   LIMIT ?"""
+        params.append(int(limit))
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        cycles = []
+        deltas: List[float] = []
+        multipliers: List[float] = []
+        n_perturbed = 0
+        for r in rows:
+            base_f = r["base_seasonal_factor_avg"] or 1.0
+            eff_f = r["seasonal_factor_avg"] or 1.0
+            delta = round(eff_f - base_f, 3)
+            cycles.append({
+                "sim_day": r["sim_day"],
+                "wall_timestamp": r["wall_timestamp"],
+                "base_seasonal_factor_avg": round(base_f, 3),
+                "seasonal_factor_avg": round(eff_f, 3),
+                "delta": delta,
+                "perturbation_count": r["perturbation_count"] or 0,
+                "perturbation_total_multiplier": r["perturbation_total_multiplier"] or 1.0,
+            })
+            deltas.append(delta)
+            multipliers.append(r["perturbation_total_multiplier"] or 1.0)
+            if (r["perturbation_count"] or 0) > 0:
+                n_perturbed += 1
+        # Reverse cycles list so response is ordered OLDEST→NEWEST (more
+        # intuitive for time-series charts on the frontend).
+        cycles.reverse()
+
+        summary = {
+            "n_cycles_total": len(cycles),
+            "n_cycles_with_perturbation": n_perturbed,
+            "avg_delta": round(sum(deltas) / len(deltas), 3) if deltas else None,
+            "max_delta": round(max(deltas), 3) if deltas else None,
+            "min_delta": round(min(deltas), 3) if deltas else None,
+            "max_total_multiplier": round(max(multipliers), 3) if multipliers else None,
+            # cycles is now OLDEST → NEWEST (reversed in loop above)
+            "window_start": cycles[0]["sim_day"] if cycles else None,
+            "window_end": cycles[-1]["sim_day"] if cycles else None,
+        }
+        return {"cycles": cycles, "summary": summary}
