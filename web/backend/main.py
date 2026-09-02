@@ -1908,6 +1908,162 @@ async def get_last_optimization():
 
 
 # ============================================
+# iter #40: Long-running simulation runner
+# ============================================
+# One-shot endpoint to run N days of simulation synchronously and persist
+# all cycles + KPIs to the DB. Useful for:
+# - Filling analytics data so perturbation-impact / forecast / cohort panels
+#   have something to show (today HF has only ~30 cycles).
+# - Quick demo from the dashboard "Run 30-day sim" button.
+# - Stress-testing the persistence layer with realistic data volumes.
+#
+# NOT for production traffic — runs OR-Tools once per day. Use the
+# scheduler (/api/scheduler/control) for continuous background runs.
+@app.post("/api/simulate/run")
+async def run_simulation(
+    days: int = 7,
+    dry_run: bool = False,
+):
+    """
+    iter #40: Run N days of multi-agent simulation synchronously.
+
+    Body (query params):
+    - days (default 7): number of simulation days to run. Clamped to [1, 90].
+    - dry_run (default False): if True, skip persistence (compute-only mode).
+
+    Returns:
+    {
+      "status": "success",
+      "days_requested": int,
+      "cycles_completed": int,
+      "first_sim_day": int,
+      "last_sim_day": int,
+      "wall_duration_seconds": float,
+      "kpi_summary": {
+        "total_tons", "total_cost_sek", "total_co2_kg",
+        "avg_fleet_utilization_pct", "n_matches_total",
+      },
+      "per_day": [{sim_day, cycle_id, n_matches, total_tons,
+                   total_cost_sek, total_co2_kg, fleet_utilization_pct}, ...]
+    }
+    """
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+    if coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    # Validate inputs
+    if not isinstance(days, int):
+        try:
+            days = int(days)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"days must be int, got {type(days).__name__}")
+    if days < 1 or days > 90:
+        raise HTTPException(
+            status_code=400,
+            detail=f"days must be in [1, 90]; got {days} "
+            f"(90-day cap to avoid runaway OR-Tools solves)",
+        )
+
+    # Capture starting sim_day for reporting
+    starting_sim_day = coordinator.clock.now.day if hasattr(coordinator, "clock") else None
+    starting_cycle_count_before = (
+        coordinator.persistence.get_summary().get("n_cycles", 0)
+        if hasattr(coordinator.persistence, "get_summary") else 0
+    )
+
+    import time as _time
+    t0 = _time.time()
+    try:
+        # If dry_run, temporarily flag coordinator to skip persistence writes.
+        # coordinator.run_optimization_cycle already supports dry_run internally
+        # (iter #12). We delegate by passing it through simulate_day's logic:
+        # simulate_day just calls run_optimization_cycle repeatedly.
+        if dry_run:
+            # Patch the run_optimization_cycle via the coordinator's flag
+            # (simulate_day itself doesn't accept dry_run; use a temporary
+            # monkey-patch on the coordinator's method).
+            original = coordinator.run_optimization_cycle
+            async def _dry_cycle(*args, **kwargs):
+                kwargs["dry_run"] = True
+                return await original(*args, **kwargs)
+            coordinator.run_optimization_cycle = _dry_cycle  # type: ignore
+            try:
+                results = await coordinator.simulate_day(days=days)
+            finally:
+                coordinator.run_optimization_cycle = original  # type: ignore
+        else:
+            results = await coordinator.simulate_day(days=days)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Simulation failed after {days} days: {type(e).__name__}: {e}",
+        )
+    elapsed_s = round(_time.time() - t0, 2)
+
+    # Aggregate KPIs
+    kpi_summary = {
+        "total_tons": 0.0,
+        "total_cost_sek": 0.0,
+        "total_co2_kg": 0.0,
+        "n_matches_total": 0,
+        "fleet_utilization_sum": 0.0,
+        "fleet_utilization_count": 0,
+    }
+    per_day = []
+    for r in results:
+        # run_optimization_cycle returns dict with cycle_id + kpi sub-dict
+        kpi = r.get("kpi", {}) if isinstance(r, dict) else {}
+        if kpi:
+            kpi_summary["total_tons"] += float(kpi.get("total_tons", 0) or 0)
+            kpi_summary["total_cost_sek"] += float(kpi.get("total_cost_sek", 0) or 0)
+            kpi_summary["total_co2_kg"] += float(kpi.get("total_co2_kg", 0) or 0)
+            kpi_summary["n_matches_total"] += int(kpi.get("n_matches", 0) or 0)
+            util = kpi.get("fleet_utilization_pct")
+            if util is not None:
+                kpi_summary["fleet_utilization_sum"] += float(util)
+                kpi_summary["fleet_utilization_count"] += 1
+        # Per-day summary (compact). sim_day + cycle_id come from TOP-LEVEL
+        # of run_optimization_cycle result (not from kpi sub-dict).
+        per_day.append({
+            "sim_day": r.get("sim_day") if isinstance(r, dict) else None,
+            "cycle_id": r.get("optimization_id") if isinstance(r, dict) else None,
+            "n_matches": kpi.get("n_matches"),
+            "total_tons": kpi.get("total_tons"),
+            "total_cost_sek": kpi.get("total_cost_sek"),
+            "total_co2_kg": kpi.get("total_co2_kg"),
+            "fleet_utilization_pct": kpi.get("fleet_utilization_pct"),
+        })
+
+    # Round aggregates
+    avg_util = (
+        round(kpi_summary["fleet_utilization_sum"] / kpi_summary["fleet_utilization_count"], 2)
+        if kpi_summary["fleet_utilization_count"] > 0 else None
+    )
+    final_sim_day = None
+    if per_day and per_day[-1].get("sim_day") is not None:
+        final_sim_day = per_day[-1]["sim_day"]
+
+    return {
+        "status": "success",
+        "days_requested": days,
+        "dry_run": dry_run,
+        "cycles_completed": len(results),
+        "first_sim_day": starting_sim_day,
+        "last_sim_day": final_sim_day,
+        "wall_duration_seconds": elapsed_s,
+        "kpi_summary": {
+            "total_tons": round(kpi_summary["total_tons"], 2),
+            "total_cost_sek": round(kpi_summary["total_cost_sek"], 2),
+            "total_co2_kg": round(kpi_summary["total_co2_kg"], 2),
+            "n_matches_total": kpi_summary["n_matches_total"],
+            "avg_fleet_utilization_pct": avg_util,
+        },
+        "per_day": per_day,
+    }
+
+
+# ============================================
 # V3: Pareto 前沿端点
 # ============================================
 @app.get("/api/optimize/pareto")
