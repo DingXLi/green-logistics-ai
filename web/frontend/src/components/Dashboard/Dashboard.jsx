@@ -52,6 +52,8 @@ const ExportButton = lazy(() => import('./ExportButton').then(m => ({ default: m
 const ForecastPanel = lazy(() => import('./ForecastPanel').then(m => ({ default: m.ForecastPanel })))
 // iter #30: ensemble forecast confidence panel
 const ForecastConfidencePanel = lazy(() => import('./ForecastConfidencePanel').then(m => ({ default: m.ForecastConfidencePanel })))
+// iter #36: persisted best_method preferences per metric (auto-resolved by /forecast?method=auto)
+const ForecastMethodPrefs = lazy(() => import('./ForecastMethodPrefs').then(m => ({ default: m.ForecastMethodPrefs })))
 // iter #28: LLM cost time-series chart
 const LlmCostTimeseriesChart = lazy(() => import('./LlmCostTimeseriesChart').then(m => ({ default: m.LlmCostTimeseriesChart })))
 // iter #29: LLM usage/cost forecast panel
@@ -651,6 +653,7 @@ export default function Dashboard() {
           {/* iter #26: KPI forecast (next N days prediction) */}
           <Suspense fallback={<LoadingSpinner label="Loading forecast…" />}>
             <ForecastPanel />
+            <ForecastMethodPrefs />
             <ForecastConfidencePanel />
           </Suspense>
         </>
