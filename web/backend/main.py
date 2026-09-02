@@ -2558,6 +2558,54 @@ async def get_seasonal_timeseries():
     return coordinator.persistence.get_seasonal_timeseries()
 
 
+# ============================================
+# iter #38: Perturbation impact analytics
+# ============================================
+# Surfaces how active perturbations changed cycle KPIs over time.
+# Returns time-series data + aggregate summary so the frontend can
+# chart base-vs-effective seasonal factors.
+@app.get("/api/persistence/perturbation-impact")
+async def get_perturbation_impact(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 90,
+):
+    """
+    iter #38: Per-cycle perturbation impact analysis.
+
+    For each cycle in the window, returns:
+    - sim_day
+    - base_seasonal_factor_avg (无扰动 baseline)
+    - seasonal_factor_avg (effective, 含扰动)
+    - perturbation_count (该 cycle 命中几个 supply 点被扰动)
+    - perturbation_total_multiplier (effective/base ratio)
+    - delta (seasonal_factor_avg - base_seasonal_factor_avg)
+
+    Plus aggregate summary:
+    - n_cycles_total / n_cycles_with_perturbation
+    - avg_delta / max_delta / min_delta
+    - max_total_multiplier
+
+    Query:
+    - since_sim_day / until_sim_day: optional sim_day filter
+    - limit: max cycles to return (default 90, ordered by sim_day DESC)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    since = int(since_sim_day) if since_sim_day is not None else None
+    until = int(until_sim_day) if until_sim_day is not None else None
+    if since is not None and until is not None and until < since:
+        raise HTTPException(
+            status_code=400,
+            detail=f"until_sim_day ({until}) must be >= since_sim_day ({since})",
+        )
+
+    return coordinator.persistence.get_perturbation_impact(
+        since_sim_day=since, until_sim_day=until, limit=limit
+    )
+
+
 @app.get("/api/persistence/llm-cost-timeseries")
 async def get_llm_cost_timeseries(
     since_sim_day: Optional[int] = None,

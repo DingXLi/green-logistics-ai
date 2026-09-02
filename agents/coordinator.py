@@ -282,6 +282,10 @@ class MultiAgentCoordinator:
             )
             # LLM + seasonal + perturbation 三者叠加：predicted_tons 受所有因素影响
             predicted_tons = round(base_pred * llm_m * seasonal_m, 2)
+            # iter #38: track whether this offer had a perturbation applied
+            # (i.e. perturbed != baseline). Default False; True only when
+            # the helper actually applied a non-1.0 multiplier.
+            had_perturbation = abs(seasonal_m - base_seasonal) > 1e-9
             sup_meta = supply_llm.get(agent_id, {})
             supply_offers.append({
                 "agent_id": agent_id,
@@ -297,8 +301,10 @@ class MultiAgentCoordinator:
                 "llm_confidence": sup_meta.get("confidence"),
                 "llm_reason": sup_meta.get("reason"),
                 "llm_source": sup_meta.get("source", "unknown"),
-                # Seasonal 决策可追溯
+                # Seasonal 决策可追溯 (iter #38: split baseline vs effective)
+                "base_seasonal_multiplier": round(base_seasonal, 3),
                 "seasonal_multiplier": round(seasonal_m, 3),
+                "perturbation_applied": had_perturbation,
                 "sim_month": _seasonal_month(day),
             })
 
@@ -362,6 +368,27 @@ class MultiAgentCoordinator:
             sum(s.get("seasonal_multiplier", 1.0) for s in supply_offers)
             / max(len(supply_offers), 1)
         )
+        # iter #38: 同时记录 baseline (无扰动) 平均 + perturbation 统计
+        # 这三个字段允许后端分析 "扰动实际造成多少影响"
+        base_seasonal_factor_avg = (
+            sum(s.get("base_seasonal_multiplier", 1.0) for s in supply_offers)
+            / max(len(supply_offers), 1)
+        )
+        perturbed_supply_count = sum(
+            1 for s in supply_offers if s.get("perturbation_applied", False)
+        )
+        # 求出该 cycle 实际生效的 perturbation 之乘积 (供查询与回放)
+        perturbation_total_multiplier = 1.0
+        if perturbed_supply_count > 0:
+            # 用 effective / base 的几何平均来近似总体扰动倍率
+            try:
+                if base_seasonal_factor_avg > 0:
+                    perturbation_total_multiplier = round(
+                        seasonal_factor_avg / base_seasonal_factor_avg, 3
+                    )
+            except Exception:
+                perturbation_total_multiplier = 1.0
+
         sim_month = _seasonal_month(day)
         # iter #12: dry_run 模式下跳过所有 persistence (但 cycle 逻辑仍完整)
         if not dry_run:
@@ -374,6 +401,10 @@ class MultiAgentCoordinator:
                 n_demand_requests=len(demand_requests),
                 seasonal_factor_avg=round(seasonal_factor_avg, 3),
                 seasonal_month=sim_month,
+                # iter #38: perturbation impact tracking
+                base_seasonal_factor_avg=round(base_seasonal_factor_avg, 3),
+                perturbation_count=perturbed_supply_count,
+                perturbation_total_multiplier=perturbation_total_multiplier,
             )
             for sup in supply_offers:
                 self.persistence.record_supply(cycle_id, sup)
