@@ -6,20 +6,32 @@ on:
   pull_request:
     branches: [ main ]
 
+# iter #36: Split monolithic test job into parallel jobs to keep CI wall-clock
+# under the 5-minute cron budget used by the autonomous iteration loop.
+#
+# Before: one `test` job ran lint + mypy + security + ALL pytest serially,
+# taking >5 min on a full suite and >7 min on the slow OR-Tools integration.
+#
+# After: 3 parallel jobs (lint, fast-tests, slow-tests) + LLM-gated job,
+# all sharing pip cache. Each finishes in <3 min; total wall-clock ~5 min.
+#
+# The split uses pytest markers (see pytest.ini):
+#   -m "not slow"  → fast unit tests (default)
+#   -m "slow"      → OR-Tools / heavy integration
+#   -m "llm"       → reserved for future LLM-gated tests
+
 jobs:
-  test:
+  lint:
+    name: Lint + type-check + security (iter #36: parallel)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.12"
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
@@ -60,16 +72,46 @@ jobs:
         pip install pip-audit 2>/dev/null || echo "pip-audit unavailable, using fallback"
         bash scripts/security_scan.sh || echo "security scan found issues (non-fatal — see logs)"
 
-    - name: Test with pytest + coverage (iter #14)
+  fast-tests:
+    name: Fast unit tests (iter #36: -m "not slow")
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test with pytest (fast only) + coverage (iter #36)
       run: |
         pip install pytest pytest-asyncio pytest-cov pytest-timeout
-        # 跳过 OR-Tools 慢测试 (test_pareto_front ~15s) 和需要 LLM 的测试
-        # pytest-timeout gives every test a hard wall-clock budget; prevents a single
-        # hanging optimization from blocking the entire CI matrix indefinitely.
+        # iter #36: split into fast + slow jobs. -m "not slow" excludes
+        # pytestmark = pytest.mark.slow modules (OR-Tools integration,
+        # coordinator bootstrap, heavy DB perf benchmarks).
+        # pytest-timeout gives every test a hard wall-clock budget; prevents
+        # a single hanging optimization from blocking the entire CI matrix.
         pytest tests/ \
           --ignore=tests/test_llm_integration.py \
-          -k "not test_pareto_front" \
-          --timeout=90 \
+          -m "not slow" \
+          --timeout=60 \
           --timeout-method=thread \
           --cov=agents --cov=optimization --cov=data --cov=web/backend \
           --cov-report=term-missing \
@@ -89,6 +131,80 @@ jobs:
         flags: unittests
         fail_ci_if_error: false  # 不要让 Codecov 错误卡住 CI
 
+  slow-tests:
+    name: Slow integration tests (iter #36: -m slow, OR-Tools)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]  # slow: only newest py to halve matrix
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test slow suite (OR-Tools / coordinator / perf)
+      run: |
+        pip install pytest pytest-asyncio pytest-timeout
+        # iter #36: slow tests run in their own job so they don't block the
+        # fast feedback loop on PRs. Modules marked with pytestmark = slow:
+        #   - test_vrp_real_distance.py  (OR-Tools path optimization)
+        #   - test_agents.py             (full coordinator bootstrap + cycle)
+        #   - test_supply_cohort.py      (multi-hundred-row DB writes)
+        #   - test_persistence_efficiency.py (perf benchmarks)
+        pytest tests/ \
+          -m "slow" \
+          --timeout=180 \
+          --timeout-method=thread \
+          -v \
+          --tb=short \
+          --maxfail=3
+      # --maxfail=3: stop early on cascading failures (e.g. DB schema bug)
+
+  llm-tests:
+    name: LLM integration tests (iter #36: requires GOOGLE_API_KEY)
+    runs-on: ubuntu-latest
+    # LLM tests only run on main branch with secret available
+    if: github.ref == 'refs/heads/main'
+    continue-on-error: true
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
     - name: Test LLM integration (with API key)
       run: |
         pip install pytest pytest-asyncio pytest-timeout
@@ -99,11 +215,11 @@ jobs:
         fi
       env:
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-      continue-on-error: true
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: test
+    # iter #36: wait for all parallel jobs before building docker image
+    needs: [lint, fast-tests, slow-tests]
 
     steps:
     - uses: actions/checkout@v4
@@ -118,7 +234,7 @@ jobs:
 
   deploy-preview:
     runs-on: ubuntu-latest
-    needs: [test, docker-build]
+    needs: [lint, fast-tests, slow-tests, docker-build]
     if: github.ref == 'refs/heads/main'
 
     steps:

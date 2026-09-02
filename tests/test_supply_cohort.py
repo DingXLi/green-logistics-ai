@@ -13,6 +13,11 @@ import pytest
 
 from agents.persistence import Persistence
 
+# iter #36: Supply cohort retention tests run large DB operations
+# (multi-hundred-row writes per test). CI splits them into a
+# parallel job (see .github/workflows/ci-cd.yml).
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def persistence(tmp_path) -> Persistence:

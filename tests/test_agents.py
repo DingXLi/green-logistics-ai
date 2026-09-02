@@ -6,6 +6,11 @@ import asyncio
 import sys
 import os
 
+# iter #36: Multi-agent coordinator integration tests are slow
+# (full bootstrap + cycle on every test). CI splits them into a
+# parallel job (see .github/workflows/ci-cd.yml).
+pytestmark = pytest.mark.slow
+
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
