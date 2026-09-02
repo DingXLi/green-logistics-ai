@@ -16,6 +16,10 @@ import pytest
 import numpy as np
 from optimization.vrp_solver import VRPSolver, Location, Vehicle
 
+# iter #36: OR-Tools integration tests are slow (path optimization per test).
+# CI splits them into a parallel job (see .github/workflows/ci-cd.yml).
+pytestmark = pytest.mark.slow
+
 
 # ============================================================
 # Fixtures

@@ -15,6 +15,11 @@ import sys
 import tempfile
 import pytest
 
+# iter #36: Persistence efficiency tests do heavy perf benchmarks
+# (hundreds of inserts + aggregates per test). CI splits them
+# into a parallel job (see .github/workflows/ci-cd.yml).
+pytestmark = pytest.mark.slow
+
 # 让 tests 能找到项目根目录
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
