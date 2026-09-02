@@ -2249,12 +2249,81 @@ async def get_carbon_scenarios(
 
     scenarios = await asyncio.gather(*[_solve_scenario(p) for p in prices])
 
+    # iter #39: compute TRUE total cost analytics per scenario so the
+    # frontend can quickly answer "carbon tax X SEK/kg increases cost by Y%".
+    # IMPORTANT: cost-optimal.cost_sek is just fuel/operating cost (co2_weight=0),
+    # so it stays the same across tax levels. To show real cost sensitivity,
+    # we compute true_total_cost = cost_sek + tax * co2_kg for each routing.
+    sorted_scenarios = sorted(scenarios, key=lambda s: s["carbon_price_sek_per_kg"])
+    baseline_true_cost_opt = None
+    if sorted_scenarios and sorted_scenarios[0].get("cost_optimal"):
+        bco = sorted_scenarios[0]["cost_optimal"]
+        bprice = sorted_scenarios[0]["carbon_price_sek_per_kg"]
+        if bco.get("cost_sek") is not None and bco.get("co2_kg") is not None:
+            baseline_true_cost_opt = bco["cost_sek"] + bprice * bco["co2_kg"]
+
+    for s in scenarios:
+        price = s["carbon_price_sek_per_kg"]
+        cost_opt = s.get("cost_optimal") or {}
+        co2_opt = s.get("co2_optimal") or {}
+        # True total cost for cost-optimal routing at this tax level
+        s["true_total_cost_cost_opt"] = None
+        if cost_opt.get("cost_sek") is not None and cost_opt.get("co2_kg") is not None:
+            s["true_total_cost_cost_opt"] = round(
+                cost_opt["cost_sek"] + price * cost_opt["co2_kg"], 2
+            )
+        # True total cost for co2-optimal routing (already includes tax in solver)
+        s["true_total_cost_co2_opt"] = None
+        if co2_opt.get("cost_sek") is not None and co2_opt.get("co2_kg") is not None:
+            s["true_total_cost_co2_opt"] = round(
+                co2_opt["cost_sek"] + price * co2_opt["co2_kg"], 2
+            )
+        # Delta from baseline (cost-opt strategy, true total)
+        s["delta_from_baseline_pct"] = None
+        if baseline_true_cost_opt and baseline_true_cost_opt > 0 and s["true_total_cost_cost_opt"] is not None:
+            s["delta_from_baseline_pct"] = round(
+                (s["true_total_cost_cost_opt"] - baseline_true_cost_opt) / baseline_true_cost_opt * 100, 2
+            )
+        # CO2 delta vs baseline (cost-opt strategy: should drop as tax rises)
+        s["co2_delta_from_baseline_pct"] = None
+        baseline_co2_opt = None
+        if sorted_scenarios and sorted_scenarios[0].get("cost_optimal"):
+            baseline_co2_opt = sorted_scenarios[0]["cost_optimal"].get("co2_kg")
+        if baseline_co2_opt and baseline_co2_opt > 0 and cost_opt.get("co2_kg") is not None:
+            s["co2_delta_from_baseline_pct"] = round(
+                (cost_opt["co2_kg"] - baseline_co2_opt) / baseline_co2_opt * 100, 2
+            )
+
+    # iter #39: compute breakeven analysis — find carbon price at which
+    # cost-optimal and co2-optimal converge (or come closest). Useful for
+    # operators to understand sensitivity: "at what tax rate do we naturally
+    # optimize for CO2 anyway?"
+    breakeven_price = None
+    breakeven_gap_sek = None
+    for s in sorted_scenarios:
+        cost_opt = s.get("cost_optimal") or {}
+        co2_opt = s.get("co2_optimal") or {}
+        cost_cost = cost_opt.get("cost_sek")
+        co2_cost = co2_opt.get("cost_sek")
+        if cost_cost is None or co2_cost is None:
+            continue
+        gap = abs(cost_cost - co2_cost)
+        if breakeven_gap_sek is None or gap < breakeven_gap_sek:
+            breakeven_gap_sek = gap
+            breakeven_price = s["carbon_price_sek_per_kg"]
+
     return {
         "n_pickups": len(pickup_locations),
         "n_deliveries": len(delivery_locations),
         "n_vehicles": len(vehicles_data),
         "scenarios": scenarios,
         "use_real_roads": use_real_roads,
+        # iter #39: analytics fields
+        "baseline_carbon_price_sek_per_kg": (
+            sorted_scenarios[0]["carbon_price_sek_per_kg"] if sorted_scenarios else None
+        ),
+        "breakeven_price_sek_per_kg": breakeven_price,
+        "breakeven_gap_sek": breakeven_gap_sek,
     }
 
 
