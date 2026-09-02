@@ -226,6 +226,10 @@ check_endpoint "/api/optimize/batch" 200 POST "/api/optimize/batch" \
     -d '{"scenarios":[{"name":"baseline","n_points":3,"time_limit_seconds":3,"co2_price":0,"use_real_roads":false}]}'
 check_endpoint "/api/optimize/pareto" 200 GET "/api/optimize/pareto?n_points=3"
 
+# ---- iter #39: carbon scenario analytics (true total cost + breakeven) ----
+check_endpoint "/api/optimize/carbon-scenarios" 200 GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2"
+check_json_field "/api/optimize/carbon-scenarios has breakeven field" GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2" ".breakeven_price_sek_per_kg | type" "number"
+
 # ---- Data / facilities ----
 check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distance-matrix"
 
