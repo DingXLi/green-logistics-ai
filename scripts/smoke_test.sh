@@ -144,6 +144,26 @@ check_endpoint "/api/admin/db-export ndjson" 200 GET "/api/admin/db-export?table
 check_endpoint "/api/admin/db-export parquet" 200 GET "/api/admin/db-export?table=cycles&fmt=parquet" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/admin/db-export invalid table" 400 GET "/api/admin/db-export?table=bogus" "${ADMIN_HEADER_ARGS[@]}"
 
+# ---- iter #37: seasonal perturbation CRUD (admin) ----
+check_endpoint "/api/admin/seasonal-perturbations" 200 GET "/api/admin/seasonal-perturbations" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/seasonal-perturbations has perturbations" GET "/api/admin/seasonal-perturbations" ".perturbations | type" "array" "${ADMIN_HEADER_ARGS[@]}"
+# create one
+create_resp=$(curl -s -X POST -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+    "${ADMIN_HEADER_ARGS[@]}" \
+    "${BASE}/api/admin/seasonal-perturbations?label=smoke-surge&start_sim_day=0&end_sim_day=10&material_type=concrete&multiplier=1.5")
+if echo "$create_resp" | jq -e '.created.id' >/dev/null 2>&1; then
+    echo -e "  ${GREEN}✓${NC} create perturbation (smoke-surge)"
+    PASS=$((PASS + 1))
+else
+    echo -e "  ${RED}✗${NC} create perturbation (smoke-surge)"
+    FAIL=$((FAIL + 1))
+    FAILED_ENDPOINTS+=("create perturbation")
+fi
+# cleanup
+curl -s -X DELETE -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+    "${ADMIN_HEADER_ARGS[@]}" \
+    "${BASE}/api/admin/seasonal-perturbations/$(echo $create_resp | jq -r '.created.id')" >/dev/null 2>&1
+
 # ---- iter #36: public auth discovery endpoint (no auth required) ----
 check_endpoint "/api/admin/auth/status" 200 GET "/api/admin/auth/status"
 # auth_enabled value depends on whether GL_ADMIN_TOKEN is set;

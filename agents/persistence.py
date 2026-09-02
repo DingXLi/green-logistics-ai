@@ -145,6 +145,21 @@ CREATE TABLE IF NOT EXISTS forecast_method_prefs (
     n_samples INTEGER DEFAULT 1,        -- 累计更新次数 (用于 confidence)
     updated_at TEXT NOT NULL            -- ISO timestamp
 );
+
+-- iter #37: 季节性扰动 (real-time shocks that overlay the static SEASONAL_FACTORS)
+-- One row = one perturbation rule. Multiple rules may overlap (multiplicative).
+CREATE TABLE IF NOT EXISTS seasonal_perturbations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,                -- 人读标签, e.g. "Christmas paper surge"
+    start_sim_day INTEGER NOT NULL,     -- 包含
+    end_sim_day INTEGER NOT NULL,       -- 包含
+    material_type TEXT NOT NULL,        -- 'concrete' | 'metal_scrap' | ... | '*' (all)
+    multiplier REAL NOT NULL,           -- 叠加到 base seasonal factor (乘)
+    active INTEGER NOT NULL DEFAULT 1,  -- 0 = 软删除 (保留历史可审计)
+    created_at TEXT NOT NULL            -- ISO timestamp
+);
+CREATE INDEX IF NOT EXISTS idx_perturb_window
+    ON seasonal_perturbations(active, start_sim_day, end_sim_day);
 """
 
 
@@ -2636,4 +2651,132 @@ class Persistence:
         """删除所有 prefs。返回删除行数。"""
         with self._conn() as conn:
             cur = conn.execute("DELETE FROM forecast_method_prefs")
+        return cur.rowcount
+
+
+    # ====================================================================
+    # iter #37: Seasonal perturbation CRUD
+    # ====================================================================
+    # Allow operators to model one-off shocks (holiday spikes, weather
+    # events, plant shutdowns) that overlay the static SEASONAL_FACTORS.
+    # See data/seasonal_perturbation.py for the application logic.
+
+    def add_seasonal_perturbation(
+        self,
+        label: str,
+        start_sim_day: int,
+        end_sim_day: int,
+        material_type: str,
+        multiplier: float,
+    ) -> Dict[str, Any]:
+        """
+        Insert a new perturbation rule. Validates bounds (raises ValueError on
+        bad input so the API layer can convert to HTTP 400).
+
+        Returns:
+            The persisted row (including auto-generated id + created_at).
+        """
+        # Local import keeps the module importable in tests without DB.
+        from data.seasonal_perturbation import validate_perturbation
+
+        err = validate_perturbation(
+            label, start_sim_day, end_sim_day, material_type, multiplier
+        )
+        if err:
+            raise ValueError(err)
+
+        now = datetime.now().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                """INSERT INTO seasonal_perturbations
+                       (label, start_sim_day, end_sim_day,
+                        material_type, multiplier, active, created_at)
+                   VALUES (?, ?, ?, ?, ?, 1, ?)""",
+                (
+                    label.strip(),
+                    int(start_sim_day),
+                    int(end_sim_day),
+                    material_type,
+                    float(multiplier),
+                    now,
+                ),
+            )
+            new_id = cur.lastrowid
+        return {
+            "id": new_id,
+            "label": label.strip(),
+            "start_sim_day": int(start_sim_day),
+            "end_sim_day": int(end_sim_day),
+            "material_type": material_type,
+            "multiplier": float(multiplier),
+            "active": True,
+            "created_at": now,
+        }
+
+    def list_seasonal_perturbations(
+        self, active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Return all perturbations, optionally filtering to active=1."""
+        sql = (
+            "SELECT id, label, start_sim_day, end_sim_day, "
+            "material_type, multiplier, active, created_at "
+            "FROM seasonal_perturbations"
+        )
+        if active_only:
+            sql += " WHERE active = 1"
+        sql += " ORDER BY start_sim_day, id"
+        with self._conn() as conn:
+            rows = conn.execute(sql).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_active_perturbations(
+        self, sim_day: int, material_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Return perturbations active at ``sim_day`` (window matches).
+
+        If ``material_type`` is provided, includes both:
+        - rules with that material_type
+        - wildcard rules (material_type='*')
+
+        This is the hot-path query called once per cycle by the coordinator.
+        Index ``idx_perturb_window`` makes it O(log n + k).
+        """
+        sql = (
+            "SELECT id, label, start_sim_day, end_sim_day, "
+            "material_type, multiplier, active, created_at "
+            "FROM seasonal_perturbations "
+            "WHERE active = 1 AND start_sim_day <= ? AND end_sim_day >= ?"
+        )
+        params: List[Any] = [int(sim_day), int(sim_day)]
+        if material_type is not None:
+            sql += " AND (material_type = ? OR material_type = '*')"
+            params.append(material_type)
+        sql += " ORDER BY id"
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_seasonal_perturbation(self, perturbation_id: int) -> bool:
+        """Hard-delete a single perturbation. Returns whether a row was removed."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM seasonal_perturbations WHERE id = ?",
+                (int(perturbation_id),),
+            )
+        return cur.rowcount > 0
+
+    def deactivate_seasonal_perturbation(self, perturbation_id: int) -> bool:
+        """Soft-delete (set active=0). Returns whether a row was updated."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE seasonal_perturbations SET active = 0 WHERE id = ?",
+                (int(perturbation_id),),
+            )
+        return cur.rowcount > 0
+
+    def clear_seasonal_perturbations(self) -> int:
+        """Hard-delete all perturbations. Returns rowcount."""
+        with self._conn() as conn:
+            cur = conn.execute("DELETE FROM seasonal_perturbations")
         return cur.rowcount

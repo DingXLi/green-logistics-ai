@@ -38,6 +38,53 @@ from .world_builder import WorldBuilder, WorldConfig
 from data.seasonal_adjuster import get_supply_multiplier as _get_supply_seasonal
 from data.seasonal_adjuster import get_demand_multiplier as _get_demand_seasonal
 from data.seasonal_adjuster import sim_day_to_month as _seasonal_month
+from data.seasonal_perturbation import (
+    apply_perturbations as _apply_perturbations,
+    SeasonalPerturbation as _SeasonalPerturbation,
+)
+
+def _get_perturbed_seasonal(
+    base_factor: float,
+    material_type: str,
+    day: int,
+    persistence: Any,
+) -> float:
+    """
+    iter #37: Apply any active perturbations to the base seasonal factor.
+
+    Coordinator calls this once per (agent, day) tuple inside the cycle loop.
+    We pre-fetch the active perturbations ONCE per cycle (not per agent) to
+    avoid N+1 queries; coordinator caches it on self._active_perturbations.
+    """
+    if persistence is None:
+        return base_factor
+    cached = getattr(persistence, "_active_perturbations_cache", None)
+    if cached is None or cached.get("sim_day") != day:
+        try:
+            rows = persistence.get_active_perturbations(day)
+            cache_objs = [_SeasonalPerturbation(
+                id=r["id"], label=r["label"],
+                start_sim_day=r["start_sim_day"],
+                end_sim_day=r["end_sim_day"],
+                material_type=r["material_type"],
+                multiplier=r["multiplier"],
+                active=bool(r["active"]),
+                created_at=r["created_at"],
+            ) for r in rows]
+            persistence._active_perturbations_cache = {"sim_day": day, "objs": cache_objs}
+        except Exception as e:
+            # Persistence failure should not break the cycle — log + return base
+            import loguru
+            loguru.logger.debug(f"[perturb] cache refresh failed: {e}")
+            return base_factor
+        cached = persistence._active_perturbations_cache
+    return _apply_perturbations(
+        base_factor=base_factor,
+        material_type=material_type,
+        sim_day=day,
+        active_perturbations=cached["objs"],
+    )
+
 
 
 class MultiAgentCoordinator:
@@ -211,7 +258,11 @@ class MultiAgentCoordinator:
         for agent_id, agent in self.supply_agents.items():
             llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
             # 季节因子: 不同 material 不同月度 pattern (建筑夏高冬低, 金属平稳)
-            seasonal_m = _get_supply_seasonal(agent.material_type, day)
+            base_seasonal = _get_supply_seasonal(agent.material_type, day)
+            # iter #37: overlay any active perturbation rules (e.g. holiday spike)
+            seasonal_m = _get_perturbed_seasonal(
+                base_seasonal, agent.material_type, day, self.persistence
+            )
             agent.accumulate_stock(
                 factor=factor,
                 llm_multiplier=llm_m,
@@ -225,8 +276,11 @@ class MultiAgentCoordinator:
             stock = await agent.get_current_stock()
             base_pred = agent.daily_capacity * 0.8 * 1
             llm_m = supply_llm.get(agent_id, {}).get("multiplier", 1.0)
-            seasonal_m = _get_supply_seasonal(agent.material_type, day)
-            # LLM + seasonal 三者叠加：predicted_tons 受三个因素同时影响
+            base_seasonal = _get_supply_seasonal(agent.material_type, day)
+            seasonal_m = _get_perturbed_seasonal(
+                base_seasonal, agent.material_type, day, self.persistence
+            )
+            # LLM + seasonal + perturbation 三者叠加：predicted_tons 受所有因素影响
             predicted_tons = round(base_pred * llm_m * seasonal_m, 2)
             sup_meta = supply_llm.get(agent_id, {})
             supply_offers.append({
@@ -274,7 +328,10 @@ class MultiAgentCoordinator:
             llm_m = llm_mults.get(dp["id"], cycle_mult)  # LLM 缺某 id 时用 deterministic
             # Seasonal: demand 同样随月份波动
             dp_material = dp.get("material_type") or (dp.get("preferred_materials") or ["mixed_waste"])[0]
-            seasonal_m = _get_demand_seasonal(dp_material, day)
+            base_seasonal = _get_demand_seasonal(dp_material, day)
+            seasonal_m = _get_perturbed_seasonal(
+                base_seasonal, dp_material, day, self.persistence
+            )
             perturbed = round(base * llm_m * jitter * seasonal_m, 2)
             # 同步 in-memory 状态供 dashboard / 下游使用
             for live_dp in self.market_agent.demand_points:
