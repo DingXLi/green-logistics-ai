@@ -203,6 +203,10 @@ green-logistics-ai/
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
 | GET    | `/api/persistence/cohort-retention-by-material` | Per-material supply retention breakdown (iter #42) |
 | GET    | `/api/persistence/forecast-calibration?metric=X&method=Y` | Forecast accuracy stats (MAE / RMSE / MAPE / bias) over predicted vs actuals (iter #42) |
+| GET    | `/api/persistence/forecast-calibration/trend?metric=X&method=Y` | Cumulative calibration trend over forecast_sim_day (iter #43) |
+| GET    | `/api/admin/runtime-config` | Read runtime configuration (admin, iter #43) |
+| POST   | `/api/admin/runtime-config?key=X&value=Y` | Update a runtime config value (admin, iter #43) |
+| POST   | `/api/admin/runtime-config/reset` | Reset all runtime config to defaults (admin, iter #43) |
 | GET    | `/api/persistence/export/cycles.csv` | Download cycles as CSV (iter #11) |
 | GET    | `/api/persistence/export/supplies.csv` | Download supplies as CSV (iter #17) |
 | GET    | `/api/persistence/export/matches.csv` | Download matches as CSV (iter #17) |
