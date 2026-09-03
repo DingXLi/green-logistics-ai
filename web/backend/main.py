@@ -4134,6 +4134,50 @@ async def get_match_distance_stats():
     return coordinator.persistence.get_match_distance_stats()
 
 
+@app.get("/api/persistence/vehicle-stats")
+async def get_vehicle_stats(
+    vehicle_id: Optional[str] = None,
+    limit: int = 100,
+):
+    """
+    iter #41: Vehicle historical aggregates across cycles.
+
+    Per-vehicle KPIs useful for fleet ops:
+    - n_routes / total_distance_km / total_duration_hours
+    - total_cost_sek / total_co2_kg
+    - avg_cost_per_km_sek / avg_co2_per_km_kg (efficiency)
+    - first/last cycle_id + last_sim_day
+
+    Query params:
+      vehicle_id: optional, return single vehicle stats
+      limit:      max vehicles returned (default 100, max 1000)
+
+    Sorted by total_distance_km DESC (most-active vehicles first).
+
+    Returns:
+      {
+        n_vehicles, vehicles: [{vehicle_id, n_routes, total_distance_km,
+                                 total_duration_hours, total_cost_sek, total_co2_kg,
+                                 avg_distance_km, avg_duration_hours,
+                                 avg_cost_per_km_sek, avg_co2_per_km_kg,
+                                 first_cycle_id, last_cycle_id, last_sim_day}, ...]
+      }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if limit < 1 or limit > 1000:
+        raise HTTPException(status_code=400, detail="limit must be in [1, 1000]")
+
+    vehicles = coordinator.persistence.get_vehicle_stats(
+        vehicle_id=vehicle_id,
+        limit=limit,
+    )
+    return {
+        "n_vehicles": len(vehicles),
+        "vehicles": vehicles,
+    }
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,

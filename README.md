@@ -196,6 +196,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/cycle-history` | Past cycles with filters (iter #11) |
 | GET    | `/api/persistence/cycle-detail/{id}` | Single cycle full breakdown (iter #11) |
 | GET    | `/api/persistence/match-distance-stats` | Match distance buckets + avg/median (iter #15) |
+| GET    | `/api/persistence/vehicle-stats` | Per-vehicle historical aggregates: routes, km, cost, CO₂, efficiency (iter #41) |
 | GET    | `/api/persistence/supply-aggregates` | Per-supply cumulative KPIs (iter #15) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
