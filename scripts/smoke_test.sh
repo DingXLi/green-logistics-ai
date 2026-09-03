@@ -234,6 +234,8 @@ check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cy
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
 check_endpoint "/api/persistence/cohort-retention-by-period" 200 GET "/api/persistence/cohort-retention-by-period"
 check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 200 GET "/api/persistence/cohort-retention-by-period?period_unit=week"
+check_endpoint "/api/persistence/cohort-retention-by-period?material_type=concrete (iter #45)" 200 GET "/api/persistence/cohort-retention-by-period?material_type=concrete"
+check_json_field "/api/persistence/cohort-retention-by-period has material_type_filter" GET "/api/persistence/cohort-retention-by-period?material_type=concrete" ".material_type_filter" "concrete"
 check_endpoint "/api/persistence/forecast" 200 GET "/api/persistence/forecast?horizon=7&history_n=14"
 check_endpoint "/api/persistence/forecast?metrics=cost_sek" 200 GET "/api/persistence/forecast?metrics=cost_sek&horizon=3"
 check_endpoint "/api/persistence/forecast invalid horizon" 400 GET "/api/persistence/forecast?horizon=0"
