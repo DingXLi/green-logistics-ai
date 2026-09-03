@@ -2300,3 +2300,86 @@ td.no-matches {
   background: #7f1d1d;
   color: #fecaca;
 }
+
+/* iter #42: Forecast calibration panel styles */
+.fcst-calib-panel {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.fc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.fc-header h3 {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fc-controls {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.fc-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+.fc-select {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.fc-select:focus {
+  outline: none;
+  border-color: #7c3aed;
+}
+.fc-stats-inline {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-left: auto;
+}
+.fc-stats-inline strong {
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+}
+.fc-section {
+  margin-bottom: 1rem;
+}
+.fc-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+.fc-empty,
+.fc-error {
+  padding: 1rem;
+  background: #1e293b;
+  border-radius: 6px;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.fc-error {
+  background: #7f1d1d;
+  color: #fecaca;
+}

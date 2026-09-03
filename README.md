@@ -201,6 +201,8 @@ green-logistics-ai/
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
+| GET    | `/api/persistence/cohort-retention-by-material` | Per-material supply retention breakdown (iter #42) |
+| GET    | `/api/persistence/forecast-calibration?metric=X&method=Y` | Forecast accuracy stats (MAE / RMSE / MAPE / bias) over predicted vs actuals (iter #42) |
 | GET    | `/api/persistence/export/cycles.csv` | Download cycles as CSV (iter #11) |
 | GET    | `/api/persistence/export/supplies.csv` | Download supplies as CSV (iter #17) |
 | GET    | `/api/persistence/export/matches.csv` | Download matches as CSV (iter #17) |

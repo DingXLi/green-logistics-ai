@@ -70,6 +70,8 @@ const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m
 const SweetSpot = lazy(() => import('./SweetSpot').then(m => ({ default: m.SweetSpot })))
 // iter #41: per-vehicle historical stats (efficiency / utilization drill-down)
 const VehicleStats = lazy(() => import('./VehicleStats').then(m => ({ default: m.VehicleStats })))
+// iter #42: forecast calibration (predicted vs actual accuracy)
+const ForecastCalibration = lazy(() => import('./ForecastCalibration').then(m => ({ default: m.ForecastCalibration })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -644,6 +646,11 @@ export default function Dashboard() {
           {/* iter #41: Per-vehicle historical stats */}
           <Suspense fallback={<LoadingSpinner label="Loading vehicle stats…" />}>
             <VehicleStats />
+          </Suspense>
+
+          {/* iter #42: Forecast calibration (predicted vs actual) */}
+          <Suspense fallback={<LoadingSpinner label="Loading forecast calibration…" />}>
+            <ForecastCalibration />
           </Suspense>
 
           {/* iter #10: Materials overview grid */}
