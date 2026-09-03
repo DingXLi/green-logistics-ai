@@ -171,6 +171,26 @@ CREATE TABLE IF NOT EXISTS seasonal_perturbations (
 );
 CREATE INDEX IF NOT EXISTS idx_perturb_window
     ON seasonal_perturbations(active, start_sim_day, end_sim_day);
+
+-- iter #42: Forecast calibration — track predictions vs actuals
+-- Recorded when /api/persistence/forecast runs. actual_value / error
+-- are backfilled once the forecast sim_day arrives in optimization_cycles.
+CREATE TABLE IF NOT EXISTS forecast_predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    metric TEXT NOT NULL,                 -- 'cost_sek' | 'co2_kg' | 'util_pct' | 'matches'
+    method TEXT NOT NULL,                 -- 'linear' | 'moving_average' | 'exponential_smoothing'
+    forecast_sim_day INTEGER NOT NULL,    -- 预测的目标 sim_day
+    forecast_value REAL NOT NULL,         -- 预测值
+    actual_value REAL,                    -- 实际值 (后补, NULL if sim_day not yet reached)
+    error REAL,                           -- actual - forecast (后补)
+    abs_pct_error REAL,                   -- |actual-forecast|/|actual|*100 (后补)
+    created_at_sim_day INTEGER NOT NULL,  -- 预测时已知 last_sim_day
+    recorded_at TEXT NOT NULL             -- ISO timestamp
+);
+CREATE INDEX IF NOT EXISTS idx_fcst_pred_metric_day
+    ON forecast_predictions(metric, forecast_sim_day);
+CREATE INDEX IF NOT EXISTS idx_fcst_pred_actual
+    ON forecast_predictions(actual_value);
 """
 
 
@@ -2862,6 +2882,217 @@ class Persistence:
         with self._conn() as conn:
             cur = conn.execute("DELETE FROM forecast_method_prefs")
         return cur.rowcount
+
+    # ====================================================================
+    # iter #42: Forecast calibration — track predicted vs actual
+    # ====================================================================
+    # Each call to /api/persistence/forecast records predictions.
+    # When the predicted sim_day actually arrives in optimization_cycles,
+    # backfill actual_value + error.
+
+    def record_forecast_predictions(
+        self,
+        metric: str,
+        method: str,
+        predictions: List[Dict[str, Any]],
+        created_at_sim_day: int,
+    ) -> int:
+        """Record predicted values for a (metric, method) combination.
+
+        Args:
+            metric: e.g. 'cost_sek'
+            method: e.g. 'linear'
+            predictions: [{"sim_day": int, "value": float}, ...]
+            created_at_sim_day: sim_day at time of prediction (last known cycle)
+
+        Returns:
+            int: number of rows inserted (skip predictions already recorded
+                 for the same metric+method+forecast_sim_day+created_at_sim_day)
+        """
+        if not predictions:
+            return 0
+        rows_inserted = 0
+        with self._conn() as conn:
+            for p in predictions:
+                sim_day = p.get("sim_day")
+                value = p.get("value")
+                if sim_day is None or value is None:
+                    continue
+                # Check for duplicate
+                existing = conn.execute(
+                    """SELECT id FROM forecast_predictions
+                       WHERE metric = ? AND method = ?
+                         AND forecast_sim_day = ?
+                         AND created_at_sim_day = ?""",
+                    (metric, method, int(sim_day), int(created_at_sim_day)),
+                ).fetchone()
+                if existing:
+                    continue
+                conn.execute(
+                    """INSERT INTO forecast_predictions
+                       (metric, method, forecast_sim_day, forecast_value,
+                        created_at_sim_day, recorded_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        metric,
+                        method,
+                        int(sim_day),
+                        float(value),
+                        int(created_at_sim_day),
+                        datetime.now().isoformat(),
+                    ),
+                )
+                rows_inserted += 1
+        return rows_inserted
+
+    def backfill_forecast_actuals(self) -> int:
+        """Compute actual values for predictions whose sim_day has arrived.
+
+        Reads optimization_cycles to find actual cost_sek / co2_kg / matches,
+        updates forecast_predictions. Returns count of rows updated.
+
+        Skips predictions whose forecast_sim_day is in the future.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT id, metric, forecast_sim_day FROM forecast_predictions
+                   WHERE actual_value IS NULL
+                     AND forecast_sim_day <= (
+                       SELECT COALESCE(MAX(sim_day), 0) FROM optimization_cycles
+                     )"""
+            ).fetchall()
+            updated = 0
+            for r in rows:
+                metric = r["metric"]
+                sim_day = r["forecast_sim_day"]
+                # Map metric to optimization_cycles column
+                metric_to_col = {
+                    "cost_sek": "total_cost_sek",
+                    "co2_kg": "total_co2_kg",
+                    "matches": "n_matches",
+                    "util_pct": "fleet_utilization_pct",
+                }
+                col = metric_to_col.get(metric)
+                if col is None:
+                    continue
+                actual = conn.execute(
+                    f"SELECT {col} AS actual FROM optimization_cycles WHERE sim_day = ?",
+                    (sim_day,),
+                ).fetchone()
+                if actual is None:
+                    continue
+                actual_value = actual["actual"]
+                if actual_value is None:
+                    continue
+                # Get predicted value
+                pred_row = conn.execute(
+                    "SELECT forecast_value FROM forecast_predictions WHERE id = ?",
+                    (r["id"],),
+                ).fetchone()
+                if pred_row is None:
+                    continue
+                forecast_value = pred_row["forecast_value"]
+                error = actual_value - forecast_value
+                abs_pct = (abs(error) / abs(actual_value) * 100) if actual_value else None
+                conn.execute(
+                    """UPDATE forecast_predictions
+                       SET actual_value = ?, error = ?, abs_pct_error = ?
+                       WHERE id = ?""",
+                    (actual_value, error, abs_pct, r["id"]),
+                )
+                updated += 1
+        return updated
+
+    def get_forecast_calibration(
+        self,
+        metric: Optional[str] = None,
+        method: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return calibration stats: MAE, MAPE, RMSE per metric/method.
+
+        Args:
+            metric: optional filter
+            method: optional filter
+
+        Returns:
+            {
+              overall: {n_predictions, n_evaluated, mae, mape_pct, rmse, bias},
+              by_metric: {<metric>: {...same stats...}},
+              by_method: {<method>: {...same stats...}},
+              by_metric_method: {<metric>: {<method>: {...stats...}}},
+            }
+        """
+        with self._conn() as conn:
+            where_clauses = ["actual_value IS NOT NULL", "error IS NOT NULL"]
+            params: List[Any] = []
+            if metric:
+                where_clauses.append("metric = ?")
+                params.append(metric)
+            if method:
+                where_clauses.append("method = ?")
+                params.append(method)
+            where_sql = " AND ".join(where_clauses)
+
+            rows = conn.execute(
+                f"SELECT metric, method, forecast_value, actual_value, error, abs_pct_error "
+                f"FROM forecast_predictions WHERE {where_sql}",
+                params,
+            ).fetchall()
+
+            def _stats(rs: List[Any]) -> Dict[str, Any]:
+                if not rs:
+                    return {
+                        "n_evaluated": 0, "mae": None, "rmse": None,
+                        "mape_pct": None, "bias": None, "min_pct_err": None, "max_pct_err": None,
+                    }
+                errors = [r["error"] for r in rs]
+                abs_pct = [r["abs_pct_error"] for r in rs if r["abs_pct_error"] is not None]
+                mae = sum(abs(e) for e in errors) / len(errors)
+                rmse = (sum(e * e for e in errors) / len(errors)) ** 0.5
+                bias = sum(errors) / len(errors)  # +ve = under-prediction
+                mape = sum(abs_pct) / len(abs_pct) if abs_pct else None
+                return {
+                    "n_evaluated": len(rs),
+                    "mae": round(mae, 4),
+                    "rmse": round(rmse, 4),
+                    "mape_pct": round(mape, 2) if mape is not None else None,
+                    "bias": round(bias, 4),
+                    "min_pct_err": round(min(abs_pct), 2) if abs_pct else None,
+                    "max_pct_err": round(max(abs_pct), 2) if abs_pct else None,
+                }
+
+            by_metric: Dict[str, List[Any]] = {}
+            by_method: Dict[str, List[Any]] = {}
+            by_mm: Dict[str, Dict[str, List[Any]]] = {}
+            for r in rows:
+                by_metric.setdefault(r["metric"], []).append(r)
+                by_method.setdefault(r["method"], []).append(r)
+                by_mm.setdefault(r["metric"], {}).setdefault(r["method"], []).append(r)
+
+            return {
+                "overall": _stats(rows),
+                "by_metric": {m: _stats(rs) for m, rs in by_metric.items()},
+                "by_method": {m: _stats(rs) for m, rs in by_method.items()},
+                "by_metric_method": {
+                    m: {meth: _stats(rs) for meth, rs in ms.items()}
+                    for m, ms in by_mm.items()
+                },
+            }
+
+    def count_forecast_predictions(
+        self,
+        metric: Optional[str] = None,
+    ) -> int:
+        """Count total forecast predictions (with or without actuals)."""
+        with self._conn() as conn:
+            if metric:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM forecast_predictions WHERE metric = ?",
+                    (metric,),
+                ).fetchone()
+            else:
+                row = conn.execute("SELECT COUNT(*) FROM forecast_predictions").fetchone()
+        return row[0]
 
 
     # ====================================================================
