@@ -212,7 +212,9 @@ green-logistics-ai/
 | GET    | `/api/persistence/export/matches.parquet` | Download matches as Apache Parquet (iter #27) |
 | GET    | `/api/persistence/export/routes.parquet` | Download routes as Apache Parquet (iter #27) |
 | GET    | `/api/admin/db-stats` | SQLite DB size, table counts, indexes (iter #15). Admin auth via `GL_ADMIN_TOKEN` (iter #34). |
-| POST   | `/api/admin/db-maintenance` | VACUUM + ANALYZE (iter #16). Admin auth via `GL_ADMIN_TOKEN` (iter #34). |
+| POST   | `/api/admin/db-maintenance` | VACUUM + ANALYZE (iter #16, with audit log iter #42). Admin auth via `GL_ADMIN_TOKEN` (iter #34). |
+| GET    | `/api/admin/db-maintenance/recommendation` | Auto-vacuum recommendation: size growth / time / cycles (admin, iter #42) |
+| GET    | `/api/admin/db-maintenance/log?limit=N` | Recent VACUUM audit log (admin, iter #42) |
 | GET    | `/api/facilities/distance-matrix` | N×N facility distance matrix (iter #15) |
 | POST   | `/api/optimize/batch` | Parallel multi-scenario optimization (iter #13) |
 | GET    | `/api/health/deep` | Multi-subsystem health check (iter #14) |
