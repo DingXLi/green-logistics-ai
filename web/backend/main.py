@@ -2487,11 +2487,13 @@ async def get_carbon_scenarios(
 # iter #41: sweet-spot finder — automatic Pareto-frontier recommendation
 # ---------------------------------------------------------------------------
 
-SWEET_SPOT_DEFAULT_PRICES = [0.0, 0.5, 1.0, 1.5, 2.5, 4.0, 6.0, 8.0, 12.0]
+SWEET_SPOT_DEFAULT_PRICES = [0.0, 0.5, 1.0, 1.5, 2.5, 4.0, 6.0, 8.0]
 """Default carbon prices (SEK/kg) to sweep when finding sweet spot.
 
 Spread is logarithmic-ish: dense in the low-tax region (most policy-relevant),
 sparser at high tax (only useful for sensitivity testing).
+
+Max 8 prices because /api/optimize/carbon-scenarios limits carbon_prices to [1, 8].
 """
 
 
