@@ -2290,6 +2290,67 @@ class Persistence:
             "material_type_filter": material_type,
         }
 
+    def get_cohort_retention_by_material(self) -> List[Dict[str, Any]]:
+        """
+        iter #42: Per-material supply retention breakdown.
+
+        For each material_type, compute the same retention metrics as
+        ``get_supply_cohort_retention`` but as a per-material slice. This
+        reveals which materials have stable vs volatile supply sources.
+
+        Returns:
+            [{
+                material_type: str,
+                total_supply_ids: int,
+                n_one_time: int,
+                n_repeating: int,
+                retention_rate_pct: float,
+                one_time_pct: float,
+                total_supply_offers: int,
+                total_cycles_with_supply: int,
+            }, ...]
+
+            Sorted by total_supply_ids DESC.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT
+                       material_type,
+                       COUNT(DISTINCT supply_id) as n_supply_ids,
+                       COUNT(DISTINCT cycle_id) as n_cycles,
+                       COUNT(*) as n_offers
+                   FROM supply_offers
+                   WHERE material_type IS NOT NULL
+                   GROUP BY material_type
+                   ORDER BY n_supply_ids DESC"""
+            ).fetchall()
+
+            results: List[Dict[str, Any]] = []
+            for r in rows:
+                mat = r["material_type"]
+                # Per-supply_id appearance count
+                supply_rows = conn.execute(
+                    """SELECT COUNT(DISTINCT cycle_id) as n_cycles
+                       FROM supply_offers
+                       WHERE material_type = ?
+                       GROUP BY supply_id""",
+                    (mat,),
+                ).fetchall()
+                total_ids = len(supply_rows)
+                n_one_time = sum(1 for s in supply_rows if s["n_cycles"] == 1)
+                n_repeating = total_ids - n_one_time
+                results.append({
+                    "material_type": mat,
+                    "total_supply_ids": total_ids,
+                    "n_one_time": n_one_time,
+                    "n_repeating": n_repeating,
+                    "retention_rate_pct": round(n_repeating / total_ids * 100, 1) if total_ids else 0.0,
+                    "one_time_pct": round(n_one_time / total_ids * 100, 1) if total_ids else 0.0,
+                    "total_supply_offers": r["n_offers"] or 0,
+                    "total_cycles_with_supply": r["n_cycles"] or 0,
+                })
+            return results
+
     def get_cohort_retention_by_period(
         self,
         n_periods: int = 4,
