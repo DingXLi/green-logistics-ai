@@ -206,6 +206,17 @@ check_endpoint "/api/persistence/forecast-calibration invalid metric" 400 GET "/
 check_endpoint "/api/persistence/forecast-calibration invalid method" 400 GET "/api/persistence/forecast-calibration?method=invalid"
 check_json_field "/api/persistence/forecast-calibration has overall" GET "/api/persistence/forecast-calibration" ".overall | type" "object"
 check_json_field "/api/persistence/forecast-calibration has n_total_predictions" GET "/api/persistence/forecast-calibration" ".n_total_predictions | type" "number"
+
+# ---- iter #43: forecast calibration trend + runtime config ----
+check_endpoint "/api/persistence/forecast-calibration/trend" 200 GET "/api/persistence/forecast-calibration/trend"
+check_endpoint "/api/persistence/forecast-calibration/trend by metric" 200 GET "/api/persistence/forecast-calibration/trend?metric=cost_sek"
+check_endpoint "/api/persistence/forecast-calibration/trend by method" 200 GET "/api/persistence/forecast-calibration/trend?method=linear"
+check_endpoint "/api/persistence/forecast-calibration/trend invalid metric" 400 GET "/api/persistence/forecast-calibration/trend?metric=invalid"
+check_json_field "/api/persistence/forecast-calibration/trend has trend array" GET "/api/persistence/forecast-calibration/trend" ".trend | type" "array"
+
+check_endpoint "/api/admin/runtime-config" 200 GET "/api/admin/runtime-config" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/runtime-config has items array" GET "/api/admin/runtime-config" ".items | type" "array" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/runtime-config has n_keys" GET "/api/admin/runtime-config" ".n_keys | type" "number" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
