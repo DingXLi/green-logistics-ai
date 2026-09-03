@@ -239,6 +239,15 @@ check_endpoint "/api/simulate/run?days=999" 400 POST "/api/simulate/run?days=999
 check_endpoint "/api/optimize/carbon-scenarios" 200 GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2"
 check_json_field "/api/optimize/carbon-scenarios has breakeven field" GET "/api/optimize/carbon-scenarios?carbon_prices=0,1.5,3&time_limit_seconds=2" ".breakeven_price_sek_per_kg | type" "number"
 
+# ---- iter #41: Pareto-frontier sweet-spot finder ----
+check_endpoint "/api/optimize/sweet-spot default weights" 200 GET "/api/optimize/sweet-spot?time_limit_seconds=1&use_real_roads=false"
+check_endpoint "/api/optimize/sweet-spot pure-cost weight" 200 GET "/api/optimize/sweet-spot?weight_cost=1.0&weight_co2=0.0&time_limit_seconds=1&use_real_roads=false"
+check_endpoint "/api/optimize/sweet-spot pure-co2 weight" 200 GET "/api/optimize/sweet-spot?weight_cost=0.0&weight_co2=1.0&time_limit_seconds=1&use_real_roads=false"
+check_endpoint "/api/optimize/sweet-spot invalid weights (negative)" 400 GET "/api/optimize/sweet-spot?weight_cost=-0.1"
+check_endpoint "/api/optimize/sweet-spot invalid time_limit" 400 GET "/api/optimize/sweet-spot?time_limit_seconds=0"
+check_json_field "/api/optimize/sweet-spot has scenarios array" GET "/api/optimize/sweet-spot?time_limit_seconds=1&use_real_roads=false" ".scenarios | type" "array"
+check_json_field "/api/optimize/sweet-spot has weight_cost" GET "/api/optimize/sweet-spot?time_limit_seconds=1&use_real_roads=false" ".weight_cost | type" "number"
+
 # ---- Data / facilities ----
 check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distance-matrix"
 
