@@ -199,6 +199,18 @@ check_endpoint "/api/persistence/cohort-retention-by-material" 200 GET "/api/per
 check_json_field "/api/persistence/cohort-retention-by-material has by_material array" GET "/api/persistence/cohort-retention-by-material" ".by_material | type" "array"
 check_json_field "/api/persistence/cohort-retention-by-material has n_materials" GET "/api/persistence/cohort-retention-by-material" ".n_materials | type" "number"
 
+# ---- iter #44: runtime-config persistence + cohort cross-tab ----
+check_endpoint "/api/admin/runtime-config/overrides" 200 GET "/api/admin/runtime-config/overrides" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/runtime-config/overrides has n_overrides" GET "/api/admin/runtime-config/overrides" ".n_overrides | type" "number" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/runtime-config/overrides has overrides array" GET "/api/admin/runtime-config/overrides" ".overrides | type" "array" "${ADMIN_HEADER_ARGS[@]}"
+
+check_endpoint "/api/persistence/cohort-retention-crosstab" 200 GET "/api/persistence/cohort-retention-crosstab"
+check_endpoint "/api/persistence/cohort-retention-crosstab with material filter" 200 GET "/api/persistence/cohort-retention-crosstab?material_type=concrete"
+check_endpoint "/api/persistence/cohort-retention-crosstab with n_periods" 200 GET "/api/persistence/cohort-retention-crosstab?n_periods=2"
+check_endpoint "/api/persistence/cohort-retention-crosstab invalid period_unit" 400 GET "/api/persistence/cohort-retention-crosstab?period_unit=invalid"
+check_json_field "/api/persistence/cohort-retention-crosstab has materials" GET "/api/persistence/cohort-retention-crosstab" ".materials | type" "array"
+check_json_field "/api/persistence/cohort-retention-crosstab has matrix" GET "/api/persistence/cohort-retention-crosstab" ".matrix | type" "array"
+
 check_endpoint "/api/persistence/forecast-calibration" 200 GET "/api/persistence/forecast-calibration"
 check_endpoint "/api/persistence/forecast-calibration by metric" 200 GET "/api/persistence/forecast-calibration?metric=cost_sek"
 check_endpoint "/api/persistence/forecast-calibration by method" 200 GET "/api/persistence/forecast-calibration?method=linear"
