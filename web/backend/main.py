@@ -1586,6 +1586,8 @@ def _get_protected_endpoints() -> list:
         # iter #42: db-maintenance recommendation + log
         "/api/admin/db-maintenance/recommendation",
         "/api/admin/db-maintenance/log",
+        # iter #43: runtime config
+        "/api/admin/runtime-config",  # GET, POST (also reset)
     ]
 
 
@@ -2484,6 +2486,68 @@ async def get_carbon_scenarios(
         "breakeven_price_sek_per_kg": breakeven_price,
         "breakeven_gap_sek": breakeven_gap_sek,
     }
+
+
+# ---------------------------------------------------------------------------
+# iter #43: Runtime configuration registry — hot-tunable params
+# ---------------------------------------------------------------------------
+# Allows ops to change behavior (default carbon price, time limits, etc.)
+# without restarting the service. Settings are in-memory (not persisted) so
+# they reset on restart; combine with env vars for production defaults.
+
+_RUNTIME_CONFIG_DEFAULTS: Dict[str, Any] = {
+    "default_carbon_price_sek_per_kg": 1.5,        # CO2税默认 (used by /optimize/carbon-scenarios)
+    "default_solver_time_limit_seconds": 3,          # OR-Tools budget per scenario
+    "default_forecast_horizon": 7,                   # /api/persistence/forecast default horizon
+    "default_forecast_history_n": 14,                # /api/persistence/forecast default history_n
+    "max_routes_per_vehicle": 5,                     # max stops per vehicle
+    "default_use_real_roads": True,                  # OSM distance vs haversine
+    "sweet_spot_weight_cost": 0.5,                   # /api/optimize/sweet-spot default weight_cost
+    "sweet_spot_weight_co2": 0.5,                    # /api/optimize/sweet-spot default weight_co2
+    "auto_vacuum_enabled": False,                    # auto-trigger vacuum after each cycle
+    "ws_max_clients_override": None,                 # None = use env GL_WS_MAX_CLIENTS
+    "cohort_n_periods": 4,                           # /api/persistence/cohort-retention-by-period default
+    "calibration_mape_warning_pct": 20.0,            # warning threshold for ForecastCalibration
+    "perturbation_max_multiplier": 3.0,              # clamp upper bound for shocks
+}
+_runtime_config: Dict[str, Any] = dict(_RUNTIME_CONFIG_DEFAULTS)
+
+
+def _get_runtime_config(key: str) -> Any:
+    """Get a runtime config value (falls back to default)."""
+    return _runtime_config.get(key, _RUNTIME_CONFIG_DEFAULTS.get(key))
+
+
+def _set_runtime_config(key: str, value: Any) -> bool:
+    """Set a runtime config value. Returns True if valid, False otherwise."""
+    if key not in _RUNTIME_CONFIG_DEFAULTS:
+        return False
+    default = _RUNTIME_CONFIG_DEFAULTS[key]
+    # Type validation
+    if default is None:
+        # Allow any type when default is None
+        pass
+    elif isinstance(default, bool):
+        if not isinstance(value, bool):
+            return False
+    elif isinstance(default, int):
+        if not isinstance(value, int) or isinstance(value, bool):
+            return False
+    elif isinstance(default, float):
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return False
+        value = float(value)
+    elif isinstance(default, str):
+        if not isinstance(value, str):
+            return False
+    _runtime_config[key] = value
+    return True
+
+
+def _reset_runtime_config() -> None:
+    """Reset all runtime config to defaults (admin only)."""
+    global _runtime_config
+    _runtime_config = dict(_RUNTIME_CONFIG_DEFAULTS)
 
 
 # ---------------------------------------------------------------------------
@@ -4564,6 +4628,127 @@ async def get_db_maintenance_log(
         "n_entries": 0,
         "entries": coordinator.persistence.get_maintenance_log(limit=limit),
     }
+
+
+@app.get("/api/admin/runtime-config")
+async def get_runtime_config(_: None = Depends(require_admin)):
+    """
+    iter #43: Read runtime configuration (admin).
+
+    Returns current values for all hot-tunable params, with their
+    defaults and a flag indicating which are non-default (modified).
+    """
+    items = []
+    for key, default in _RUNTIME_CONFIG_DEFAULTS.items():
+        current = _runtime_config.get(key, default)
+        items.append({
+            "key": key,
+            "value": current,
+            "default": default,
+            "modified": current != default,
+            "type": _type_name(default),
+        })
+    return {
+        "n_keys": len(items),
+        "items": items,
+    }
+
+
+@app.post("/api/admin/runtime-config")
+async def update_runtime_config(
+    key: str,
+    value: Any,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #43: Update a runtime config value (admin).
+
+    Body params (form or query):
+      key: config key (e.g. "default_carbon_price_sek_per_kg")
+      value: new value (string-typed; parsed to int/float/bool/str)
+
+    Returns: {key, value, applied: bool, reason?: str}
+    """
+    if key not in _RUNTIME_CONFIG_DEFAULTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown key: {key}, valid: {sorted(_RUNTIME_CONFIG_DEFAULTS.keys())}",
+        )
+    default = _RUNTIME_CONFIG_DEFAULTS[key]
+    # Parse value string to typed value
+    try:
+        parsed = _parse_config_value(value, default)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"value parse error: {e}",
+        )
+    if not _set_runtime_config(key, parsed):
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid value type for {key}: expected {_type_name(default)}",
+        )
+    logger.info(f"runtime_config: {key} = {parsed} (was {_runtime_config.get(key)})")
+    return {
+        "key": key,
+        "value": _runtime_config[key],
+        "applied": True,
+    }
+
+
+@app.post("/api/admin/runtime-config/reset")
+async def reset_runtime_config(_: None = Depends(require_admin)):
+    """
+    iter #43: Reset all runtime config to defaults (admin).
+    """
+    _reset_runtime_config()
+    return {"reset": True, "n_keys": len(_RUNTIME_CONFIG_DEFAULTS)}
+
+
+def _type_name(value: Any) -> str:
+    """Return JSON-friendly type name."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    return type(value).__name__
+
+
+def _parse_config_value(raw: Any, default: Any) -> Any:
+    """Parse raw input (likely str from HTTP) into the default's type."""
+    if default is None:
+        return raw
+    if isinstance(default, bool):
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            low = raw.strip().lower()
+            if low in ("true", "1", "yes", "on"):
+                return True
+            if low in ("false", "0", "no", "off"):
+                return False
+        if isinstance(raw, int):
+            return bool(raw)
+        raise ValueError(f"cannot parse bool from {raw!r}")
+    if isinstance(default, int):
+        if isinstance(raw, bool):
+            raise ValueError("expected int, got bool")
+        return int(raw)
+    if isinstance(default, float):
+        if isinstance(raw, bool):
+            raise ValueError("expected float, got bool")
+        return float(raw)
+    if isinstance(default, str):
+        return str(raw)
+    return raw
 
 
 @app.get("/api/admin/db-export")
