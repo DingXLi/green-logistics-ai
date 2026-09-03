@@ -66,6 +66,8 @@ const LlmCostTimeseriesChart = lazy(() => import('./LlmCostTimeseriesChart').the
 const LlmCostForecastPanel = lazy(() => import('./LlmCostForecastPanel').then(m => ({ default: m.LlmCostForecastPanel })))
 // iter #11: cycle history with expandable detail
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
+// iter #41: Pareto-frontier sweet-spot finder (auto-recommend carbon tax)
+const SweetSpot = lazy(() => import('./SweetSpot').then(m => ({ default: m.SweetSpot })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -680,6 +682,9 @@ export default function Dashboard() {
           <SeasonalComparison />
 
           <CarbonScenarios />
+
+          {/* iter #41: Pareto sweet-spot finder (recommended carbon tax) */}
+          <SweetSpot />
         </Suspense>
       )}
 

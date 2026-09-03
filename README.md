@@ -173,6 +173,7 @@ green-logistics-ai/
 | POST   | `/api/optimize` | Single optimization cycle |
 | POST   | `/api/optimize/pareto` | Multi-objective Pareto scan (cost vs CO₂) |
 | POST   | `/api/optimize/carbon-scenarios` | Recompute under 4 carbon prices |
+| GET    | `/api/optimize/sweet-spot?weight_cost=X&weight_co2=Y` | Pareto sweet-spot finder: automatically recommends carbon tax price minimizing weighted cost+CO₂ (iter #41) |
 | GET    | `/api/optimize/last` | Last cycle result (cached on coordinator) |
 | GET    | `/api/facilities` | Real Swedish recycling facilities |
 | GET    | `/api/materials` | Material metadata (kt/year, seasonal pattern) |
