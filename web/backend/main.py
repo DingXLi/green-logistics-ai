@@ -4270,6 +4270,41 @@ async def get_supply_cohort_retention(material_type: Optional[str] = None):
     )
 
 
+@app.get("/api/persistence/cohort-retention-by-material")
+async def get_cohort_retention_by_material():
+    """
+    iter #42: Per-material supply retention breakdown.
+
+    For each material_type, return the same retention metrics as
+    /api/persistence/supply-cohort-retention. Lets operators see
+    which materials have stable vs volatile supply sources (e.g.,
+    wood retention 90% = recurring lumber suppliers; e-waste retention
+    30% = one-off decommissioning projects).
+
+    Returns:
+        {
+            n_materials: int,
+            by_material: [{
+                material_type: str,
+                total_supply_ids: int,
+                n_one_time: int,
+                n_repeating: int,
+                retention_rate_pct: float,
+                one_time_pct: float,
+                total_supply_offers: int,
+                total_cycles_with_supply: int,
+            }, ...]
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    by_material = coordinator.persistence.get_cohort_retention_by_material()
+    return {
+        "n_materials": len(by_material),
+        "by_material": by_material,
+    }
+
+
 @app.get("/api/persistence/cohort-retention-by-period")
 async def get_cohort_retention_by_period(
     n_periods: int = 4,
