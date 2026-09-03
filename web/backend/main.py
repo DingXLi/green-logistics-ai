@@ -4548,6 +4548,7 @@ async def get_cohort_retention_by_material():
 async def get_cohort_retention_by_period(
     n_periods: int = 4,
     period_unit: str = "quartile",
+    material_type: Optional[str] = None,
 ):
     """
     Supply 留存按时段划分 (iter #19 + iter #24 时间窗口扩展) — 早期 vs 后期 retention 对比。
@@ -4555,7 +4556,7 @@ async def get_cohort_retention_by_period(
     将所有 cycle 按 sim_day 顺序划分成多个 period, 每段独立计算 retention rate,
     让用户看 早期 vs 后期 churn 趋势。
 
-    Query (iter #24 加 period_unit):
+    Query (iter #24 加 period_unit + iter #45 加 material_type):
     - n_periods: 分多少段 (default 4)
       - quartile: range 1-10
       - day:      range 1-30
@@ -4566,10 +4567,12 @@ async def get_cohort_retention_by_period(
       - day:      每段 = 1 sim_day
       - week:     每段 = 7 sim_days
       - month:    每段 = 30 sim_days
+    - material_type: iter #45 加 — filter to single material (e.g. 'concrete')
 
     Returns:
         {
           total_supply_ids, n_periods, period_unit,  # period_unit iter #24
+          material_type_filter,                       # iter #45
           period_labels, periods: [...],
           trend: "improving" | "declining" | "stable" | "unknown"
         }
@@ -4597,6 +4600,7 @@ async def get_cohort_retention_by_period(
     return coordinator.persistence.get_cohort_retention_by_period(
         n_periods=n_periods,
         period_unit=period_unit,
+        material_type=material_type,
     )
 
 
