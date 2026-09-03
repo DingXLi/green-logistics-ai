@@ -2532,6 +2532,7 @@ class Persistence:
         self,
         n_periods: int = 4,
         period_unit: str = "quartile",  # iter #24: day | week | month | quartile
+        material_type: Optional[str] = None,  # iter #45: filter by material
     ) -> Dict[str, Any]:
         """
         Supply 留存按时段划分 (iter #19 + iter #24 时间窗口扩展) — 早期 vs 后期 retention 对比。
@@ -2599,12 +2600,20 @@ class Persistence:
 
         with self._conn() as conn:
             # Get min/max sim_day from supply_offers (the table we care about)
+            # iter #45: optional material_type filter
+            where_clause = ""
+            range_params: List[Any] = []
+            if material_type:
+                where_clause = "WHERE s.material_type = ?"
+                range_params = [material_type]
             range_row = conn.execute(
-                """SELECT MIN(c.sim_day) as min_day, MAX(c.sim_day) as max_day,
+                f"""SELECT MIN(c.sim_day) as min_day, MAX(c.sim_day) as max_day,
                           COUNT(DISTINCT s.cycle_id) as n_cycles,
                           COUNT(DISTINCT s.supply_id) as n_supplies
                    FROM supply_offers s
-                   JOIN optimization_cycles c ON c.cycle_id = s.cycle_id"""
+                   JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                   {where_clause}""",
+                range_params,
             ).fetchone()
             min_day = range_row["min_day"]
             max_day = range_row["max_day"]
@@ -2618,6 +2627,7 @@ class Persistence:
                     "period_labels": [],
                     "periods": [],
                     "trend": "unknown",
+                    "material_type_filter": material_type,  # iter #45
                 }
 
             # iter #24: determine segment boundaries based on unit
@@ -2681,14 +2691,26 @@ class Persistence:
             periods_data = []
             for p in period_labels:
                 # 该段内的 supply_ids + 出现次数
-                rows = conn.execute(
-                    """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
-                       FROM supply_offers s
-                       JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
-                       WHERE c.sim_day BETWEEN ? AND ?
-                       GROUP BY s.supply_id""",
-                    (p["sim_day_min"], p["sim_day_max"]),
-                ).fetchall()
+                # iter #45: optional material_type filter
+                if material_type:
+                    rows = conn.execute(
+                        """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                           FROM supply_offers s
+                           JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                           WHERE c.sim_day BETWEEN ? AND ?
+                             AND s.material_type = ?
+                           GROUP BY s.supply_id""",
+                        (p["sim_day_min"], p["sim_day_max"], material_type),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                           FROM supply_offers s
+                           JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                           WHERE c.sim_day BETWEEN ? AND ?
+                           GROUP BY s.supply_id""",
+                        (p["sim_day_min"], p["sim_day_max"]),
+                    ).fetchall()
 
                 n_ids = len(rows)
                 n_one = sum(1 for r in rows if r["n_cycles"] == 1)
@@ -2737,6 +2759,7 @@ class Persistence:
             "period_labels": [p["period_label"] for p in periods_data],
             "periods": periods_data,
             "trend": trend,
+            "material_type_filter": material_type,  # iter #45
         }
 
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
