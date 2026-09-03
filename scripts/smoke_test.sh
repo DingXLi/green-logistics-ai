@@ -183,6 +183,19 @@ check_endpoint "/api/persistence/vehicle-stats invalid limit (0)" 400 GET "/api/
 check_endpoint "/api/persistence/vehicle-stats invalid limit (>1000)" 400 GET "/api/persistence/vehicle-stats?limit=9999"
 check_json_field "/api/persistence/vehicle-stats has vehicles array" GET "/api/persistence/vehicle-stats" ".vehicles | type" "array"
 check_json_field "/api/persistence/vehicle-stats has n_vehicles" GET "/api/persistence/vehicle-stats" ".n_vehicles | type" "number"
+
+# ---- iter #42: per-material cohort retention + forecast calibration ----
+check_endpoint "/api/persistence/cohort-retention-by-material" 200 GET "/api/persistence/cohort-retention-by-material"
+check_json_field "/api/persistence/cohort-retention-by-material has by_material array" GET "/api/persistence/cohort-retention-by-material" ".by_material | type" "array"
+check_json_field "/api/persistence/cohort-retention-by-material has n_materials" GET "/api/persistence/cohort-retention-by-material" ".n_materials | type" "number"
+
+check_endpoint "/api/persistence/forecast-calibration" 200 GET "/api/persistence/forecast-calibration"
+check_endpoint "/api/persistence/forecast-calibration by metric" 200 GET "/api/persistence/forecast-calibration?metric=cost_sek"
+check_endpoint "/api/persistence/forecast-calibration by method" 200 GET "/api/persistence/forecast-calibration?method=linear"
+check_endpoint "/api/persistence/forecast-calibration invalid metric" 400 GET "/api/persistence/forecast-calibration?metric=invalid"
+check_endpoint "/api/persistence/forecast-calibration invalid method" 400 GET "/api/persistence/forecast-calibration?method=invalid"
+check_json_field "/api/persistence/forecast-calibration has overall" GET "/api/persistence/forecast-calibration" ".overall | type" "object"
+check_json_field "/api/persistence/forecast-calibration has n_total_predictions" GET "/api/persistence/forecast-calibration" ".n_total_predictions | type" "number"
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
