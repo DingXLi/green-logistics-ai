@@ -3374,6 +3374,31 @@ async def get_forecast_confidence(
             except Exception as e:
                 logger.debug(f"save_method_pref failed (ignore): {e}")
 
+        # iter #42: record predictions for calibration (fire-and-forget)
+        # Stores each method's predicted value at each forecast_sim_day.
+        # Once that sim_day arrives in optimization_cycles, /api/persistence/forecast-calibration
+        # backfills actual_value + error to compute MAE / MAPE / RMSE.
+        last_sim_day = first_result.get("last_sim_day") or 0
+        for method, result in method_results.items():
+            for metric_key, metric_data in result.get("metrics", {}).items():
+                forecast_points = metric_data.get("forecast", [])
+                if not forecast_points:
+                    continue
+                try:
+                    coordinator.persistence.record_forecast_predictions(
+                        metric=metric_key,
+                        method=method,
+                        predictions=forecast_points,
+                        created_at_sim_day=int(last_sim_day),
+                    )
+                except Exception as e:
+                    logger.debug(f"record_forecast_predictions failed (ignore): {e}")
+        # Backfill actuals for past predictions (fire-and-forget)
+        try:
+            coordinator.persistence.backfill_forecast_actuals()
+        except Exception as e:
+            logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+
         return {
             "horizon": horizon,
             "history_n": history_n,
@@ -3424,6 +3449,70 @@ async def clear_forecast_method_prefs(
     else:
         n = coordinator.persistence.clear_method_prefs()
         return {"deleted": n, "scope": "all"}
+
+
+@app.get("/api/persistence/forecast-calibration")
+async def get_forecast_calibration(
+    metric: Optional[str] = None,
+    method: Optional[str] = None,
+):
+    """
+    iter #42: Forecast calibration — actual vs predicted accuracy stats.
+
+    Returns MAE / MAPE / RMSE / bias for forecast predictions whose
+    target sim_day has already occurred in optimization_cycles.
+
+    Stats interpretation:
+    - mae (Mean Absolute Error): average |actual - predicted|
+    - rmse (Root Mean Squared Error): sqrt(mean(error²)); penalizes outliers
+    - mape_pct: Mean Absolute Percentage Error; intuitive (lower = better)
+    - bias: mean(actual - predicted); +ve = model under-predicts, -ve = over-predicts
+
+    Query params:
+    - metric: optional filter (e.g. 'cost_sek')
+    - method: optional filter (e.g. 'linear')
+
+    Returns:
+        {
+          n_total_predictions, n_evaluated, n_pending,
+          overall: {mae, rmse, mape_pct, bias, ...},
+          by_metric: {<metric>: {stats}},
+          by_method: {<method>: {stats}},
+          by_metric_method: {<metric>: {<method>: {stats}}},
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if metric and metric not in {"cost_sek", "co2_kg", "util_pct", "matches"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid metric: {metric}, valid: cost_sek, co2_kg, util_pct, matches",
+        )
+    if method and method not in {"linear", "moving_average", "exponential_smoothing"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method}",
+        )
+
+    # Backfill any new actuals first (cheap query; runs in O(pending))
+    try:
+        coordinator.persistence.backfill_forecast_actuals()
+    except Exception as e:
+        logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+
+    stats = coordinator.persistence.get_forecast_calibration(
+        metric=metric, method=method,
+    )
+    n_total = coordinator.persistence.count_forecast_predictions(metric=metric)
+    n_evaluated = stats.get("overall", {}).get("n_evaluated", 0)
+    return {
+        "n_total_predictions": n_total,
+        "n_evaluated": n_evaluated,
+        "n_pending": n_total - n_evaluated,
+        "metric_filter": metric,
+        "method_filter": method,
+        **stats,
+    }
 
 
 # ============================================
