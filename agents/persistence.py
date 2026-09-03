@@ -205,6 +205,14 @@ CREATE TABLE IF NOT EXISTS db_maintenance_log (
     ran_at TEXT NOT NULL                  -- ISO timestamp
 );
 CREATE INDEX IF NOT EXISTS idx_maint_log_ran_at ON db_maintenance_log(ran_at);
+
+-- iter #44: Runtime config persistence (overrides that survive restart)
+-- One row per key. Loaded into in-memory _runtime_config at startup.
+CREATE TABLE IF NOT EXISTS runtime_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,           -- JSON-encoded value (so we can store any type)
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -2923,6 +2931,87 @@ class Persistence:
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ============================================
+    # iter #44: Runtime config persistence
+    # ============================================
+    # Saves overrides in SQLite so they survive restarts. Loaded on startup.
+
+    def load_runtime_config(self) -> Dict[str, Any]:
+        """Load all persisted runtime config overrides (called at startup).
+
+        Returns: {key: parsed_value, ...} — only keys with a persisted row.
+        Unknown keys in DB (e.g. after code update that removed the key)
+        are ignored, with a debug log warning.
+        """
+        import json as _json
+        overrides: Dict[str, Any] = {}
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM runtime_config"
+            ).fetchall()
+        for r in rows:
+            try:
+                overrides[r["key"]] = _json.loads(r["value"])
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    f"runtime_config: bad value for key {r['key']}: {e}, skipping"
+                )
+        return overrides
+
+    def save_runtime_config(self, key: str, value: Any) -> Dict[str, Any]:
+        """Persist a single key=value to runtime_config.
+
+        Returns: {key, value, applied: bool, updated_at}
+        """
+        import json as _json
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT INTO runtime_config (key, value, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(key) DO UPDATE SET
+                       value = excluded.value,
+                       updated_at = excluded.updated_at""",
+                (key, _json.dumps(value), datetime.now().isoformat()),
+            )
+        return {
+            "key": key,
+            "value": value,
+            "applied": True,
+            "updated_at": datetime.now().isoformat(),
+        }
+
+    def delete_runtime_config(self, key: str) -> bool:
+        """Delete a persisted override (returns True if row existed)."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM runtime_config WHERE key = ?", (key,)
+            )
+        return cur.rowcount > 0
+
+    def list_runtime_config_overrides(self) -> List[Dict[str, Any]]:
+        """Return all persisted overrides with their string value + parse status."""
+        import json as _json
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value, updated_at FROM runtime_config ORDER BY key"
+            ).fetchall()
+        results = []
+        for r in rows:
+            try:
+                parsed = _json.loads(r["value"])
+                parse_ok = True
+            except (ValueError, TypeError):
+                parsed = None
+                parse_ok = False
+            results.append({
+                "key": r["key"],
+                "value": r["value"],  # raw string
+                "parsed_value": parsed,
+                "parse_ok": parse_ok,
+                "updated_at": r["updated_at"],
+            })
+        return results
 
     # ============================================
     # iter #35: forecast method preferences (最佳 method 持久化)
