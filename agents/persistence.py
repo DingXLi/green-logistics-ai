@@ -2393,6 +2393,141 @@ class Persistence:
                 })
             return results
 
+    def get_cohort_retention_crosstab(
+        self,
+        n_periods: int = 4,
+        period_unit: str = "quartile",
+        material_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #44: Cross-tab cohort retention (period × material).
+
+        Returns a 2D matrix: rows = periods, columns = materials,
+        values = retention_rate_pct for that material in that period.
+
+        Args:
+            n_periods: how many time periods (1-10, default 4)
+            period_unit: 'quartile' | 'day' | 'week' | 'month'
+            material_type: optional filter to single material
+
+        Returns:
+            {
+              n_periods: int,
+              period_unit: str,
+              period_labels: [{period_idx, sim_day_min, sim_day_max}, ...],
+              materials: [str, ...],  # sorted list of material names
+              matrix: [[float, ...], ...],  # matrix[i][j] = retention% for period i, material j
+              cell_counts: [[int, ...], ...],  # n_supply_ids per cell (for sample-size context)
+              material_filter: str | None,
+              trend_per_material: {<material>: "improving" | "declining" | "stable" | "unknown"},
+            }
+        """
+        with self._conn() as conn:
+            # Get sim_day range
+            range_row = conn.execute(
+                "SELECT MIN(sim_day) as min_d, MAX(sim_day) as max_d, COUNT(*) as n_cycles FROM optimization_cycles"
+            ).fetchone()
+            if not range_row["min_d"]:
+                return {
+                    "n_periods": 0, "period_unit": period_unit,
+                    "period_labels": [], "materials": [], "matrix": [], "cell_counts": [],
+                    "material_filter": material_type,
+                    "trend_per_material": {},
+                }
+            min_day = range_row["min_d"]
+            max_day = range_row["max_d"]
+            n_cycles = range_row["n_cycles"]
+
+            # Get unique materials
+            where = "WHERE material_type IS NOT NULL"
+            params: List[Any] = []
+            if material_type:
+                where += " AND material_type = ?"
+                params.append(material_type)
+            mat_rows = conn.execute(
+                f"SELECT DISTINCT material_type FROM supply_offers {where} ORDER BY material_type",
+                params,
+            ).fetchall()
+            materials = [r["material_type"] for r in mat_rows]
+            if not materials:
+                return {
+                    "n_periods": 0, "period_unit": period_unit,
+                    "period_labels": [], "materials": [], "matrix": [], "cell_counts": [],
+                    "material_filter": material_type,
+                    "trend_per_material": {},
+                }
+
+            # Compute period boundaries (similar to by_period)
+            day_range = max_day - min_day + 1
+            n_periods_eff = min(n_periods, day_range, 10)  # cap at 10
+            days_per_segment = max(1, day_range // n_periods_eff)
+
+            period_labels = []
+            for i in range(n_periods_eff):
+                p_start = min_day + i * days_per_segment
+                p_end = min_day + (i + 1) * days_per_segment - 1
+                p_end = min(p_end, max_day)
+                if p_start > max_day:
+                    break
+                period_labels.append({
+                    "period_idx": i + 1,
+                    "sim_day_min": p_start,
+                    "sim_day_max": p_end,
+                })
+            n_periods = len(period_labels)
+
+            # Build matrix: rows = periods, cols = materials
+            matrix: List[List[Optional[float]]] = []
+            cell_counts: List[List[int]] = []
+            for p in period_labels:
+                row_retention: List[Optional[float]] = []
+                row_counts: List[int] = []
+                for mat in materials:
+                    rows = conn.execute(
+                        """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                           FROM supply_offers s
+                           JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                           WHERE c.sim_day BETWEEN ? AND ?
+                             AND s.material_type = ?
+                           GROUP BY s.supply_id""",
+                        (p["sim_day_min"], p["sim_day_max"], mat),
+                    ).fetchall()
+                    n_ids = len(rows)
+                    n_rep = sum(1 for r in rows if r["n_cycles"] >= 2)
+                    rate = round(n_rep / n_ids * 100, 1) if n_ids > 0 else None
+                    row_retention.append(rate)
+                    row_counts.append(n_ids)
+                matrix.append(row_retention)
+                cell_counts.append(row_counts)
+
+        # Trend per material
+        trend_per_material: Dict[str, str] = {}
+        for j, mat in enumerate(materials):
+            col = [matrix[i][j] for i in range(n_periods) if matrix[i][j] is not None]
+            if len(col) >= 2:
+                first, last = col[0], col[-1]
+                if first is None or last is None:
+                    trend_per_material[mat] = "unknown"
+                elif last - first > 5:
+                    trend_per_material[mat] = "improving"
+                elif first - last > 5:
+                    trend_per_material[mat] = "declining"
+                else:
+                    trend_per_material[mat] = "stable"
+            else:
+                trend_per_material[mat] = "unknown"
+
+        return {
+            "n_periods": n_periods,
+            "period_unit": period_unit,
+            "period_labels": period_labels,
+            "materials": materials,
+            "matrix": matrix,
+            "cell_counts": cell_counts,
+            "material_filter": material_type,
+            "trend_per_material": trend_per_material,
+        }
+
     def get_cohort_retention_by_period(
         self,
         n_periods: int = 4,
