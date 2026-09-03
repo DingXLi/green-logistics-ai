@@ -202,6 +202,9 @@ green-logistics-ai/
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
 | GET    | `/api/persistence/cohort-retention-by-material` | Per-material supply retention breakdown (iter #42) |
+| GET    | `/api/persistence/cohort-retention-crosstab?n_periods=4&period_unit=quartile&material_type=X` | Cross-tab retention matrix: period × material (iter #44) |
+| GET    | `/api/admin/runtime-config/overrides` | List persisted runtime config overrides (admin, iter #44) |
+| POST   | `/api/admin/runtime-config/apply?updates=JSON&persist=true` | Atomic batch update of multiple runtime config keys (admin, iter #44) |
 | GET    | `/api/persistence/forecast-calibration?metric=X&method=Y` | Forecast accuracy stats (MAE / RMSE / MAPE / bias) over predicted vs actuals (iter #42) |
 | GET    | `/api/persistence/forecast-calibration/trend?metric=X&method=Y` | Cumulative calibration trend over forecast_sim_day (iter #43) |
 | GET    | `/api/admin/runtime-config` | Read runtime configuration (admin, iter #43) |
