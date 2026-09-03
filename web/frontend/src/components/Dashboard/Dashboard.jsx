@@ -74,6 +74,8 @@ const VehicleStats = lazy(() => import('./VehicleStats').then(m => ({ default: m
 const ForecastCalibration = lazy(() => import('./ForecastCalibration').then(m => ({ default: m.ForecastCalibration })))
 // iter #43: forecast calibration trend over time
 const ForecastCalibrationTrend = lazy(() => import('./ForecastCalibrationTrend').then(m => ({ default: m.ForecastCalibrationTrend })))
+// iter #45: cohort retention crosstab heatmap
+const CohortRetentionCrosstab = lazy(() => import('./CohortRetentionCrosstab').then(m => ({ default: m.CohortRetentionCrosstab })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -658,6 +660,11 @@ export default function Dashboard() {
           {/* iter #43: Forecast calibration trend over time */}
           <Suspense fallback={<LoadingSpinner label="Loading forecast trend…" />}>
             <ForecastCalibrationTrend />
+          </Suspense>
+
+          {/* iter #45: Cohort retention crosstab heatmap */}
+          <Suspense fallback={<LoadingSpinner label="Loading retention heatmap…" />}>
+            <CohortRetentionCrosstab />
           </Suspense>
 
           {/* iter #10: Materials overview grid */}
