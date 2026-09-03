@@ -3251,6 +3251,83 @@ class Persistence:
                 row = conn.execute("SELECT COUNT(*) FROM forecast_predictions").fetchone()
         return row[0]
 
+    def get_forecast_calibration_trend(
+        self,
+        metric: Optional[str] = None,
+        method: Optional[str] = None,
+        bucket: str = "evaluated_at_day",  # 'evaluated_at_day' | 'forecast_sim_day'
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #43: Calibration trend over time.
+
+        Computes per-cycle calibration stats from forecast_predictions where
+        actual_value is set. The "bucket" controls how time is grouped:
+        - 'evaluated_at_day': when actual was filled in (uses recorded_at prefix? — fallback to forecast_sim_day)
+        - 'forecast_sim_day': bucket by the target sim_day
+
+        For each bucket (sim_day), we compute cumulative MAE / RMSE / MAPE /
+        bias over all evaluated predictions up to and including that day.
+
+        Returns:
+            [{
+              bucket_sim_day: int,
+              n_evaluated: int,
+              cumulative_mae: float,
+              cumulative_rmse: float,
+              cumulative_mape_pct: float,
+              cumulative_bias: float,
+            }, ...]
+            Sorted by bucket_sim_day ASC.
+        """
+        with self._conn() as conn:
+            where_clauses = ["actual_value IS NOT NULL", "error IS NOT NULL"]
+            params: List[Any] = []
+            if metric:
+                where_clauses.append("metric = ?")
+                params.append(metric)
+            if method:
+                where_clauses.append("method = ?")
+                params.append(method)
+            where_sql = " AND ".join(where_clauses)
+
+            # Use forecast_sim_day as the time bucket (recordings happen after eval)
+            rows = conn.execute(
+                f"SELECT forecast_sim_day, error, abs_pct_error "
+                f"FROM forecast_predictions WHERE {where_sql} "
+                f"ORDER BY forecast_sim_day ASC, id ASC",
+                params,
+            ).fetchall()
+
+        if not rows:
+            return []
+
+        # Group by sim_day
+        from collections import defaultdict
+        by_day: Dict[int, List[Any]] = defaultdict(list)
+        for r in rows:
+            by_day[int(r["forecast_sim_day"])].append(r)
+
+        # Compute cumulative stats
+        results: List[Dict[str, Any]] = []
+        cumulative: List[Any] = []
+        for day in sorted(by_day.keys()):
+            cumulative.extend(by_day[day])
+            errors = [r["error"] for r in cumulative]
+            abs_pct = [r["abs_pct_error"] for r in cumulative if r["abs_pct_error"] is not None]
+            mae = sum(abs(e) for e in errors) / len(errors)
+            rmse = (sum(e * e for e in errors) / len(errors)) ** 0.5
+            bias = sum(errors) / len(errors)
+            mape = sum(abs_pct) / len(abs_pct) if abs_pct else None
+            results.append({
+                "bucket_sim_day": day,
+                "n_evaluated": len(cumulative),
+                "cumulative_mae": round(mae, 4),
+                "cumulative_rmse": round(rmse, 4),
+                "cumulative_mape_pct": round(mape, 2) if mape is not None else None,
+                "cumulative_bias": round(bias, 4),
+            })
+        return results
+
 
     # ====================================================================
     # iter #37: Seasonal perturbation CRUD

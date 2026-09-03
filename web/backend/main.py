@@ -3593,6 +3593,65 @@ async def get_forecast_calibration(
     }
 
 
+@app.get("/api/persistence/forecast-calibration/trend")
+async def get_forecast_calibration_trend(
+    metric: Optional[str] = None,
+    method: Optional[str] = None,
+):
+    """
+    iter #43: Cumulative forecast calibration trend over time.
+
+    Returns per-sim_day cumulative MAE/RMSE/MAPE/bias computed from
+    evaluated predictions up to and including that day.
+
+    Query params:
+    - metric: optional filter (cost_sek / co2_kg / util_pct / matches)
+    - method: optional filter (linear / moving_average / exponential_smoothing)
+
+    Returns:
+        {
+          n_buckets: int,
+          trend: [{
+            bucket_sim_day: int,
+            n_evaluated: int,
+            cumulative_mae: float,
+            cumulative_rmse: float,
+            cumulative_mape_pct: float | null,
+            cumulative_bias: float,
+          }, ...],
+          metric_filter, method_filter,
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if metric and metric not in {"cost_sek", "co2_kg", "util_pct", "matches"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid metric: {metric}",
+        )
+    if method and method not in {"linear", "moving_average", "exponential_smoothing"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method}",
+        )
+
+    # Backfill any new actuals first
+    try:
+        coordinator.persistence.backfill_forecast_actuals()
+    except Exception as e:
+        logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+
+    trend = coordinator.persistence.get_forecast_calibration_trend(
+        metric=metric, method=method,
+    )
+    return {
+        "n_buckets": len(trend),
+        "trend": trend,
+        "metric_filter": metric,
+        "method_filter": method,
+    }
+
+
 # ============================================
 # iter #37: Seasonal perturbation endpoints (admin)
 # ============================================
