@@ -2617,3 +2617,124 @@ td.no-matches {
   background: #7f1d1d;
   color: #fecaca;
 }
+
+/* iter #45: Runtime config admin panel */
+.rc-panel {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.rc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rc-header h3 {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rc-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rc-btn-warn,
+.rc-btn-danger,
+.rc-btn-edit,
+.rc-btn-save,
+.rc-btn-cancel {
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.rc-btn-warn {
+  background: #f59e0b;
+  color: #0f172a;
+  font-weight: 600;
+}
+.rc-btn-warn:hover { background: #d97706; }
+.rc-btn-danger {
+  background: #ef4444;
+  color: #fff;
+  font-weight: 600;
+}
+.rc-btn-danger:hover { background: #dc2626; }
+.rc-btn-edit {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+.rc-btn-edit:hover { background: #475569; }
+.rc-btn-save {
+  background: #10b981;
+  color: #fff;
+}
+.rc-btn-save:hover { background: #059669; }
+.rc-btn-cancel {
+  background: #475569;
+  color: #cbd5e1;
+}
+.rc-btn-cancel:hover { background: #64748b; }
+.rc-section {
+  margin-top: 1rem;
+}
+.rc-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+.rc-current-modified {
+  color: #f59e0b;
+  font-weight: 600;
+}
+.rc-modified {
+  background: rgba(245, 158, 11, 0.08);
+}
+.rc-edit-input {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #7c3aed;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  width: 100%;
+  font-family: 'JetBrains Mono', monospace;
+}
+.rc-edit-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+}
+.rc-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.rc-persist-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.rc-error {
+  padding: 1rem;
+  background: #7f1d1d;
+  color: #fecaca;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}

@@ -76,6 +76,8 @@ const ForecastCalibration = lazy(() => import('./ForecastCalibration').then(m =>
 const ForecastCalibrationTrend = lazy(() => import('./ForecastCalibrationTrend').then(m => ({ default: m.ForecastCalibrationTrend })))
 // iter #45: cohort retention crosstab heatmap
 const CohortRetentionCrosstab = lazy(() => import('./CohortRetentionCrosstab').then(m => ({ default: m.CohortRetentionCrosstab })))
+// iter #45: runtime config admin panel
+const RuntimeConfig = lazy(() => import('./RuntimeConfig').then(m => ({ default: m.RuntimeConfig })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -665,6 +667,11 @@ export default function Dashboard() {
           {/* iter #45: Cohort retention crosstab heatmap */}
           <Suspense fallback={<LoadingSpinner label="Loading retention heatmap…" />}>
             <CohortRetentionCrosstab />
+          </Suspense>
+
+          {/* iter #45: Runtime config admin panel */}
+          <Suspense fallback={<LoadingSpinner label="Loading runtime config…" />}>
+            <RuntimeConfig />
           </Suspense>
 
           {/* iter #10: Materials overview grid */}
