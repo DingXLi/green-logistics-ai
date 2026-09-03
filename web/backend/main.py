@@ -765,6 +765,17 @@ class BackgroundScheduler:
                         await _broadcast_cycle_update(result)
                     except Exception as e:
                         logger.warning(f"WS broadcast 在 scheduler cycle 失败: {e}")
+                    # iter #43: auto-vacuum check after each cycle
+                    if _get_runtime_config("auto_vacuum_enabled"):
+                        try:
+                            rec = self.coord.persistence.should_auto_vacuum()
+                            if rec["should_vacuum"]:
+                                logger.info(
+                                    f"auto-vacuum triggered after cycle: {rec['reasons'][:2]}"
+                                )
+                                self.coord.persistence.vacuum(triggered_by="auto")
+                        except Exception as e:
+                            logger.warning(f"auto-vacuum failed (ignore): {e}")
             except Exception as e:
                 self.error_count += 1
                 self.last_error = f"{type(e).__name__}: {str(e)[:200]}"
