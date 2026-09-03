@@ -1945,6 +1945,86 @@ class Persistence:
             "time_range": time_range,
         }
 
+    def get_vehicle_stats(
+        self,
+        vehicle_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #41: Vehicle historical aggregates.
+
+        Per-vehicle aggregates across all cycles:
+        - n_routes, total_distance_km, total_duration_hours
+        - total_cost_sek, total_co2_kg
+        - avg_distance_km, avg_duration_hours, avg_cost_per_km, avg_co2_per_km
+        - first_cycle_id, last_cycle_id (chronological order)
+        - last_sim_day (most recent cycle where vehicle was used)
+
+        Sorted by total_distance_km DESC.
+
+        Args:
+            vehicle_id: optional, return only this vehicle
+            limit: max number of vehicles to return (default 100)
+
+        Returns:
+            [{vehicle_id, n_routes, total_distance_km, total_duration_hours,
+              total_cost_sek, total_co2_kg, avg_distance_km, avg_duration_hours,
+              avg_cost_per_km_sek, avg_co2_per_km_kg,
+              first_cycle_id, last_cycle_id, last_sim_day}, ...]
+        """
+        where_clauses: List[str] = ["vehicle_id IS NOT NULL"]
+        params: List[Any] = []
+        if vehicle_id is not None:
+            where_clauses.append("vehicle_id = ?")
+            params.append(vehicle_id)
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT vehicle_id,
+                       COUNT(*) as n_routes,
+                       SUM(distance_km) as total_distance_km,
+                       SUM(duration_hours) as total_duration_hours,
+                       SUM(cost_sek) as total_cost_sek,
+                       SUM(co2_kg) as total_co2_kg,
+                       AVG(distance_km) as avg_distance_km,
+                       AVG(duration_hours) as avg_duration_hours,
+                       MIN(r.cycle_id) as first_cycle_id,
+                       MAX(r.cycle_id) as last_cycle_id,
+                       MAX(oc.sim_day) as last_sim_day
+                FROM routes r
+                LEFT JOIN optimization_cycles oc ON oc.cycle_id = r.cycle_id
+                WHERE {where_sql}
+                GROUP BY vehicle_id
+                ORDER BY total_distance_km DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+
+        results: List[Dict[str, Any]] = []
+        for r in rows:
+            total_dist = r["total_distance_km"] or 0.0
+            total_cost = r["total_cost_sek"] or 0.0
+            total_co2 = r["total_co2_kg"] or 0.0
+            results.append({
+                "vehicle_id": r["vehicle_id"],
+                "n_routes": r["n_routes"] or 0,
+                "total_distance_km": round(total_dist, 2),
+                "total_duration_hours": round(r["total_duration_hours"] or 0.0, 2),
+                "total_cost_sek": round(total_cost, 2),
+                "total_co2_kg": round(total_co2, 2),
+                "avg_distance_km": round(r["avg_distance_km"] or 0.0, 2),
+                "avg_duration_hours": round(r["avg_duration_hours"] or 0.0, 2),
+                "avg_cost_per_km_sek": round(total_cost / total_dist, 3) if total_dist > 0 else None,
+                "avg_co2_per_km_kg": round(total_co2 / total_dist, 3) if total_dist > 0 else None,
+                "first_cycle_id": r["first_cycle_id"],
+                "last_cycle_id": r["last_cycle_id"],
+                "last_sim_day": r["last_sim_day"],
+            })
+        return results
+
     def get_supply_aggregates(self, supply_id: Optional[str] = None,
                               material_type: Optional[str] = None,
                               limit_supplies: int = 100) -> List[Dict[str, Any]]:

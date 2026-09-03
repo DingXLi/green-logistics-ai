@@ -68,6 +68,8 @@ const LlmCostForecastPanel = lazy(() => import('./LlmCostForecastPanel').then(m 
 const CycleHistory = lazy(() => import('./CycleHistory').then(m => ({ default: m.CycleHistory })))
 // iter #41: Pareto-frontier sweet-spot finder (auto-recommend carbon tax)
 const SweetSpot = lazy(() => import('./SweetSpot').then(m => ({ default: m.SweetSpot })))
+// iter #41: per-vehicle historical stats (efficiency / utilization drill-down)
+const VehicleStats = lazy(() => import('./VehicleStats').then(m => ({ default: m.VehicleStats })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -637,6 +639,11 @@ export default function Dashboard() {
           {/* iter #9: Fleet utilization trend chart */}
           <Suspense fallback={<LoadingSpinner label="Loading fleet chart…" />}>
             <FleetUtilizationChart />
+          </Suspense>
+
+          {/* iter #41: Per-vehicle historical stats */}
+          <Suspense fallback={<LoadingSpinner label="Loading vehicle stats…" />}>
+            <VehicleStats />
           </Suspense>
 
           {/* iter #10: Materials overview grid */}

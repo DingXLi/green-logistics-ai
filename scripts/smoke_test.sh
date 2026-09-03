@@ -175,6 +175,14 @@ check_json_field "/api/admin/auth/status has header_formats list" GET "/api/admi
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
 check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence/match-distance-stats"
 check_endpoint "/api/persistence/supply-aggregates" 200 GET "/api/persistence/supply-aggregates"
+
+# ---- iter #41: Vehicle historical stats ----
+check_endpoint "/api/persistence/vehicle-stats" 200 GET "/api/persistence/vehicle-stats"
+check_endpoint "/api/persistence/vehicle-stats with limit" 200 GET "/api/persistence/vehicle-stats?limit=5"
+check_endpoint "/api/persistence/vehicle-stats invalid limit (0)" 400 GET "/api/persistence/vehicle-stats?limit=0"
+check_endpoint "/api/persistence/vehicle-stats invalid limit (>1000)" 400 GET "/api/persistence/vehicle-stats?limit=9999"
+check_json_field "/api/persistence/vehicle-stats has vehicles array" GET "/api/persistence/vehicle-stats" ".vehicles | type" "array"
+check_json_field "/api/persistence/vehicle-stats has n_vehicles" GET "/api/persistence/vehicle-stats" ".n_vehicles | type" "number"
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"

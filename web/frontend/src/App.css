@@ -2222,3 +2222,81 @@ td.no-matches {
   background: #7f1d1d;
   color: #fecaca;
 }
+
+/* iter #41: Vehicle stats panel styles */
+.vehicle-stats-panel {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.vs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.vs-header h3 {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.vs-controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.vs-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+.vs-select {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.vs-select:focus {
+  outline: none;
+  border-color: #7c3aed;
+}
+.vs-chart-wrap {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+.vs-section {
+  margin-bottom: 1rem;
+}
+.vs-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+.vs-empty,
+.vs-error {
+  padding: 1rem;
+  background: #1e293b;
+  border-radius: 6px;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.vs-error {
+  background: #7f1d1d;
+  color: #fecaca;
+}
