@@ -4600,6 +4600,55 @@ async def get_cohort_retention_by_period(
     )
 
 
+@app.get("/api/persistence/cohort-retention-crosstab")
+async def get_cohort_retention_crosstab(
+    n_periods: int = 4,
+    period_unit: str = "quartile",
+    material_type: Optional[str] = None,
+):
+    """
+    iter #44: Cross-tab cohort retention (period × material).
+
+    Returns a 2D matrix showing retention_rate_pct for each
+    (period, material) cell. Useful for spotting "which materials
+    are losing retention in which time periods".
+
+    Query params:
+    - n_periods: 1-10, default 4
+    - period_unit: quartile | day | week | month, default quartile
+    - material_type: optional filter to single material
+
+    Returns:
+        {
+          n_periods, period_unit, material_filter,
+          period_labels: [{period_idx, sim_day_min, sim_day_max}, ...],
+          materials: [str, ...],
+          matrix: [[retention_pct or null, ...], ...],  # [i][j] = period i × material j
+          cell_counts: [[n_supply_ids, ...], ...],  # sample sizes per cell
+          trend_per_material: {<mat>: "improving" | "declining" | "stable" | "unknown"},
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if period_unit not in {"quartile", "day", "week", "month"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid period_unit: {period_unit}",
+        )
+    max_periods_map = {"quartile": 10, "day": 30, "week": 52, "month": 12}
+    max_n = max_periods_map[period_unit]
+    if n_periods < 1 or n_periods > max_n:
+        raise HTTPException(
+            status_code=400,
+            detail=f"n_periods must be 1-{max_n} for period_unit='{period_unit}', got {n_periods}",
+        )
+    return coordinator.persistence.get_cohort_retention_crosstab(
+        n_periods=n_periods,
+        period_unit=period_unit,
+        material_type=material_type,
+    )
+
+
 @app.get("/api/persistence/cycle-kpi-summary")
 async def get_cycle_kpi_summary(
     last_n: Optional[int] = None,
