@@ -1023,6 +1023,16 @@ async def startup_event():
             "Scheduler 未启用 (设 GL_SCHEDULER_ENABLED=true 打开)"
         )
 
+    # iter #44: load persisted runtime config overrides (if any)
+    if coordinator is not None and coordinator.persistence is not None:
+        try:
+            overrides = coordinator.persistence.load_runtime_config()
+            for k, v in overrides.items():
+                if _set_runtime_config(k, v):
+                    logger.info(f"runtime_config: loaded override {k}={v}")
+        except Exception as e:
+            logger.warning(f"runtime_config load failed (ignore): {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -1599,6 +1609,9 @@ def _get_protected_endpoints() -> list:
         "/api/admin/db-maintenance/log",
         # iter #43: runtime config
         "/api/admin/runtime-config",  # GET, POST (also reset)
+        # iter #44: runtime config batch + overrides
+        "/api/admin/runtime-config/apply",  # POST
+        "/api/admin/runtime-config/overrides",  # GET
     ]
 
 
@@ -4728,16 +4741,18 @@ async def get_runtime_config(_: None = Depends(require_admin)):
 async def update_runtime_config(
     key: str,
     value: Any,
+    persist: bool = False,
     _: None = Depends(require_admin),
 ):
     """
-    iter #43: Update a runtime config value (admin).
+    iter #43 + iter #44: Update a runtime config value (admin).
 
     Body params (form or query):
       key: config key (e.g. "default_carbon_price_sek_per_kg")
       value: new value (string-typed; parsed to int/float/bool/str)
+      persist: if true, save to SQLite so the change survives restart (iter #44)
 
-    Returns: {key, value, applied: bool, reason?: str}
+    Returns: {key, value, applied, persisted: bool, updated_at?: str}
     """
     if key not in _RUNTIME_CONFIG_DEFAULTS:
         raise HTTPException(
@@ -4759,20 +4774,134 @@ async def update_runtime_config(
             detail=f"invalid value type for {key}: expected {_type_name(default)}",
         )
     logger.info(f"runtime_config: {key} = {parsed} (was {_runtime_config.get(key)})")
+    persisted = False
+    updated_at = None
+    if persist:
+        if coordinator is None or coordinator.persistence is None:
+            raise HTTPException(status_code=503, detail="Persistence not initialized")
+        result = coordinator.persistence.save_runtime_config(key, parsed)
+        persisted = True
+        updated_at = result["updated_at"]
     return {
         "key": key,
         "value": _runtime_config[key],
         "applied": True,
+        "persisted": persisted,
+        "updated_at": updated_at,
+    }
+
+
+@app.post("/api/admin/runtime-config/apply")
+async def apply_runtime_config_batch(
+    updates: str,  # JSON-encoded [{key, value}, ...]
+    persist: bool = False,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #44: Apply a batch of runtime config updates atomically.
+
+    Body params (form or query):
+      updates: JSON string [{key, value}, ...] (each value is a string
+               that will be parsed to the key's default type)
+      persist: if true, also save all to SQLite
+
+    On any validation failure, NO updates are applied (atomic transaction).
+    Returns: {applied: [{key, value}], n_applied, persisted, errors: []}
+    """
+    import json as _json
+    try:
+        parsed_updates = _json.loads(updates)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=f"invalid JSON: {e}")
+    if not isinstance(parsed_updates, list):
+        raise HTTPException(status_code=400, detail="updates must be a JSON array")
+    if not (1 <= len(parsed_updates) <= 50):
+        raise HTTPException(status_code=400, detail="updates count must be in [1, 50]")
+
+    # Validate all first (atomic)
+    validated: List[Tuple[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+    for i, item in enumerate(parsed_updates):
+        if not isinstance(item, dict) or "key" not in item or "value" not in item:
+            errors.append({"index": str(i), "reason": "item must have key+value"})
+            continue
+        k = item["key"]
+        v = item["value"]
+        if k not in _RUNTIME_CONFIG_DEFAULTS:
+            errors.append({"index": str(i), "key": k, "reason": f"unknown key: {k}"})
+            continue
+        default = _RUNTIME_CONFIG_DEFAULTS[k]
+        try:
+            typed_v = _parse_config_value(v, default)
+        except (ValueError, TypeError) as e:
+            errors.append({"index": str(i), "key": k, "reason": f"parse error: {e}"})
+            continue
+        validated.append((k, typed_v))
+
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail={"reason": "validation errors (no updates applied)", "errors": errors},
+        )
+
+    # Apply all
+    applied_results = []
+    for k, v in validated:
+        if _set_runtime_config(k, v):
+            applied_results.append({"key": k, "value": v})
+            logger.info(f"runtime_config (batch): {k} = {v}")
+
+    # Persist if requested
+    if persist:
+        if coordinator is None or coordinator.persistence is None:
+            raise HTTPException(status_code=503, detail="Persistence not initialized")
+        for k, v in applied_results:
+            coordinator.persistence.save_runtime_config(k, v)
+
+    return {
+        "n_applied": len(applied_results),
+        "applied": applied_results,
+        "persisted": persist,
     }
 
 
 @app.post("/api/admin/runtime-config/reset")
-async def reset_runtime_config(_: None = Depends(require_admin)):
+async def reset_runtime_config(
+    clear_persisted: bool = False,
+    _: None = Depends(require_admin),
+):
     """
-    iter #43: Reset all runtime config to defaults (admin).
+    iter #43 + iter #44: Reset all runtime config to defaults (admin).
+
+    Query:
+    - clear_persisted: also delete all rows in runtime_config table
     """
     _reset_runtime_config()
-    return {"reset": True, "n_keys": len(_RUNTIME_CONFIG_DEFAULTS)}
+    deleted = 0
+    if clear_persisted:
+        if coordinator is None or coordinator.persistence is None:
+            raise HTTPException(status_code=503, detail="Persistence not initialized")
+        with coordinator.persistence._conn() as conn:
+            cur = conn.execute("DELETE FROM runtime_config")
+        deleted = cur.rowcount
+    return {"reset": True, "n_keys": len(_RUNTIME_CONFIG_DEFAULTS), "deleted_persisted": deleted}
+
+
+@app.get("/api/admin/runtime-config/overrides")
+async def get_runtime_config_overrides(_: None = Depends(require_admin)):
+    """
+    iter #44: List all persisted runtime config overrides (admin).
+
+    Returns rows from runtime_config SQLite table (not in-memory state).
+    Useful for ops to see "what overrides are saved vs defaults".
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    overrides = coordinator.persistence.list_runtime_config_overrides()
+    return {
+        "n_overrides": len(overrides),
+        "overrides": overrides,
+    }
 
 
 def _type_name(value: Any) -> str:
