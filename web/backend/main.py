@@ -1583,6 +1583,9 @@ def _get_protected_endpoints() -> list:
         "/api/admin/llm-stats/reset",
         # iter #37: seasonal perturbation endpoints (CRUD)
         "/api/admin/seasonal-perturbations",
+        # iter #42: db-maintenance recommendation + log
+        "/api/admin/db-maintenance/recommendation",
+        "/api/admin/db-maintenance/log",
     ]
 
 
@@ -4499,18 +4502,68 @@ async def get_cycle_kpi_summary(
 @app.post("/api/admin/db-maintenance")
 async def post_db_maintenance(_: None = Depends(require_admin)):
     """
-    DB 维护 (iter #16) — VACUUM + ANALYZE。
+    DB 维护 (iter #16 + iter #42 audit log) — VACUUM + ANALYZE。
 
     VACUUM: rebuild DB file, 释放碎片空间, 减小文件体积
     ANALYZE: 收集统计信息, 帮助 query planner 选最优 index
 
     Returns:
         {action, size_before_bytes, size_after_bytes,
-         reclaimed_bytes, reclaimed_pct, success}
+         reclaimed_bytes, reclaimed_pct, success, triggered_by, ran_at}
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    return coordinator.persistence.vacuum()
+    return coordinator.persistence.vacuum(triggered_by="manual")
+
+
+@app.get("/api/admin/db-maintenance/recommendation")
+async def get_db_maintenance_recommendation(_: None = Depends(require_admin)):
+    """
+    iter #42: Auto-vacuum recommendation (admin).
+
+    Returns whether VACUUM/ANALYZE is recommended based on:
+    - DB size growth since last vacuum (> 30%)
+    - Total cycle count (> 1000 with no vacuum)
+    - Days since last vacuum (> 7)
+    - First vacuum ever
+
+    Returns:
+        {
+          should_vacuum: bool,
+          reasons: [str, ...],
+          stats: {
+            db_size_bytes, db_size_mb, total_cycles,
+            last_vacuum_at, days_since_last_vacuum,
+            size_growth_pct_since_last_vacuum,
+            size_after_last_vacuum_bytes,
+            total_maintenance_runs,
+          }
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.should_auto_vacuum()
+
+
+@app.get("/api/admin/db-maintenance/log")
+async def get_db_maintenance_log(
+    limit: int = 20,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #42: Recent DB maintenance audit log (admin).
+
+    Returns last N entries from db_maintenance_log table
+    (VACUUM/ANALYZE runs with size + timestamp).
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=400, detail="limit must be in [1, 200]")
+    return {
+        "n_entries": 0,
+        "entries": coordinator.persistence.get_maintenance_log(limit=limit),
+    }
 
 
 @app.get("/api/admin/db-export")

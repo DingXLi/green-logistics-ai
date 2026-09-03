@@ -135,6 +135,16 @@ check_endpoint "/api/health/deep" 200 GET "/api/health/deep"
 check_endpoint "/api/admin/db-stats" 200 GET "/api/admin/db-stats" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/admin/db-info" 200 GET "/api/admin/db-info" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/admin/db-maintenance" 200 POST "/api/admin/db-maintenance" "${ADMIN_HEADER_ARGS[@]}"
+
+# ---- iter #42: db maintenance recommendation + log ----
+check_endpoint "/api/admin/db-maintenance/recommendation" 200 GET "/api/admin/db-maintenance/recommendation" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/db-maintenance/recommendation has should_vacuum" GET "/api/admin/db-maintenance/recommendation" ".should_vacuum | type" "boolean" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/db-maintenance/recommendation has stats" GET "/api/admin/db-maintenance/recommendation" ".stats | type" "object" "${ADMIN_HEADER_ARGS[@]}"
+
+check_endpoint "/api/admin/db-maintenance/log" 200 GET "/api/admin/db-maintenance/log" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-maintenance/log limit=5" 200 GET "/api/admin/db-maintenance/log?limit=5" "${ADMIN_HEADER_ARGS[@]}"
+check_endpoint "/api/admin/db-maintenance/log invalid limit" 400 GET "/api/admin/db-maintenance/log?limit=0" "${ADMIN_HEADER_ARGS[@]}"
+check_json_field "/api/admin/db-maintenance/log has entries array" GET "/api/admin/db-maintenance/log" ".entries | type" "array" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/admin/perf-stats" 200 GET "/api/admin/perf-stats" "${ADMIN_HEADER_ARGS[@]}"
 # iter #27: per-endpoint error tracking field
 check_json_field "/api/admin/perf-stats has total_errors field" GET "/api/admin/perf-stats" ".total_errors" "0" "${ADMIN_HEADER_ARGS[@]}"
