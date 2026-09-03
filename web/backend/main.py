@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, Header, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response as FastAPIResponse, JSONResponse
 from pydantic import BaseModel, field_validator
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime
 from loguru import logger
 import sys
@@ -2480,6 +2480,223 @@ async def get_carbon_scenarios(
         ),
         "breakeven_price_sek_per_kg": breakeven_price,
         "breakeven_gap_sek": breakeven_gap_sek,
+    }
+
+
+# ---------------------------------------------------------------------------
+# iter #41: sweet-spot finder — automatic Pareto-frontier recommendation
+# ---------------------------------------------------------------------------
+
+SWEET_SPOT_DEFAULT_PRICES = [0.0, 0.5, 1.0, 1.5, 2.5, 4.0, 6.0, 8.0, 12.0]
+"""Default carbon prices (SEK/kg) to sweep when finding sweet spot.
+
+Spread is logarithmic-ish: dense in the low-tax region (most policy-relevant),
+sparser at high tax (only useful for sensitivity testing).
+"""
+
+
+def _compute_sweet_spot_score(
+    scenarios: List[Dict[str, Any]],
+    weight_cost: float,
+    weight_co2: float,
+) -> Dict[str, Any]:
+    """Compute sweet-spot across scenarios using normalized weighted sum.
+
+    Each scenario's cost and CO2 are normalized to [0, 1] using min-max across
+    scenarios (baseline = cheapest/most-CO2 if cost_weight dominates, but we
+    normalize per metric so direction is consistent).
+
+    For cost: lower is better → normalized so cheapest scenario = 0, most expensive = 1.
+    For CO2:  lower is better → normalized so lowest-CO2 scenario = 0, highest = 1.
+
+    score = weight_cost * cost_norm + weight_co2 * co2_norm
+    Scenario with minimum score = sweet spot.
+
+    Returns dict with:
+        sweet_spot_index: int | None  (index into scenarios)
+        sweet_spot_price: float | None
+        score_per_scenario: list[float]  (for visualization)
+        cost_range_sek: tuple[float, float]
+        co2_range_kg: tuple[float, float]
+    """
+    # Filter scenarios with valid data
+    valid_idx: List[int] = []
+    for i, s in enumerate(scenarios):
+        cost_opt = s.get("cost_optimal") or {}
+        if cost_opt.get("cost_sek") is None or cost_opt.get("co2_kg") is None:
+            continue
+        valid_idx.append(i)
+
+    if not valid_idx:
+        return {
+            "sweet_spot_index": None,
+            "sweet_spot_price": None,
+            "score_per_scenario": [None] * len(scenarios),
+            "cost_range_sek": [None, None],
+            "co2_range_kg": [None, None],
+            "n_valid_scenarios": 0,
+        }
+
+    # Collect true_total_cost and co2_kg for each valid scenario
+    cost_values: List[float] = []
+    co2_values: List[float] = []
+    for i in valid_idx:
+        s = scenarios[i]
+        cost_opt = s["cost_optimal"]
+        # cost_sek here is pure operating cost (co2_weight=0, no tax)
+        # For sweet-spot analysis we want a stable cost signal independent of tax,
+        # so use the cost-opt's raw fuel cost. Tax effect is captured by CO2 reduction.
+        cost_values.append(float(cost_opt["cost_sek"]))
+        co2_values.append(float(cost_opt["co2_kg"]))
+
+    cost_min, cost_max = min(cost_values), max(cost_values)
+    co2_min, co2_max = min(co2_values), max(co2_values)
+    cost_range = cost_max - cost_min if cost_max > cost_min else 1.0
+    co2_range = co2_max - co2_min if co2_max > co2_min else 1.0
+
+    scores_per_scenario: List[Optional[float]] = [None] * len(scenarios)
+    valid_scores: List[Tuple[int, float]] = []  # (scenario_index, score)
+    for j, i in enumerate(valid_idx):
+        cost_norm = (cost_values[j] - cost_min) / cost_range
+        co2_norm = (co2_values[j] - co2_min) / co2_range
+        score = weight_cost * cost_norm + weight_co2 * co2_norm
+        scores_per_scenario[i] = round(score, 6)
+        valid_scores.append((i, score))
+
+    if not valid_scores:
+        return {
+            "sweet_spot_index": None,
+            "sweet_spot_price": None,
+            "score_per_scenario": scores_per_scenario,
+            "cost_range_sek": [cost_min, cost_max],
+            "co2_range_kg": [co2_min, co2_max],
+            "n_valid_scenarios": 0,
+        }
+
+    best_idx, best_score = min(valid_scores, key=lambda x: x[1])
+    return {
+        "sweet_spot_index": best_idx,
+        "sweet_spot_price": scenarios[best_idx]["carbon_price_sek_per_kg"],
+        "best_score": round(best_score, 6),
+        "score_per_scenario": scores_per_scenario,
+        "cost_range_sek": [round(cost_min, 2), round(cost_max, 2)],
+        "co2_range_kg": [round(co2_min, 2), round(co2_max, 2)],
+        "n_valid_scenarios": len(valid_idx),
+    }
+
+
+@app.get("/api/optimize/sweet-spot")
+async def get_sweet_spot(
+    weight_cost: float = 0.5,
+    weight_co2: float = 0.5,
+    time_limit_seconds: int = 2,
+    use_real_roads: bool = True,
+):
+    """
+    iter #41: Pareto frontier sweet-spot finder.
+
+    Sweeps a fixed set of carbon prices (SWEET_SPOT_DEFAULT_PRICES) and returns:
+    - sweet-spot price (the carbon tax that minimizes weighted cost+CO2)
+    - all scenarios with normalized scores
+    - sensitivity table for frontend visualization
+
+    Use case: an operator wants to know "at what carbon tax rate is our
+    fleet optimal overall?" without manually exploring each scenario.
+
+    Query params:
+      weight_cost (0..1): how much to weight pure operating cost vs CO2 reduction
+      weight_co2  (0..1): how much to weight CO2 reduction vs cost
+                          (must satisfy weight_cost + weight_co2 > 0)
+      time_limit_seconds: per-scenario OR-Tools solve budget (lower = faster sweep)
+      use_real_roads: use OSM distance (default true; set false for haversine fallback)
+
+    Returns:
+      {
+        sweet_spot: {carbon_price_sek_per_kg, cost_sek, co2_kg, score},
+        scenarios: [{carbon_price, cost_sek, co2_kg, score, ...}],
+        weight_cost, weight_co2,
+        cost_range_sek: [min, max],
+        co2_range_kg: [min, max],
+        n_scenarios,
+        use_real_roads,
+      }
+    """
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    # Validate weights
+    if weight_cost < 0 or weight_co2 < 0:
+        raise HTTPException(status_code=400, detail="weight_cost and weight_co2 must be >= 0")
+    if weight_cost + weight_co2 <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="weight_cost + weight_co2 must be > 0",
+        )
+    if time_limit_seconds < 1 or time_limit_seconds > 30:
+        raise HTTPException(status_code=400, detail="time_limit_seconds must be in [1, 30]")
+
+    # Reuse carbon-scenarios core by constructing it via shared logic.
+    # We do this by calling the existing endpoint internally to avoid
+    # duplicating the world-building logic.
+    scenarios_resp = await get_carbon_scenarios(
+        carbon_prices=",".join(str(p) for p in SWEET_SPOT_DEFAULT_PRICES),
+        time_limit_seconds=time_limit_seconds,
+        use_real_roads=use_real_roads,
+    )
+
+    scenarios = scenarios_resp.get("scenarios", [])
+    if not scenarios:
+        return {
+            "sweet_spot": None,
+            "scenarios": [],
+            "weight_cost": weight_cost,
+            "weight_co2": weight_co2,
+            "cost_range_sek": [None, None],
+            "co2_range_kg": [None, None],
+            "n_scenarios": 0,
+            "n_valid_scenarios": 0,
+            "use_real_roads": use_real_roads,
+            "reason": scenarios_resp.get("reason", "No scenarios computed"),
+        }
+
+    sweet = _compute_sweet_spot_score(scenarios, weight_cost, weight_co2)
+
+    # Build output scenarios (lightweight: only cost-opt data + score)
+    out_scenarios = []
+    for i, s in enumerate(scenarios):
+        cost_opt = s.get("cost_optimal") or {}
+        co2_opt = s.get("co2_optimal") or {}
+        out_scenarios.append({
+            "carbon_price_sek_per_kg": s["carbon_price_sek_per_kg"],
+            "cost_sek": cost_opt.get("cost_sek"),
+            "co2_kg": cost_opt.get("co2_kg"),
+            "co2_optimal_cost_sek": co2_opt.get("cost_sek"),
+            "co2_optimal_co2_kg": co2_opt.get("co2_kg"),
+            "n_routes": cost_opt.get("n_routes", 0),
+            "score": sweet["score_per_scenario"][i],
+            "is_sweet_spot": i == sweet["sweet_spot_index"],
+        })
+
+    sweet_spot_obj = None
+    if sweet["sweet_spot_index"] is not None:
+        ss = out_scenarios[sweet["sweet_spot_index"]]
+        sweet_spot_obj = {
+            "carbon_price_sek_per_kg": ss["carbon_price_sek_per_kg"],
+            "cost_sek": ss["cost_sek"],
+            "co2_kg": ss["co2_kg"],
+            "score": ss["score"],
+        }
+
+    return {
+        "sweet_spot": sweet_spot_obj,
+        "scenarios": out_scenarios,
+        "weight_cost": weight_cost,
+        "weight_co2": weight_co2,
+        "cost_range_sek": sweet["cost_range_sek"],
+        "co2_range_kg": sweet["co2_range_kg"],
+        "n_scenarios": len(out_scenarios),
+        "n_valid_scenarios": sweet["n_valid_scenarios"],
+        "use_real_roads": use_real_roads,
     }
 
 
