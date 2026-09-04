@@ -683,6 +683,69 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_llm_cost_by_decision_type(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #48: LLM usage breakdown by decision_type.
+
+        Aggregates llm_decisions by decision_type ('demand_prediction' /
+        'supply_prediction') to show which type uses LLM the most.
+
+        Returns:
+            [{
+              decision_type: str,
+              n_total: int,
+              n_llm: int,
+              n_fallback: int,
+              llm_rate_pct: float,
+              avg_multiplier: float | None,
+              avg_confidence: float | None,
+              n_unique_targets: int,
+              first_decision_sim_day: int | None,
+              last_decision_sim_day: int | None,
+            }, ...]
+            Sorted by n_total DESC.
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT decision_type,
+                          COUNT(*) AS n_total,
+                          SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) AS n_llm,
+                          SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END) AS n_fallback,
+                          ROUND(AVG(multiplier), 3) AS avg_multiplier,
+                          ROUND(AVG(confidence), 3) AS avg_confidence,
+                          COUNT(DISTINCT target_id) AS n_unique_targets,
+                          MIN(sim_day) AS first_decision_sim_day,
+                          MAX(sim_day) AS last_decision_sim_day
+                   FROM llm_decisions
+                   {where_sql}
+                   GROUP BY decision_type
+                   ORDER BY n_total DESC""",
+                params,
+            ).fetchall()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            n_total = d.get("n_total") or 0
+            n_llm = d.get("n_llm") or 0
+            d["llm_rate_pct"] = round(100 * n_llm / max(n_total, 1), 2)
+            results.append(d)
+        return results
+
     def forecast_llm_cost(
         self,
         horizon: int = 7,
