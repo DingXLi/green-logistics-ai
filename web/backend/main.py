@@ -4644,6 +4644,44 @@ async def get_vehicle_stats(
     }
 
 
+@app.get("/api/persistence/fleet-utilization-summary")
+async def get_fleet_utilization_summary(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #49: Fleet utilization percentiles over time.
+
+    Aggregates fleet_utilization_pct across cycles and returns
+    distribution stats: mean / median / percentiles (p10-p99) /
+    n_idle_cycles (< 25%) / n_busy_cycles (>= 75%) / stddev.
+
+    Useful for fleet ops to spot chronic underutilization or saturation.
+
+    Query:
+    - since_sim_day / until_sim_day: optional filter
+
+    Returns:
+        {n_cycles, mean, median, p10, p25, p50, p75, p90, p99,
+         min, max, stddev, n_idle_cycles, n_busy_cycles,
+         since_sim_day, until_sim_day}
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    if until_sim_day is not None and until_sim_day < 0:
+        raise HTTPException(status_code=400, detail="until_sim_day must be >= 0")
+    if since_sim_day is not None and until_sim_day is not None and since_sim_day > until_sim_day:
+        raise HTTPException(
+            status_code=400,
+            detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+        )
+    return coordinator.persistence.get_fleet_utilization_summary(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,
