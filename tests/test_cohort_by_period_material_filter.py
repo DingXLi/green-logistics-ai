@@ -147,6 +147,7 @@ def test_period_endpoint_with_material_filter(monkeypatch):
         ],
         "trend": "declining",
         "material_type_filter": "concrete",
+        "trend_per_material": {},
     }
 
     class _FakePersistence:
@@ -179,6 +180,7 @@ def test_period_endpoint_without_filter(monkeypatch):
         "periods": [],
         "trend": "unknown",
         "material_type_filter": None,
+        "trend_per_material": {},
     }
 
     class _FakePersistence:
@@ -196,3 +198,85 @@ def test_period_endpoint_without_filter(monkeypatch):
     data = resp.json()
     assert data["material_type_filter"] is None
     assert backend_main.coordinator.persistence.called_with == (4, "quartile", None)
+
+
+# ============================================
+# iter #46: trend_per_material in by_period response
+# ============================================
+
+
+def test_by_period_trend_per_material_empty(persistence):
+    """No cycles → empty trend_per_material."""
+    result = persistence.get_cohort_retention_by_period(
+        n_periods=4, period_unit="quartile", material_type=None,
+    )
+    assert "trend_per_material" in result
+    # No cycles, no materials, so empty dict
+    assert result["trend_per_material"] == {}
+
+
+def test_by_period_trend_per_material_no_filter(persistence):
+    """Without material filter, returns per-material trends."""
+    # Insert 4 cycles in day 1, 2, 3, 4 (small range to keep n_periods=2)
+    for d in [1, 2, 3, 4]:
+        _insert_cycle(persistence, f"c{d}", sim_day=d)
+    # Day 1: concrete has 1 supply, day 2: same supply (repeat) -> 100% retention in P1
+    _insert_supply(persistence, "c1", "s1", "concrete")
+    _insert_supply(persistence, "c2", "s1", "concrete")  # repeat
+    # Day 3, 4: wood_waste, both new (no repeat) -> 0% retention in P2
+    _insert_supply(persistence, "c3", "s2", "wood_waste")
+    _insert_supply(persistence, "c4", "s2", "wood_waste")
+    result = persistence.get_cohort_retention_by_period(
+        n_periods=2, period_unit="quartile", material_type=None,
+    )
+    assert "trend_per_material" in result
+    # Should have both materials
+    assert "concrete" in result["trend_per_material"]
+    assert "wood_waste" in result["trend_per_material"]
+
+
+def test_by_period_trend_per_material_with_filter(persistence):
+    """With material_type filter, trend_per_material is empty (per-material
+    trend is only computed when no filter, to avoid redundancy)."""
+    for d in [1, 2, 3, 4]:
+        _insert_cycle(persistence, f"c{d}", sim_day=d)
+    _insert_supply(persistence, "c1", "s1", "concrete")
+    _insert_supply(persistence, "c2", "s1", "concrete")
+    result = persistence.get_cohort_retention_by_period(
+        n_periods=2, period_unit="quartile", material_type="concrete",
+    )
+    # With material_type filter, trend_per_material is empty (no breakdown needed)
+    assert result["trend_per_material"] == {}
+
+
+def test_by_period_endpoint_returns_trend_per_material(monkeypatch):
+    """API endpoint surfaces trend_per_material field."""
+    from web.backend import main as backend_main
+    from fastapi.testclient import TestClient
+
+    fake_result = {
+        "total_supply_ids": 5,
+        "n_periods": 4,
+        "period_unit": "quartile",
+        "period_labels": [],
+        "periods": [],
+        "trend": "improving",
+        "material_type_filter": None,
+        "trend_per_material": {"concrete": "improving", "wood_waste": "stable"},
+    }
+
+    class _FakePersistence:
+        def get_cohort_retention_by_period(self, n_periods=4, period_unit="quartile", material_type=None):
+            return fake_result
+
+    class _FakeCoord:
+        persistence = _FakePersistence()
+
+    monkeypatch.setattr(backend_main, "coordinator", _FakeCoord())
+    client = TestClient(backend_main.app)
+    resp = client.get("/api/persistence/cohort-retention-by-period")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "trend_per_material" in data
+    assert data["trend_per_material"]["concrete"] == "improving"
+    assert data["trend_per_material"]["wood_waste"] == "stable"
