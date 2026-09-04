@@ -4384,6 +4384,56 @@ class Persistence:
             rows = conn.execute(sql).fetchall()
         return [dict(r) for r in rows]
 
+    def get_perturbation_history(
+        self,
+        include_inactive: bool = True,
+        since_sim_day: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #49: Full perturbation history (CRUD audit log).
+
+        Lists all perturbations ever created, including deactivated ones.
+        Useful for ops to see what shocks have been applied over time.
+
+        Args:
+            include_inactive: if False, only return active=1
+            since_sim_day: only include perturbations whose window
+                          started on or after this sim_day
+
+        Returns:
+            [{
+              id, label, start_sim_day, end_sim_day, material_type,
+              multiplier, active, created_at,
+              duration_sim_days (end - start + 1),
+            }, ...]
+            Sorted by start_sim_day DESC (newest first).
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if not include_inactive:
+            where_clauses.append("active = 1")
+        if since_sim_day is not None:
+            where_clauses.append("start_sim_day >= ?")
+            params.append(int(since_sim_day))
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT id, label, start_sim_day, end_sim_day,
+                          material_type, multiplier, active, created_at
+                   FROM seasonal_perturbations
+                   {where_sql}
+                   ORDER BY start_sim_day DESC, id DESC""",
+                params,
+            ).fetchall()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["duration_sim_days"] = d["end_sim_day"] - d["start_sim_day"] + 1
+            results.append(d)
+        return results
+
     def get_active_perturbations(
         self, sim_day: int, material_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:

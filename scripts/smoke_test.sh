@@ -306,6 +306,9 @@ check_json_field "/api/persistence/material-supply-demand-balance has by_materia
 # iter #49: fleet utilization percentiles
 check_endpoint "/api/persistence/fleet-utilization-summary (iter #49)" 200 GET "/api/persistence/fleet-utilization-summary"
 check_json_field "/api/persistence/fleet-utilization-summary has n_cycles" GET "/api/persistence/fleet-utilization-summary" ".n_cycles | type" "number"
+# iter #49: perturbation history
+check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
+check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 

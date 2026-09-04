@@ -4644,6 +4644,50 @@ async def get_vehicle_stats(
     }
 
 
+@app.get("/api/persistence/perturbation-history")
+async def get_perturbation_history(
+    include_inactive: bool = True,
+    since_sim_day: Optional[int] = None,
+):
+    """
+    iter #49: Full perturbation history audit log.
+
+    Lists all perturbations ever created (including deactivated ones),
+    sorted by start_sim_day DESC. Useful for ops to see what shocks
+    have been applied over time.
+
+    Query:
+    - include_inactive: if False, only return active=1
+    - since_sim_day: only include perturbations whose window
+                     started on or after this sim_day
+
+    Returns:
+        {
+          n_total, n_active,
+          perturbations: [
+            {id, label, start_sim_day, end_sim_day, material_type,
+             multiplier, active, created_at, duration_sim_days},
+            ...
+          ],
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    perturbations = coordinator.persistence.get_perturbation_history(
+        include_inactive=include_inactive, since_sim_day=since_sim_day,
+    )
+    n_active = sum(1 for p in perturbations if p.get("active"))
+    return {
+        "n_total": len(perturbations),
+        "n_active": n_active,
+        "include_inactive": include_inactive,
+        "since_sim_day": since_sim_day,
+        "perturbations": perturbations,
+    }
+
+
 @app.get("/api/persistence/fleet-utilization-summary")
 async def get_fleet_utilization_summary(
     since_sim_day: Optional[int] = None,
