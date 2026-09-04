@@ -324,6 +324,11 @@ check_json_field "/api/optimize/sweet-spot has weight_cost" GET "/api/optimize/s
 
 # ---- Data / facilities ----
 check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distance-matrix"
+# iter #47: region profiles (SCB kommunstatistik)
+check_endpoint "/api/regions (iter #47)" 200 GET "/api/regions"
+check_json_field "/api/regions has n_regions" GET "/api/regions" ".n_regions | type" "number"
+check_json_field "/api/regions has regions array" GET "/api/regions" ".regions | type" "array"
+check_json_field "/api/regions has total_population" GET "/api/regions" ".total_population | type" "number"
 
 # ---- Seasonal / external ----
 check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"

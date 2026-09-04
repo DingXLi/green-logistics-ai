@@ -84,6 +84,8 @@ const SeasonalMaterialCrossTab = lazy(() => import('./SeasonalMaterialCrossTab')
 const PerturbationImpactByMaterial = lazy(() => import('./PerturbationImpactByMaterial').then(m => ({ default: m.PerturbationImpactByMaterial })))
 // iter #47: statistical anomaly detection (z-score)
 const AnomalousCycles = lazy(() => import('./AnomalousCycles').then(m => ({ default: m.AnomalousCycles })))
+// iter #47: Swedish region profiles (SCB)
+const RegionProfiles = lazy(() => import('./RegionProfiles').then(m => ({ default: m.RegionProfiles })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -710,6 +712,8 @@ export default function Dashboard() {
             <PerturbationImpactByMaterial />
             {/* iter #47: statistical anomaly detection */}
             <AnomalousCycles />
+            {/* iter #47: SCB region profiles */}
+            <RegionProfiles />
             <SimulationControlPanel />
           </Suspense>
         </>
