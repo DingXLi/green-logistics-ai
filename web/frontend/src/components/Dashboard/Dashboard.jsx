@@ -88,6 +88,8 @@ const AnomalousCycles = lazy(() => import('./AnomalousCycles').then(m => ({ defa
 const RegionProfiles = lazy(() => import('./RegionProfiles').then(m => ({ default: m.RegionProfiles })))
 // iter #48: LLM cost breakdown by decision type
 const LLMCostByType = lazy(() => import('./LLMCostByType').then(m => ({ default: m.LLMCostByType })))
+// iter #49: material supply-demand balance
+const MaterialBalance = lazy(() => import('./MaterialBalance').then(m => ({ default: m.MaterialBalance })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -736,6 +738,9 @@ export default function Dashboard() {
           <Suspense fallback={<LoadingSpinner label="Loading seasonal cross-tab..." />}>
             <SeasonalMaterialCrossTab />
           </Suspense>
+
+          {/* iter #49: material supply-demand balance */}
+          <MaterialBalance />
 
           <CarbonScenarios />
 

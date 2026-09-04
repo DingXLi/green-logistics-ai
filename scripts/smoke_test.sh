@@ -300,6 +300,9 @@ check_endpoint "/api/persistence/llm-cost-by-type?since=0&until=999 (iter #48)" 
 # iter #48: per-target LLM stats
 check_endpoint "/api/persistence/llm-decision-targets (iter #48)" 200 GET "/api/persistence/llm-decision-targets"
 check_json_field "/api/persistence/llm-decision-targets has targets" GET "/api/persistence/llm-decision-targets" ".targets | type" "array"
+# iter #49: material supply-demand balance (iter #48 leftover, finished iter #49)
+check_endpoint "/api/persistence/material-supply-demand-balance (iter #49)" 200 GET "/api/persistence/material-supply-demand-balance"
+check_json_field "/api/persistence/material-supply-demand-balance has by_material" GET "/api/persistence/material-supply-demand-balance" ".by_material | type" "array"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 
