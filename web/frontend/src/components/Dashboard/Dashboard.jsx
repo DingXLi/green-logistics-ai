@@ -90,6 +90,8 @@ const RegionProfiles = lazy(() => import('./RegionProfiles').then(m => ({ defaul
 const LLMCostByType = lazy(() => import('./LLMCostByType').then(m => ({ default: m.LLMCostByType })))
 // iter #49: material supply-demand balance
 const MaterialBalance = lazy(() => import('./MaterialBalance').then(m => ({ default: m.MaterialBalance })))
+// iter #49: per-target LLM call stats
+const LLMDecisionTargets = lazy(() => import('./LLMDecisionTargets').then(m => ({ default: m.LLMDecisionTargets })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -769,6 +771,8 @@ export default function Dashboard() {
           <LlmCostForecastPanel />
           {/* iter #48: LLM cost breakdown by decision type */}
           <LLMCostByType />
+          {/* iter #49: per-target LLM call stats */}
+          <LLMDecisionTargets />
         </Suspense>
       )}
 
