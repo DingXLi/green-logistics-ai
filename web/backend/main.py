@@ -3158,6 +3158,46 @@ async def get_perturbation_impact(
     )
 
 
+@app.get("/api/persistence/perturbation-impact-by-material")
+async def get_perturbation_impact_by_material(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #46: Per-material perturbation impact breakdown.
+
+    Aggregates supply_offers.perturbation_applied by material_type to show
+    which materials are most affected by active perturbations. Useful for
+    spotting "perturbation X is hitting concrete 5x more than metal_scrap".
+
+    Query:
+    - since_sim_day / until_sim_day: optional sim_day filter (same as
+      /api/persistence/perturbation-impact)
+
+    Returns:
+        {
+          by_material: [{material_type, n_perturbed, n_total,
+                          perturbation_rate_pct, avg_effective_multiplier,
+                          avg_base_multiplier, avg_ratio}],
+          summary: {n_materials, n_perturbed_total, n_supply_offers_total,
+                    overall_perturbation_rate_pct},
+          window: {since_sim_day, until_sim_day},
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    since = int(since_sim_day) if since_sim_day is not None else None
+    until = int(until_sim_day) if until_sim_day is not None else None
+    if since is not None and until is not None and until < since:
+        raise HTTPException(
+            status_code=400,
+            detail=f"until_sim_day ({until}) must be >= since_sim_day ({since})",
+        )
+    return coordinator.persistence.get_perturbation_impact_by_material(
+        since_sim_day=since, until_sim_day=until
+    )
+
+
 @app.get("/api/persistence/llm-cost-timeseries")
 async def get_llm_cost_timeseries(
     since_sim_day: Optional[int] = None,

@@ -262,6 +262,10 @@ check_endpoint "/api/persistence/forecast-method-prefs" 200 GET "/api/persistenc
 check_endpoint "/api/persistence/perturbation-impact" 200 GET "/api/persistence/perturbation-impact?limit=5"
 check_json_field "/api/persistence/perturbation-impact has cycles array" GET "/api/persistence/perturbation-impact" ".cycles | type" "array"
 check_json_field "/api/persistence/perturbation-impact has summary" GET "/api/persistence/perturbation-impact" ".summary.n_cycles_total | type" "number"
+# iter #46: per-material perturbation impact breakdown
+check_endpoint "/api/persistence/perturbation-impact-by-material (iter #46)" 200 GET "/api/persistence/perturbation-impact-by-material"
+check_json_field "/api/persistence/perturbation-impact-by-material has by_material" GET "/api/persistence/perturbation-impact-by-material" ".by_material | type" "array"
+check_json_field "/api/persistence/perturbation-impact-by-material has summary" GET "/api/persistence/perturbation-impact-by-material" ".summary | type" "object"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"

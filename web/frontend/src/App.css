@@ -3004,3 +3004,109 @@ td.no-matches {
   color: #64748b;
   font-style: italic;
 }
+
+/* iter #46: PerturbationImpactByMaterial styles */
+.pibm-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.5rem 0 0.75rem 0;
+  flex-wrap: wrap;
+}
+.pibm-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.pibm-input {
+  padding: 0.3rem 0.5rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+}
+.pibm-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+}
+.pibm-clear {
+  background: #334155;
+  color: #cbd5e1;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.pibm-clear:hover {
+  background: #475569;
+}
+
+.pibm-kpi-row {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+
+.pibm-table-wrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.pibm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.pibm-table th,
+.pibm-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border: 1px solid #1e293b;
+}
+.pibm-table thead th {
+  background: #0f172a;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+.pibm-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.pibm-sortable:hover {
+  background: #1e293b;
+}
+.pibm-material {
+  background: #0f172a;
+}
+.pibm-num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  color: #e2e8f0;
+}
+.pibm-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 140px;
+}
+.pibm-bar {
+  height: 14px;
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 0.2s ease;
+}
+.pibm-bar-label {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+.pibm-footnote {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-style: italic;
+}

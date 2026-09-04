@@ -3866,3 +3866,106 @@ class Persistence:
             "window_end": cycles[-1]["sim_day"] if cycles else None,
         }
         return {"cycles": cycles, "summary": summary}
+
+    def get_perturbation_impact_by_material(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #46: Per-material perturbation impact breakdown.
+
+        Aggregates supply_offers.perturbation_applied by material_type
+        to show "which materials get hit most by perturbations" and
+        the avg seasonal_multiplier ratio (effective / baseline).
+
+        Returns:
+            {
+              "by_material": [
+                {material_type, n_perturbed, n_total,
+                 perturbation_rate_pct, avg_effective_multiplier,
+                 avg_base_multiplier, avg_ratio},
+                ...
+              ],
+              "summary": {
+                "n_materials": int,
+                "n_perturbed_total": int,
+                "n_supply_offers_total": int,
+                "overall_perturbation_rate_pct": float,
+              },
+              "window": {
+                "since_sim_day": int | None,
+                "until_sim_day": int | None,
+              },
+            }
+
+        Excludes NULL material_type rows.
+        """
+        where_clauses: List[str] = ["s.material_type IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        # Join supply_offers with cycles for the window filter.
+        # material_type NULL rows are excluded; "perturbed" means
+        # perturbation_applied == 1.
+        sql = f"""SELECT s.material_type AS material_type,
+                          COUNT(*) AS n_total,
+                          SUM(CASE WHEN s.perturbation_applied = 1 THEN 1 ELSE 0 END)
+                              AS n_perturbed,
+                          AVG(CASE WHEN s.perturbation_applied = 1
+                                   THEN s.seasonal_multiplier END) AS avg_effective,
+                          AVG(CASE WHEN s.perturbation_applied = 1
+                                   THEN s.base_seasonal_multiplier END) AS avg_base
+                   FROM supply_offers s
+                   JOIN optimization_cycles c ON s.cycle_id = c.cycle_id
+                   {where_sql}
+                   GROUP BY s.material_type
+                   ORDER BY n_perturbed DESC, n_total DESC"""
+
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        by_material: List[Dict[str, Any]] = []
+        n_perturbed_total = 0
+        n_total_all = 0
+        for r in rows:
+            d = dict(r)
+            n_total = d.get("n_total") or 0
+            n_perturbed = d.get("n_perturbed") or 0
+            n_perturbed_total += n_perturbed
+            n_total_all += n_total
+            avg_eff = d.get("avg_effective")
+            avg_base = d.get("avg_base")
+            ratio = None
+            if avg_eff is not None and avg_base not in (None, 0):
+                ratio = round(avg_eff / avg_base, 3)
+            by_material.append({
+                "material_type": d["material_type"],
+                "n_perturbed": n_perturbed,
+                "n_total": n_total,
+                "perturbation_rate_pct": round(100 * n_perturbed / max(n_total, 1), 1),
+                "avg_effective_multiplier": round(avg_eff, 3) if avg_eff is not None else None,
+                "avg_base_multiplier": round(avg_base, 3) if avg_base is not None else None,
+                "avg_ratio": ratio,
+            })
+
+        return {
+            "by_material": by_material,
+            "summary": {
+                "n_materials": len(by_material),
+                "n_perturbed_total": n_perturbed_total,
+                "n_supply_offers_total": n_total_all,
+                "overall_perturbation_rate_pct": (
+                    round(100 * n_perturbed_total / max(n_total_all, 1), 1)
+                ),
+            },
+            "window": {
+                "since_sim_day": int(since_sim_day) if since_sim_day is not None else None,
+                "until_sim_day": int(until_sim_day) if until_sim_day is not None else None,
+            },
+        }

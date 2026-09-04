@@ -80,6 +80,8 @@ const CohortRetentionCrosstab = lazy(() => import('./CohortRetentionCrosstab').t
 const RuntimeConfig = lazy(() => import('./RuntimeConfig').then(m => ({ default: m.RuntimeConfig })))
 // iter #46: seasonal multiplier cross-tab (material × month)
 const SeasonalMaterialCrossTab = lazy(() => import('./SeasonalMaterialCrossTab').then(m => ({ default: m.SeasonalMaterialCrossTab })))
+// iter #46: per-material perturbation impact breakdown
+const PerturbationImpactByMaterial = lazy(() => import('./PerturbationImpactByMaterial').then(m => ({ default: m.PerturbationImpactByMaterial })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -702,6 +704,8 @@ export default function Dashboard() {
             <ForecastConfidencePanel />
             <SeasonalPerturbationPanel />
             <PerturbationImpactPanel />
+            {/* iter #46: per-material perturbation breakdown */}
+            <PerturbationImpactByMaterial />
             <SimulationControlPanel />
           </Suspense>
         </>
