@@ -82,6 +82,8 @@ const RuntimeConfig = lazy(() => import('./RuntimeConfig').then(m => ({ default:
 const SeasonalMaterialCrossTab = lazy(() => import('./SeasonalMaterialCrossTab').then(m => ({ default: m.SeasonalMaterialCrossTab })))
 // iter #46: per-material perturbation impact breakdown
 const PerturbationImpactByMaterial = lazy(() => import('./PerturbationImpactByMaterial').then(m => ({ default: m.PerturbationImpactByMaterial })))
+// iter #47: statistical anomaly detection (z-score)
+const AnomalousCycles = lazy(() => import('./AnomalousCycles').then(m => ({ default: m.AnomalousCycles })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -706,6 +708,8 @@ export default function Dashboard() {
             <PerturbationImpactPanel />
             {/* iter #46: per-material perturbation breakdown */}
             <PerturbationImpactByMaterial />
+            {/* iter #47: statistical anomaly detection */}
+            <AnomalousCycles />
             <SimulationControlPanel />
           </Suspense>
         </>

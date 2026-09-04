@@ -267,6 +267,11 @@ check_json_field "/api/persistence/perturbation-impact has summary" GET "/api/pe
 check_endpoint "/api/persistence/perturbation-impact-by-material (iter #46)" 200 GET "/api/persistence/perturbation-impact-by-material"
 check_json_field "/api/persistence/perturbation-impact-by-material has by_material" GET "/api/persistence/perturbation-impact-by-material" ".by_material | type" "array"
 check_json_field "/api/persistence/perturbation-impact-by-material has summary" GET "/api/persistence/perturbation-impact-by-material" ".summary | type" "object"
+# iter #47: anomaly detection (z-score)
+check_endpoint "/api/persistence/anomalous-cycles (iter #47)" 200 GET "/api/persistence/anomalous-cycles"
+check_json_field "/api/persistence/anomalous-cycles has anomalies array" GET "/api/persistence/anomalous-cycles" ".anomalies | type" "array"
+check_json_field "/api/persistence/anomalous-cycles has z_threshold" GET "/api/persistence/anomalous-cycles" ".z_threshold | type" "number"
+check_endpoint "/api/persistence/anomalous-cycles?z_threshold=3.5" 200 GET "/api/persistence/anomalous-cycles?z_threshold=3.5"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"
