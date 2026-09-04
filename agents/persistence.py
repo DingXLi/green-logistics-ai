@@ -2695,6 +2695,7 @@ class Persistence:
                     "periods": [],
                     "trend": "unknown",
                     "material_type_filter": material_type,  # iter #45
+                    "trend_per_material": {},  # iter #46
                 }
 
             # iter #24: determine segment boundaries based on unit
@@ -2753,6 +2754,8 @@ class Persistence:
                         "period_labels": [],
                         "periods": [],
                         "trend": "unknown",
+                        "material_type_filter": material_type,  # iter #45
+                        "trend_per_material": {},  # iter #46
                     }
 
             periods_data = []
@@ -2819,6 +2822,46 @@ class Persistence:
             else:
                 trend = "stable"
 
+        # iter #46: Per-material trend (consistency with crosstab).
+        # Only computed when no material_type filter (otherwise it's redundant).
+        # Uses a separate connection to avoid disturbing the main with block scope.
+        trend_per_material: Dict[str, str] = {}
+        if not material_type and len(periods_data) >= 2:
+            with self._conn() as conn2:
+                for mat_row in conn2.execute(
+                    "SELECT DISTINCT material_type FROM supply_offers "
+                    "WHERE material_type IS NOT NULL ORDER BY material_type"
+                ).fetchall():
+                    mat = mat_row["material_type"]
+                    per_period_rates = []
+                    for p in period_labels:
+                        mat_rows = conn2.execute(
+                            """SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                               FROM supply_offers s
+                               JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                               WHERE c.sim_day BETWEEN ? AND ?
+                                 AND s.material_type = ?
+                               GROUP BY s.supply_id""",
+                            (p["sim_day_min"], p["sim_day_max"], mat),
+                        ).fetchall()
+                        n_ids = len(mat_rows)
+                        n_rep = sum(1 for r in mat_rows if r["n_cycles"] >= 2)
+                        if n_ids > 0:
+                            per_period_rates.append(round(n_rep / n_ids * 100, 1))
+                        else:
+                            per_period_rates.append(None)
+                    rates = [r for r in per_period_rates if r is not None]
+                    if len(rates) >= 2:
+                        diff = rates[-1] - rates[0]
+                        if diff > 5:
+                            trend_per_material[mat] = "improving"
+                        elif diff < -5:
+                            trend_per_material[mat] = "declining"
+                        else:
+                            trend_per_material[mat] = "stable"
+                    else:
+                        trend_per_material[mat] = "unknown"
+
         return {
             "total_supply_ids": range_row["n_supplies"] or 0,
             "n_periods": n_periods,
@@ -2827,6 +2870,7 @@ class Persistence:
             "periods": periods_data,
             "trend": trend,
             "material_type_filter": material_type,  # iter #45
+            "trend_per_material": trend_per_material,  # iter #46
         }
 
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
