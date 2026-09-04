@@ -86,6 +86,8 @@ const PerturbationImpactByMaterial = lazy(() => import('./PerturbationImpactByMa
 const AnomalousCycles = lazy(() => import('./AnomalousCycles').then(m => ({ default: m.AnomalousCycles })))
 // iter #47: Swedish region profiles (SCB)
 const RegionProfiles = lazy(() => import('./RegionProfiles').then(m => ({ default: m.RegionProfiles })))
+// iter #48: LLM cost breakdown by decision type
+const LLMCostByType = lazy(() => import('./LLMCostByType').then(m => ({ default: m.LLMCostByType })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -760,6 +762,8 @@ export default function Dashboard() {
           <LlmCostTimeseriesChart />
           {/* iter #29: LLM usage/cost forecast */}
           <LlmCostForecastPanel />
+          {/* iter #48: LLM cost breakdown by decision type */}
+          <LLMCostByType />
         </Suspense>
       )}
 
