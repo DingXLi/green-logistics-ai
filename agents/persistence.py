@@ -2541,6 +2541,108 @@ class Persistence:
                 result.append(d)
         return result
 
+    def get_material_supply_demand_balance(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #48: Material supply vs demand balance.
+
+        For each material_type, computes:
+        - total_supply_tons: sum of available_tons from supply_offers
+        - total_demand_tons: sum of required_tons from demand_requests
+        - total_matched_tons: sum of tons from matches
+        - supply_demand_ratio: matched / supply
+        - demand_fulfillment_pct: matched / demand
+        - excess_supply_tons: supply - matched (oversupply)
+        - unmet_demand_tons: demand - matched (unmet)
+
+        Useful for identifying materials with chronic oversupply or shortage.
+
+        Returns:
+            [{
+              material_type: str,
+              total_supply_tons, total_demand_tons, total_matched_tons,
+              supply_demand_ratio, demand_fulfillment_pct,
+              excess_supply_tons, unmet_demand_tons,
+              n_supply_offers, n_demand_requests, n_matches,
+            }, ...]
+            Sorted by unmet_demand_tons DESC (most-unmet first).
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""WITH supply AS (
+                       SELECT s.material_type AS mt,
+                              SUM(s.available_tons) AS total_supply_tons,
+                              COUNT(*) AS n_supply_offers
+                       FROM supply_offers s
+                       JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                       {where_sql}
+                       GROUP BY s.material_type
+                   ),
+                   demand AS (
+                       SELECT d.material_type AS mt,
+                              SUM(d.required_tons) AS total_demand_tons,
+                              COUNT(*) AS n_demand_requests
+                       FROM demand_requests d
+                       JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                       {where_sql}
+                       GROUP BY d.material_type
+                   ),
+                   matched AS (
+                       SELECT m.material_type AS mt,
+                              SUM(m.tons) AS total_matched_tons,
+                              COUNT(*) AS n_matches
+                       FROM matches m
+                       JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                       {where_sql}
+                       GROUP BY m.material_type
+                   )
+                   SELECT COALESCE(s.mt, d.mt, mat.mt) AS material_type,
+                          COALESCE(s.total_supply_tons, 0) AS total_supply_tons,
+                          COALESCE(d.total_demand_tons, 0) AS total_demand_tons,
+                          COALESCE(mat.total_matched_tons, 0) AS total_matched_tons,
+                          COALESCE(s.n_supply_offers, 0) AS n_supply_offers,
+                          COALESCE(d.n_demand_requests, 0) AS n_demand_requests,
+                          COALESCE(mat.n_matches, 0) AS n_matches
+                   FROM supply s
+                   FULL OUTER JOIN demand d ON s.mt = d.mt
+                   FULL OUTER JOIN matched mat ON COALESCE(s.mt, d.mt) = mat.mt
+                   WHERE COALESCE(s.mt, d.mt, mat.mt) IS NOT NULL
+                   ORDER BY material_type ASC""",
+                params + params + params,  # 3 copies for 3 CTEs
+            ).fetchall()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            sup = d["total_supply_tons"] or 0
+            dem = d["total_demand_tons"] or 0
+            mat = d["total_matched_tons"] or 0
+            d["supply_demand_ratio"] = round(mat / sup, 3) if sup > 0 else None
+            d["demand_fulfillment_pct"] = round(100 * mat / dem, 2) if dem > 0 else None
+            d["excess_supply_tons"] = round(sup - mat, 2)
+            d["unmet_demand_tons"] = round(dem - mat, 2)
+            d["total_supply_tons"] = round(sup, 2)
+            d["total_demand_tons"] = round(dem, 2)
+            d["total_matched_tons"] = round(mat, 2)
+            results.append(d)
+
+        # Re-sort by unmet_demand_tons DESC
+        results.sort(key=lambda r: r["unmet_demand_tons"], reverse=True)
+        return results
+
     def get_material_aggregates(self, material_type: Optional[str] = None,
                                  limit: int = 50) -> List[Dict[str, Any]]:
         """

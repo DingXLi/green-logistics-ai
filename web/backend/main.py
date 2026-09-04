@@ -4705,6 +4705,58 @@ async def get_material_aggregates(
     )
 
 
+@app.get("/api/persistence/material-supply-demand-balance")
+async def get_material_supply_demand_balance(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #48: Material supply vs demand balance.
+
+    For each material_type, computes:
+    - total_supply_tons: from supply_offers
+    - total_demand_tons: from demand_requests
+    - total_matched_tons: from matches
+    - supply_demand_ratio: matched / supply
+    - demand_fulfillment_pct: matched / demand
+    - excess_supply_tons: supply - matched
+    - unmet_demand_tons: demand - matched
+
+    Useful for identifying materials with chronic oversupply or shortage.
+
+    Returns:
+        {
+          since_sim_day, until_sim_day,
+          by_material: [
+            {material_type, total_supply_tons, total_demand_tons,
+             total_matched_tons, supply_demand_ratio,
+             demand_fulfillment_pct, excess_supply_tons,
+             unmet_demand_tons, n_supply_offers, n_demand_requests,
+             n_matches},
+            ...
+          ],
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    if until_sim_day is not None and until_sim_day < 0:
+        raise HTTPException(status_code=400, detail="until_sim_day must be >= 0")
+    if since_sim_day is not None and until_sim_day is not None and since_sim_day > until_sim_day:
+        raise HTTPException(
+            status_code=400,
+            detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+        )
+    return {
+        "since_sim_day": since_sim_day,
+        "until_sim_day": until_sim_day,
+        "by_material": coordinator.persistence.get_material_supply_demand_balance(
+            since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+        ),
+    }
+
+
 @app.get("/api/persistence/supply-cohort-retention")
 async def get_supply_cohort_retention(material_type: Optional[str] = None):
     """
