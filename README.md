@@ -185,6 +185,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/kpi-timeseries` | Per-sim_day KPI series |
 | GET    | `/api/persistence/fleet-timeseries` | Per-sim_day fleet series |
 | GET    | `/api/persistence/seasonal-timeseries` | Per-month seasonal series |
+| GET    | `/api/persistence/seasonal-timeseries-by-material` | Per-material seasonal multiplier cross-tab: which materials are most affected by seasonal swings (iter #46) |
 | GET    | `/api/persistence/llm-cost-timeseries` | Per-sim_day LLM usage series (iter #28) |
 | GET    | `/api/persistence/llm-cost-forecast` | LLM usage/cost forecast with 3 methods (iter #29) |
 | GET    | `/api/persistence/forecast?method=linear\|moving_average\|exponential_smoothing\|auto` | KPI forecast with method (iter #28). `method=auto` uses the per-metric best method persisted from `forecast-confidence` calls (iter #35). |
@@ -204,6 +205,8 @@ green-logistics-ai/
 | GET    | `/api/persistence/cohort-retention-by-material` | Per-material supply retention breakdown (iter #42) |
 | GET    | `/api/persistence/cohort-retention-by-period?material_type=X` | Per-period retention with optional material filter (iter #45) |
 | GET    | `/api/persistence/cohort-retention-crosstab?n_periods=4&period_unit=quartile&material_type=X` | Cross-tab retention matrix: period × material (iter #44) |
+| GET    | `/api/persistence/perturbation-impact?limit=90` | Per-cycle perturbation impact: which cycles had active shocks, with delta + multiplier (iter #38) |
+| GET    | `/api/persistence/perturbation-impact-by-material?since_sim_day=0&until_sim_day=999` | Per-material perturbation breakdown: which materials get hit most by active shocks, with avg_ratio (iter #46) |
 | GET    | `/api/admin/runtime-config/overrides` | List persisted runtime config overrides (admin, iter #44) |
 | POST   | `/api/admin/runtime-config/apply?updates=JSON&persist=true` | Atomic batch update of multiple runtime config keys (admin, iter #44) |
 | GET    | `/api/persistence/forecast-calibration?metric=X&method=Y` | Forecast accuracy stats (MAE / RMSE / MAPE / bias) over predicted vs actuals (iter #42) |
