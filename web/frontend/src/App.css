@@ -3110,3 +3110,29 @@ td.no-matches {
   color: #94a3b8;
   font-style: italic;
 }
+
+/* iter #46: per-material trend pills in CohortRetentionByPeriod */
+.cohort-material-trends {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+}
+.cohort-material-trend-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.cohort-material-trend-icon {
+  font-size: 0.85rem;
+}
+.cohort-material-trend-name {
+  font-weight: 600;
+  text-transform: capitalize;
+}

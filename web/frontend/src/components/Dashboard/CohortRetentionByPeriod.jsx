@@ -127,6 +127,25 @@ export function CohortRetentionByPeriod() {
           <span className="cohort-trend-icon">{trend.icon}</span>
           <span className="cohort-trend-label">{trend.label}</span>
         </div>
+        {/* iter #46: per-material trend badges (only when no material filter) */}
+        {!materialType && data.trend_per_material && Object.keys(data.trend_per_material).length > 0 && (
+          <div className="cohort-material-trends">
+            {Object.entries(data.trend_per_material).map(([mat, matTrend]) => {
+              const mt = TREND_COLORS[matTrend] || TREND_COLORS.unknown
+              return (
+                <div
+                  key={mat}
+                  className="cohort-material-trend-pill"
+                  style={{ backgroundColor: mt.bg, borderLeft: `3px solid ${mt.accent}` }}
+                  title={`${mat} trend: ${mt.label}`}
+                >
+                  <span className="cohort-material-trend-icon">{mt.icon}</span>
+                  <span className="cohort-material-trend-name">{mat}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
         <label className="cohort-periods-label">
           Unit:
           <select
