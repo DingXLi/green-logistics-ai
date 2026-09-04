@@ -3103,6 +3103,111 @@ class Persistence:
             },
         }
 
+    def detect_anomalous_cycles(
+        self,
+        z_threshold: float = 2.0,
+        min_history: int = 5,
+        metrics: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #47: Statistical anomaly detection for cycle KPIs.
+
+        Uses z-score (standard deviations from mean) to flag cycles where any
+        of {cost_sek, co2_kg, util_pct, distance_km, tons} is significantly
+        different from the historical norm. Useful for ops to spot:
+        - Sudden cost spikes (potential solver bug, fuel price change)
+        - CO2 anomalies (load emission regression)
+        - Utilization drops (depot issue, vehicle outage)
+        - Distance outliers (routing bug)
+
+        Args:
+            z_threshold: how many stddevs to flag (default 2.0 = ~5% extreme)
+            min_history: need at least N cycles to compute stats (default 5)
+            metrics: which KPIs to check (default all 5)
+
+        Returns:
+            [{
+              cycle_id, sim_day, sim_hour, wall_timestamp,
+              anomalies: [{metric, value, mean, stddev, z_score, severity}, ...],
+              max_severity: "high" | "medium" | "low" | "none",
+            }, ...]
+        """
+        if metrics is None:
+            metrics = ["total_cost_sek", "total_co2_kg", "fleet_utilization_pct",
+                       "total_distance_km", "total_tons"]
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT cycle_id, sim_day, sim_hour, wall_timestamp,
+                          total_cost_sek, total_co2_kg, fleet_utilization_pct,
+                          total_distance_km, total_tons
+                   FROM optimization_cycles
+                   ORDER BY sim_day ASC, id ASC"""
+            ).fetchall()
+
+        if len(rows) < min_history:
+            return []
+
+        # Compute mean + stddev for each metric
+        stats: Dict[str, Dict[str, float]] = {}
+        for metric in metrics:
+            values = [r[metric] for r in rows if r[metric] is not None]
+            if not values:
+                continue
+            n = len(values)
+            mean = sum(values) / n
+            variance = sum((v - mean) ** 2 for v in values) / n
+            stddev = variance ** 0.5
+            stats[metric] = {"mean": mean, "stddev": stddev}
+
+        # Flag each cycle
+        anomalous = []
+        for r in rows:
+            cycle_anomalies = []
+            for metric in metrics:
+                if metric not in stats:
+                    continue
+                value = r[metric]
+                if value is None:
+                    continue
+                s = stats[metric]
+                if s["stddev"] < 1e-9:  # no variance = nothing to flag
+                    continue
+                z = abs(value - s["mean"]) / s["stddev"]
+                if z >= z_threshold:
+                    # severity: |z| > 3.0 high, 2.5-3.0 medium, 2.0-2.5 low
+                    if z >= 3.0:
+                        severity = "high"
+                    elif z >= 2.5:
+                        severity = "medium"
+                    else:
+                        severity = "low"
+                    cycle_anomalies.append({
+                        "metric": metric,
+                        "value": round(value, 2),
+                        "mean": round(s["mean"], 2),
+                        "stddev": round(s["stddev"], 2),
+                        "z_score": round(z, 2),
+                        "severity": severity,
+                    })
+
+            if cycle_anomalies:
+                # Compute max severity across this cycle's anomalies
+                sev_order = {"high": 3, "medium": 2, "low": 1, "none": 0}
+                max_sev = max(cycle_anomalies,
+                              key=lambda a: sev_order.get(a["severity"], 0))
+                anomalous.append({
+                    "cycle_id": r["cycle_id"],
+                    "sim_day": r["sim_day"],
+                    "sim_hour": r["sim_hour"],
+                    "wall_timestamp": r["wall_timestamp"],
+                    "anomalies": cycle_anomalies,
+                    "max_severity": max_sev["severity"],
+                    "n_anomalies": len(cycle_anomalies),
+                })
+
+        return anomalous
+
     def vacuum(self, triggered_by: str = "manual") -> Dict[str, Any]:
         """
         VACUUM + ANALYZE (iter #16 + iter #42 audit log) — SQLite 性能维护。

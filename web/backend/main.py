@@ -4796,6 +4796,64 @@ async def get_cycle_kpi_summary(
     )
 
 
+@app.get("/api/persistence/anomalous-cycles")
+async def get_anomalous_cycles(
+    z_threshold: float = 2.0,
+    min_history: int = 5,
+):
+    """
+    iter #47: Detect cycles with anomalous KPIs (statistical outliers).
+
+    Uses z-score: a cycle is flagged if any of {cost_sek, co2_kg, util_pct,
+    distance_km, tons} is >= z_threshold stddevs from the historical mean.
+    Useful for ops to spot regressions, solver bugs, or fuel-price spikes.
+
+    Query:
+    - z_threshold: how many stddevs to flag (default 2.0 = ~5% extreme).
+                  Lower = more sensitive, higher = only extreme outliers.
+    - min_history: need at least N cycles to compute stats (default 5).
+
+    Returns:
+        {
+          n_anomalous: int,
+          n_total_cycles: int,
+          z_threshold: float,
+          min_history: int,
+          anomalies: [
+            {cycle_id, sim_day, sim_hour, wall_timestamp,
+             anomalies: [{metric, value, mean, stddev, z_score, severity}, ...],
+             max_severity: "high" | "medium" | "low",
+             n_anomalies: int},
+            ...
+          ],
+        }
+
+    Severity:
+    - "high"   : |z| >= 3.0 (≈ 0.3% extreme)
+    - "medium" : |z| >= 2.5 (≈ 1% rare)
+    - "low"    : |z| >= 2.0 (≈ 5% unusual)
+
+    Returns empty list when not enough history.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    anomalies = coordinator.persistence.detect_anomalous_cycles(
+        z_threshold=z_threshold, min_history=min_history,
+    )
+    # Get total cycle count for context
+    try:
+        n_total = coordinator.persistence.get_summary().get("n_cycles", 0)
+    except Exception:
+        n_total = None
+    return {
+        "n_anomalous": len(anomalies),
+        "n_total_cycles": n_total,
+        "z_threshold": z_threshold,
+        "min_history": min_history,
+        "anomalies": anomalies,
+    }
+
+
 @app.post("/api/admin/db-maintenance")
 async def post_db_maintenance(_: None = Depends(require_admin)):
     """
