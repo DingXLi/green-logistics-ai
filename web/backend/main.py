@@ -3242,6 +3242,49 @@ async def get_llm_cost_timeseries(
     }
 
 
+@app.get("/api/persistence/llm-decision-targets")
+async def get_llm_decision_targets(
+    decision_type: Optional[str] = None,
+    limit: int = 50,
+):
+    """
+    iter #48: List unique LLM call targets with per-target stats.
+
+    Groups llm_decisions by (target_id, decision_type). Useful for
+    identifying which supply/demand points get the most LLM attention
+    (and which fall back most often to deterministic predictions).
+
+    Query:
+    - decision_type: optional filter
+                    ('demand_prediction' / 'supply_prediction' / etc.)
+    - limit: max targets to return (default 50, max 500)
+
+    Returns:
+        {
+          decision_type, limit,
+          n_targets: int,
+          targets: [
+            {target_id, decision_type, target_type, n_calls,
+             n_real_llm, n_fallback, last_called_sim_day,
+             first_called_sim_day, avg_multiplier, avg_confidence},
+            ...
+          ],
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    targets = coordinator.persistence.get_llm_decision_targets(
+        decision_type=decision_type, limit=limit,
+    )
+    return {
+        "decision_type": decision_type,
+        "limit": limit,
+        "n_targets": len(targets),
+        "targets": targets,
+    }
+
+
 @app.get("/api/persistence/llm-cost-by-type")
 async def get_llm_cost_by_type(
     since_sim_day: Optional[int] = None,
