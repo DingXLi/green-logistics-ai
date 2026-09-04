@@ -303,6 +303,9 @@ check_json_field "/api/persistence/llm-decision-targets has targets" GET "/api/p
 # iter #49: material supply-demand balance (iter #48 leftover, finished iter #49)
 check_endpoint "/api/persistence/material-supply-demand-balance (iter #49)" 200 GET "/api/persistence/material-supply-demand-balance"
 check_json_field "/api/persistence/material-supply-demand-balance has by_material" GET "/api/persistence/material-supply-demand-balance" ".by_material | type" "array"
+# iter #49: fleet utilization percentiles
+check_endpoint "/api/persistence/fleet-utilization-summary (iter #49)" 200 GET "/api/persistence/fleet-utilization-summary"
+check_json_field "/api/persistence/fleet-utilization-summary has n_cycles" GET "/api/persistence/fleet-utilization-summary" ".n_cycles | type" "number"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 

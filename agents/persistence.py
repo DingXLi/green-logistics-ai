@@ -2380,6 +2380,95 @@ class Persistence:
             "time_range": time_range,
         }
 
+    def get_fleet_utilization_summary(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #49: Fleet utilization percentiles over time.
+
+        Aggregates fleet_utilization_pct across cycles and returns
+        mean / median / percentiles (p10, p25, p50, p75, p90, p99)
+        + n_idle_cycles (< 25%) / n_busy_cycles (>= 75%).
+
+        Args:
+            since_sim_day: optional filter
+            until_sim_day: optional filter
+
+        Returns:
+            {
+              mean, median, p10, p25, p50, p75, p90, p99,
+              n_cycles, n_idle_cycles, n_busy_cycles,
+              min, max, stddev,
+              since_sim_day, until_sim_day,
+            }
+        """
+        where_clauses: List[str] = ["fleet_utilization_pct IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT fleet_utilization_pct
+                   FROM optimization_cycles
+                   {where_sql}
+                   ORDER BY sim_day ASC, id ASC""",
+                params,
+            ).fetchall()
+
+        values = [r["fleet_utilization_pct"] for r in rows if r["fleet_utilization_pct"] is not None]
+        n = len(values)
+        if n == 0:
+            return {
+                "n_cycles": 0,
+                "n_idle_cycles": 0,
+                "n_busy_cycles": 0,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            }
+
+        sorted_vals = sorted(values)
+        mean = sum(values) / n
+        median = sorted_vals[n // 2]
+        # Percentile helper
+        def pct(p):
+            if n == 1:
+                return sorted_vals[0]
+            idx = (p / 100) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
+
+        variance = sum((v - mean) ** 2 for v in values) / n
+        stddev = variance ** 0.5
+
+        return {
+            "n_cycles": n,
+            "mean": round(mean, 2),
+            "median": round(median, 2),
+            "p10": round(pct(10), 2),
+            "p25": round(pct(25), 2),
+            "p50": round(pct(50), 2),
+            "p75": round(pct(75), 2),
+            "p90": round(pct(90), 2),
+            "p99": round(pct(99), 2),
+            "min": round(min(values), 2),
+            "max": round(max(values), 2),
+            "stddev": round(stddev, 2),
+            "n_idle_cycles": sum(1 for v in values if v < 25),
+            "n_busy_cycles": sum(1 for v in values if v >= 75),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+
     def get_vehicle_stats(
         self,
         vehicle_id: Optional[str] = None,
