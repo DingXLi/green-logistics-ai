@@ -290,6 +290,9 @@ check_endpoint "/api/persistence/export/routes.ndjson" 200 GET "/api/persistence
 # iter #47: perturbed supplies CSV export (extends supplies.csv with iter #38 cols)
 check_endpoint "/api/persistence/export/perturbed-supplies.csv (iter #47)" 200 GET "/api/persistence/export/perturbed-supplies.csv?limit=10"
 check_endpoint "/api/persistence/export/perturbed-supplies.csv?only_perturbed=true (iter #47)" 200 GET "/api/persistence/export/perturbed-supplies.csv?limit=10&only_perturbed=true"
+# iter #48: cycle-detail CSV export (combined 5-section CSV)
+check_endpoint "/api/persistence/export/cycle-detail/c1.csv (iter #48, 404 expected)" 404 GET "/api/persistence/export/cycle-detail/nonexistent.csv"
+# Note: 200 check skipped because depends on having a real cycle_id; the 404 confirms endpoint is wired
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 

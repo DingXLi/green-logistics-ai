@@ -4120,6 +4120,48 @@ async def get_cycle_detail(
     return detail
 
 
+@app.get("/api/persistence/export/cycle-detail/{cycle_id}.csv")
+async def export_cycle_detail_csv(
+    cycle_id: str,
+    include_metadata: bool = True,
+):
+    """
+    iter #48: Export full cycle detail (iter #11) as one combined CSV.
+
+    Returns all sections in one file, separated by `# section:` comments:
+        - cycle_metadata: single row of 22 KPI columns
+        - supply_offers: all supply points in this cycle
+        - demand_requests: all demand points
+        - matches: all matches with distance + profit
+        - routes: all vehicle routes with stops_count
+
+    Path param:
+    - cycle_id: the cycle to export
+
+    Query:
+    - include_metadata: iter #19, top file metadata header (default true)
+
+    Returns:
+        text/csv response. 404 if cycle_id not found.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    csv_data = coordinator.persistence.export_cycle_detail_csv(
+        cycle_id=cycle_id, include_metadata=include_metadata,
+    )
+    if csv_data is None:
+        raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
+    return FastAPIResponse(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="green_logistics_cycle_detail_{cycle_id}.csv"'
+            ),
+        },
+    )
+
+
 @app.get("/api/persistence/export/cycles.csv")
 async def export_cycles_csv(limit: int = 1000, include_metadata: bool = True):
     """

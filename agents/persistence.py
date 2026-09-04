@@ -1849,6 +1849,132 @@ class Persistence:
             writer.writerow(dict(r))
         return buf.getvalue()
 
+    def export_cycle_detail_csv(
+        self,
+        cycle_id: str,
+        include_metadata: bool = True,
+    ) -> Optional[str]:
+        """
+        iter #48: Export full cycle detail as one combined CSV (iter #11 data).
+
+        Includes all sections in one file, separated by header comments:
+            - cycle metadata (single row: 25 KPI columns)
+            - supply_offers (n_supplies rows)
+            - demand_requests (n_demands rows)
+            - matches (n_matches rows)
+            - routes (n_routes rows, stops_count derived from stops_json)
+
+        Args:
+            cycle_id: the cycle to export
+            include_metadata: iter #19, top file metadata header
+
+        Returns:
+            CSV string with multiple sections, or None if cycle_id not found.
+        """
+        detail = self.get_cycle_detail(cycle_id)
+        if detail is None:
+            return None
+
+        cycle = detail["cycle"]
+        supplies = detail.get("supply_offers", [])
+        demands = detail.get("demand_requests", [])
+        matches = detail.get("matches", [])
+        routes = detail.get("routes", [])
+
+        buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# cycle_id: {cycle_id}\n")
+            buf.write(f"# n_supplies: {len(supplies)}\n")
+            buf.write(f"# n_demands: {len(demands)}\n")
+            buf.write(f"# n_matches: {len(matches)}\n")
+            buf.write(f"# n_routes: {len(routes)}\n")
+
+        # Section 1: cycle metadata (single row)
+        buf.write(f"# section: cycle_metadata\n")
+        cycle_cols = [
+            "cycle_id", "sim_day", "sim_hour", "wall_timestamp", "activity_factor",
+            "n_supply_offers", "n_demand_requests", "n_matches",
+            "total_tons", "total_cost_sek", "total_co2_kg", "total_distance_km",
+            "n_vehicles_used", "n_vehicles_available", "fleet_utilization_pct",
+            "solver_status", "wall_duration_ms",
+            "seasonal_factor_avg", "seasonal_month", "base_seasonal_factor_avg",
+            "perturbation_count", "perturbation_total_multiplier",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=cycle_cols, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerow(cycle)
+        buf.write("\n")
+
+        # Section 2: supply_offers
+        buf.write(f"# section: supply_offers\n")
+        supply_cols = [
+            "supply_id", "material_type", "location_lat", "location_lon",
+            "available_tons", "moisture_percent", "quality_score",
+            "base_seasonal_multiplier", "seasonal_multiplier", "perturbation_applied",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=supply_cols, extrasaction="ignore")
+        writer.writeheader()
+        for s in supplies:
+            writer.writerow(s)
+        buf.write("\n")
+
+        # Section 3: demand_requests
+        buf.write(f"# section: demand_requests\n")
+        demand_cols = [
+            "demand_id", "name", "location_lat", "location_lon",
+            "material_type", "required_tons", "priority", "deadline",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=demand_cols, extrasaction="ignore")
+        writer.writeheader()
+        for d in demands:
+            writer.writerow(d)
+        buf.write("\n")
+
+        # Section 4: matches
+        buf.write(f"# section: matches\n")
+        match_cols = [
+            "supply_id", "demand_id", "material_type",
+            "tons", "distance_km", "estimated_profit_sek",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=match_cols, extrasaction="ignore")
+        writer.writeheader()
+        for m in matches:
+            writer.writerow(m)
+        buf.write("\n")
+
+        # Section 5: routes
+        buf.write(f"# section: routes\n")
+        route_cols = [
+            "vehicle_id", "distance_km", "duration_hours",
+            "cost_sek", "co2_kg", "stops_count",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=route_cols, extrasaction="ignore")
+        writer.writeheader()
+        for r in routes:
+            # derive stops_count from stops list (already parsed by get_cycle_detail)
+            row = dict(r)
+            stops = row.get("stops")
+            if isinstance(stops, list):
+                row["stops_count"] = len(stops)
+            else:
+                # Fallback: try parsing stops_json string
+                stops_json = row.get("stops_json")
+                if stops_json:
+                    try:
+                        stops_parsed = json.loads(stops_json) if isinstance(stops_json, str) else stops_json
+                        row["stops_count"] = len(stops_parsed) if isinstance(stops_parsed, list) else 0
+                    except (json.JSONDecodeError, TypeError):
+                        row["stops_count"] = 0
+                else:
+                    row["stops_count"] = 0
+            writer.writerow(row)
+
+        return buf.getvalue()
+
     # ============================================
     # iter #27: Native row exports (for parquet / json / ndjson)
     # 避免 CSV 解析 round-trip — 直接返 list of dicts
