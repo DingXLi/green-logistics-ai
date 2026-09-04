@@ -5545,6 +5545,62 @@ async def get_materials():
     }
 
 
+@app.get("/api/regions")
+async def get_regions():
+    """
+    iter #47: Region/city profiles (SCB kommunstatistik 2023).
+
+    Returns the 3 Swedish cities covered by the simulation: Borås, Göteborg,
+    Stockholm. Each profile includes:
+    - population (2023 estimate)
+    - per_capita_waste_kg (household + share of C&D)
+    - construction_share_pct (% of total waste that's construction)
+    - industry_focus (drives the material mix the city produces)
+    - lat/lon (city center coords for map display)
+    - estimated_daily_waste_tons (population × per_capita / 365 / 1000)
+
+    Useful for dashboard panels that need to compare regions, plus gives
+    the simulation parameters per-city in a unified place.
+
+    Data source: data/swedish_waste_stats.py + agents/world_builder.py
+    """
+    from data.swedish_waste_stats import CITY_DEMAND_PROFILES
+    from agents.world_builder import CITY_CENTERS
+
+    result = []
+    for city, profile in CITY_DEMAND_PROFILES.items():
+        lat, lon = CITY_CENTERS.get(city, (None, None))
+        pop = profile.get("population", 0)
+        per_capita = profile.get("per_capita_waste_kg", 0)
+        # population × per_capita_kg / 365 / 1000 = tons/day
+        # (mixed household + C&D, then broken down by material elsewhere)
+        est_daily = round((pop * per_capita) / 365 / 1000, 1) if pop and per_capita else None
+        result.append({
+            "city": city,
+            "population": pop,
+            "per_capita_waste_kg": per_capita,
+            "construction_share_pct": profile.get("construction_share_pct"),
+            "industry_focus": profile.get("industry_focus"),
+            "source": profile.get("source"),
+            "lat": lat,
+            "lon": lon,
+            "estimated_daily_waste_tons": est_daily,
+        })
+
+    total_pop = sum(r["population"] for r in result)
+    total_daily = round(
+        sum(r["estimated_daily_waste_tons"] or 0 for r in result), 1
+    )
+
+    return {
+        "n_regions": len(result),
+        "regions": result,
+        "total_population": total_pop,
+        "total_estimated_daily_waste_tons": total_daily,
+        "data_source": "data/swedish_waste_stats.py (SCB kommunstatistik 2023) + agents/world_builder.py",
+    }
+
+
 # ============================================
 # V2 新增：调度器状态端点 (Task A)
 # ============================================

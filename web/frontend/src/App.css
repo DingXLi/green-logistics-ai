@@ -3289,3 +3289,98 @@ td.no-matches {
   color: #64748b;
   margin-top: 0.25rem;
 }
+
+/* iter #47: RegionProfiles styles */
+.rp-summary {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+.rp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.rp-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+}
+.rp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 0.4rem;
+}
+.rp-card-title {
+  margin: 0;
+  font-size: 1rem;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+.rp-card-pop {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+.rp-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.rp-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+.rp-card-label {
+  color: #94a3b8;
+}
+.rp-card-value {
+  font-weight: 500;
+  color: #e2e8f0;
+}
+.rp-card-industry {
+  font-style: italic;
+  color: #a5b4fc;
+  font-size: 0.75rem;
+  text-align: right;
+  max-width: 60%;
+}
+.rp-card-coords code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  background: #1e293b;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.rp-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+@media (max-width: 768px) {
+  .rp-charts {
+    grid-template-columns: 1fr;
+  }
+}
+.rp-chart-block h4 {
+  margin: 0 0 0.4rem 0;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+}
+.rp-footnote {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-style: italic;
+  line-height: 1.4;
+}
