@@ -3384,3 +3384,101 @@ td.no-matches {
   font-style: italic;
   line-height: 1.4;
 }
+
+/* iter #48: LLMCostByType styles */
+.lct-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.5rem 0 0.75rem 0;
+  flex-wrap: wrap;
+}
+.lct-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.lct-input {
+  padding: 0.3rem 0.5rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+}
+.lct-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+}
+.lct-clear {
+  background: #334155;
+  color: #cbd5e1;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.lct-clear:hover {
+  background: #475569;
+}
+
+.lct-table-wrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.lct-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.lct-table th,
+.lct-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border: 1px solid #1e293b;
+}
+.lct-table thead th {
+  background: #0f172a;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+.lct-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.lct-sortable:hover {
+  background: #1e293b;
+}
+.lct-num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  color: #e2e8f0;
+}
+.lct-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 110px;
+}
+.lct-bar {
+  height: 14px;
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 0.2s ease;
+}
+.lct-bar-label {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+}
+.lct-footnote {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-style: italic;
+  line-height: 1.4;
+}
