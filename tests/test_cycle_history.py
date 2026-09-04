@@ -167,7 +167,7 @@ class TestCycleHistoryPersistence(unittest.TestCase):
             self.assertGreater(c["n_matches"], 0)
 
     def test_export_cycles_csv_returns_header_and_rows(self):
-        csv_str = self.p.export_cycles_csv(limit=10)
+        csv_str = self.p.export_cycles_csv(limit=10, include_metadata=False)
         lines = csv_str.strip().split("\n")
         # header + 5 cycles
         self.assertEqual(len(lines), 6)
@@ -186,7 +186,9 @@ class TestCycleHistoryPersistence(unittest.TestCase):
         try:
             from agents.persistence import Persistence
             empty_p = Persistence(db_path=empty_path)
-            csv_str = empty_p.export_cycles_csv(limit=10)
+            # iter #19: default include_metadata=True adds 6 comment lines.
+            # Pass include_metadata=False to get just the header row.
+            csv_str = empty_p.export_cycles_csv(limit=10, include_metadata=False)
             lines = csv_str.strip().split("\n")
             self.assertEqual(len(lines), 1)
             self.assertIn("cycle_id", lines[0])
@@ -194,7 +196,7 @@ class TestCycleHistoryPersistence(unittest.TestCase):
             os.unlink(empty_path)
 
     def test_export_cycles_csv_limit(self):
-        csv_str = self.p.export_cycles_csv(limit=2)
+        csv_str = self.p.export_cycles_csv(limit=2, include_metadata=False)
         lines = csv_str.strip().split("\n")
         # header + 2 cycles
         self.assertEqual(len(lines), 3)
@@ -338,11 +340,13 @@ class TestCycleHistoryAPI(unittest.TestCase):
         self.assertEqual(resp.status_code, 503)
 
     def test_export_cycles_csv_endpoint_200(self):
-        resp = self.client.get("/api/persistence/export/cycles.csv")
+        # iter #19: include_metadata=True is the default; pass include_metadata=false
+        # to test the no-metadata case.
+        resp = self.client.get("/api/persistence/export/cycles.csv?include_metadata=false")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text/csv", resp.headers.get("content-type", ""))
         self.assertIn("attachment", resp.headers.get("content-disposition", ""))
-        # body should have header + 1 cycle
+        # body should have header + 1 cycle (when include_metadata=false)
         lines = resp.text.strip().split("\n")
         self.assertEqual(len(lines), 2)
         self.assertIn("cycle_id", lines[0])
