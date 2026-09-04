@@ -4209,6 +4209,46 @@ async def export_matches_csv(limit: int = 10000, include_metadata: bool = True):
     )
 
 
+@app.get("/api/persistence/export/perturbed-supplies.csv")
+async def export_perturbed_supplies_csv(
+    limit: int = 10000,
+    include_metadata: bool = True,
+    only_perturbed: bool = False,
+):
+    """
+    iter #47: Export supply_offers with perturbation tracking (15 cols).
+
+    Extends the standard /export/supplies.csv (iter #17) with iter #38
+    perturbation columns: base_seasonal_multiplier, seasonal_multiplier,
+    perturbation_applied. Adds derived columns multiplier_ratio (effective
+    / base) and was_perturbed (bool).
+
+    Query:
+    - limit: max rows (default 10000, max 50000)
+    - include_metadata: iter #19, top metadata header
+    - only_perturbed: if true, only export rows where perturbation_applied=1
+                      (saves space when analyzing only shocked rows)
+
+    Returns: text/csv 响应 + Content-Disposition: attachment.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50000, limit))
+    csv_data = coordinator.persistence.export_perturbed_supplies_csv(
+        limit=limit, include_metadata=include_metadata, only_perturbed=only_perturbed,
+    )
+    suffix = "_perturbed" if only_perturbed else ""
+    return FastAPIResponse(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="green_logistics_perturbed_supplies{suffix}_{limit}.csv"'
+            ),
+        },
+    )
+
+
 @app.get("/api/persistence/export/routes.csv")
 async def export_routes_csv(limit: int = 10000, include_metadata: bool = True):
     """

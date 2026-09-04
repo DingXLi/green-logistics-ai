@@ -1679,6 +1679,88 @@ class Persistence:
             writer.writerow(dict(r))
         return buf.getvalue()
 
+    def export_perturbed_supplies_csv(
+        self,
+        limit: int = 10000,
+        include_metadata: bool = True,
+        only_perturbed: bool = False,
+    ) -> str:
+        """
+        Export supply_offers with perturbation tracking (iter #47).
+
+        Extends the standard supplies export (iter #17) with the iter #38
+        perturbation columns: base_seasonal_multiplier, seasonal_multiplier,
+        perturbation_applied. Useful for analyzing how active shocks
+        affected individual supply points.
+
+        Columns (13):
+            cycle_id, supply_id, material_type, location_lat, location_lon,
+            available_tons, sim_day, sim_hour,
+            base_seasonal_multiplier, seasonal_multiplier, perturbation_applied,
+            multiplier_ratio (effective / base), was_perturbed (bool)
+
+        Args (iter #47):
+            limit: max rows (default 10000)
+            include_metadata: iter #19, top metadata header
+            only_perturbed: if True, only include rows where perturbation_applied=1
+                           (saves space when only analyzing shocks)
+        """
+        where_clause = ""
+        if only_perturbed:
+            where_clause = "WHERE s.perturbation_applied = 1"
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT s.cycle_id, s.supply_id, s.material_type,
+                          s.location_lat, s.location_lon,
+                          s.available_tons, s.moisture_percent, s.quality_score,
+                          c.sim_day, c.sim_hour,
+                          s.base_seasonal_multiplier, s.seasonal_multiplier,
+                          s.perturbation_applied
+                   FROM supply_offers s
+                   LEFT JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                   {where_clause}
+                   ORDER BY c.sim_day DESC, s.supply_id
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+
+        # Enrich rows with derived fields
+        enriched = []
+        for r in rows:
+            d = dict(r)
+            # Use 'is None' (not 'or 1.0') to preserve 0.0 (which is invalid
+            # but should be handled, not silently coerced to 1.0).
+            base_raw = d.get("base_seasonal_multiplier")
+            base = 1.0 if base_raw is None else base_raw
+            eff_raw = d.get("seasonal_multiplier")
+            eff = 1.0 if eff_raw is None else eff_raw
+            d["multiplier_ratio"] = round(eff / base, 3) if base not in (0, None) else None
+            d["was_perturbed"] = bool(d.get("perturbation_applied"))
+            enriched.append(d)
+
+        columns = [
+            "cycle_id", "supply_id", "material_type", "location_lat",
+            "location_lon", "available_tons", "moisture_percent",
+            "quality_score", "sim_day", "sim_hour",
+            "base_seasonal_multiplier", "seasonal_multiplier",
+            "perturbation_applied", "multiplier_ratio", "was_perturbed",
+        ]
+        buf = io.StringIO()
+        if include_metadata:
+            buf.write(f"# Green Logistics AI CSV export\n")
+            buf.write(f"# generated_at: {datetime.now().isoformat()}\n")
+            buf.write(f"# db_path: {self.db_path}\n")
+            buf.write(f"# db_size_bytes: {self.db_path.stat().st_size if self.db_path.exists() else 0}\n")
+            buf.write(f"# table: perturbed_supplies\n")
+            buf.write(f"# row_count: {len(enriched)}\n")
+            buf.write(f"# only_perturbed: {only_perturbed}\n")
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in enriched:
+            writer.writerow(r)
+        return buf.getvalue()
+
     def export_matches_csv(self, limit: int = 10000,
                            include_metadata: bool = True) -> str:
         """
