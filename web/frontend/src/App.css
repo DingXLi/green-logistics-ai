@@ -2738,3 +2738,142 @@ td.no-matches {
   border-radius: 6px;
   font-size: 0.9rem;
 }
+
+/* iter #46: 401 auth-required banner */
+.rc-auth-banner {
+  padding: 1.25rem;
+  background: #1e293b;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+.rc-auth-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fbbf24;
+  margin-bottom: 0.5rem;
+}
+.rc-auth-detail {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+.rc-auth-detail code {
+  background: #0f172a;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  color: #fbbf24;
+}
+.rc-auth-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.rc-auth-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.rc-auth-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+}
+.rc-auth-hint {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.rc-auth-hint code {
+  background: #0f172a;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.rc-auth-status {
+  padding: 0.6rem 0.9rem;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rc-auth-status code {
+  background: #1e293b;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  color: #fbbf24;
+  font-size: 0.8rem;
+}
+.rc-auth-status strong {
+  color: #e2e8f0;
+}
+
+/* iter #46: mini auth-status indicator (when token loaded) */
+.rc-auth-mini {
+  padding: 0.4rem 0.75rem;
+  background: #064e3b;
+  color: #d1fae5;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.rc-auth-mini code {
+  background: #022c22;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  color: #6ee7b7;
+  font-size: 0.8rem;
+}
+.rc-token-clear {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #047857;
+  color: #d1fae5;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.rc-token-clear:hover {
+  background: #047857;
+}
+
+/* iter #46: row highlight for modified values */
+.rc-row-modified {
+  background: rgba(245, 158, 11, 0.05);
+}
+.rc-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rc-badge-modified {
+  background: #f59e0b;
+  color: #0f172a;
+}
+.rc-badge-default {
+  background: #334155;
+  color: #cbd5e1;
+}
