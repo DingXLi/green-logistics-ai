@@ -282,6 +282,9 @@ check_endpoint "/api/persistence/export/cycles.ndjson" 200 GET "/api/persistence
 check_endpoint "/api/persistence/export/supplies.ndjson" 200 GET "/api/persistence/export/supplies.ndjson?limit=10"
 check_endpoint "/api/persistence/export/matches.ndjson" 200 GET "/api/persistence/export/matches.ndjson?limit=10"
 check_endpoint "/api/persistence/export/routes.ndjson" 200 GET "/api/persistence/export/routes.ndjson?limit=10"
+# iter #47: perturbed supplies CSV export (extends supplies.csv with iter #38 cols)
+check_endpoint "/api/persistence/export/perturbed-supplies.csv (iter #47)" 200 GET "/api/persistence/export/perturbed-supplies.csv?limit=10"
+check_endpoint "/api/persistence/export/perturbed-supplies.csv?only_perturbed=true (iter #47)" 200 GET "/api/persistence/export/perturbed-supplies.csv?limit=10&only_perturbed=true"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 
