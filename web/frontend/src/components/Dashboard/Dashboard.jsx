@@ -78,6 +78,8 @@ const ForecastCalibrationTrend = lazy(() => import('./ForecastCalibrationTrend')
 const CohortRetentionCrosstab = lazy(() => import('./CohortRetentionCrosstab').then(m => ({ default: m.CohortRetentionCrosstab })))
 // iter #45: runtime config admin panel
 const RuntimeConfig = lazy(() => import('./RuntimeConfig').then(m => ({ default: m.RuntimeConfig })))
+// iter #46: seasonal multiplier cross-tab (material × month)
+const SeasonalMaterialCrossTab = lazy(() => import('./SeasonalMaterialCrossTab').then(m => ({ default: m.SeasonalMaterialCrossTab })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -715,6 +717,11 @@ export default function Dashboard() {
           } />
 
           <SeasonalComparison />
+
+          {/* iter #46: material × month seasonal multiplier heatmap */}
+          <Suspense fallback={<LoadingSpinner label="Loading seasonal cross-tab..." />}>
+            <SeasonalMaterialCrossTab />
+          </Suspense>
 
           <CarbonScenarios />
 

@@ -2877,3 +2877,130 @@ td.no-matches {
   background: #334155;
   color: #cbd5e1;
 }
+
+/* iter #46: SeasonalMaterialCrossTab styles */
+.smc-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+.smc-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.4rem 0.75rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+}
+.smc-pill:hover {
+  background: #334155;
+  border-color: #475569;
+}
+.smc-pill.active {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #fff;
+}
+.smc-pill.dim {
+  opacity: 0.4;
+}
+.smc-pill-name {
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+.smc-pill-meta {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+.smc-pill.active .smc-pill-meta {
+  color: #cbd5e1;
+}
+
+.smc-table-wrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.smc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.smc-table th,
+.smc-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  border: 1px solid #1e293b;
+}
+.smc-table thead th {
+  background: #0f172a;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+.smc-month {
+  min-width: 50px;
+}
+.smc-summary {
+  background: #1e293b;
+  color: #94a3b8;
+}
+.smc-row-label {
+  text-align: left !important;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: #0f172a;
+  white-space: nowrap;
+}
+.smc-cell {
+  font-weight: 600;
+  font-size: 0.8rem;
+  min-width: 50px;
+}
+.smc-empty {
+  color: #475569;
+  background: #0f172a;
+}
+.smc-summary-cell {
+  background: #0f172a;
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.smc-row-dim {
+  opacity: 0.35;
+}
+.smc-legend {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.smc-legend-label {
+  font-weight: 600;
+  color: #cbd5e1;
+}
+.smc-legend-cell {
+  display: inline-block;
+  min-width: 32px;
+  padding: 0.15rem 0.4rem;
+  text-align: center;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: #fff;
+}
+.smc-legend-foot {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}

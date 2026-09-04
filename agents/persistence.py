@@ -913,6 +913,73 @@ class Persistence:
             out.append(d)
         return out
 
+    def get_seasonal_timeseries_by_material(
+        self,
+    ) -> Dict[str, Any]:
+        """
+        iter #46: Seasonal time-series broken down by material_type.
+
+        JOINs supply_offers with optimization_cycles so we can answer
+        "in July, how many tons of concrete were produced vs metal_scrap?".
+
+        Output shape:
+            {
+              "n_materials": int,
+              "n_months": int,                # months that have any data
+              "materials": [str, ...],        # sorted list
+              "month_labels": [str, ...],     # ["Jan", ..., "Dec"]
+              "matrix": [
+                {material, month, month_name, n_supply_offers,
+                 total_tons, avg_seasonal_multiplier, avg_base_multiplier}
+                ...
+              ]
+            }
+
+        Empty when no cycles exist.
+        """
+        month_names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ]
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT s.material_type AS material_type,
+                          c.seasonal_month AS seasonal_month,
+                          COUNT(*) AS n_supply_offers,
+                          SUM(s.available_tons) AS total_tons,
+                          AVG(s.seasonal_multiplier) AS avg_seasonal_multiplier,
+                          AVG(s.base_seasonal_multiplier) AS avg_base_multiplier
+                   FROM supply_offers s
+                   JOIN optimization_cycles c ON s.cycle_id = c.cycle_id
+                   WHERE c.seasonal_month BETWEEN 1 AND 12
+                     AND s.material_type IS NOT NULL
+                   GROUP BY s.material_type, c.seasonal_month
+                   ORDER BY s.material_type ASC, c.seasonal_month ASC"""
+            ).fetchall()
+
+        matrix = []
+        materials_set = set()
+        months_set = set()
+        for r in rows:
+            d = dict(r)
+            month = d["seasonal_month"]
+            material = d["material_type"]
+            materials_set.add(material)
+            months_set.add(month)
+            d["month_name"] = month_names[month - 1] if 1 <= month <= 12 else "?"
+            d["total_tons"] = round(d.get("total_tons") or 0.0, 2)
+            d["avg_seasonal_multiplier"] = round(d.get("avg_seasonal_multiplier") or 1.0, 3)
+            d["avg_base_multiplier"] = round(d.get("avg_base_multiplier") or 1.0, 3)
+            matrix.append(d)
+
+        return {
+            "n_materials": len(materials_set),
+            "n_months": len(months_set),
+            "materials": sorted(materials_set),
+            "month_labels": month_names,
+            "matrix": matrix,
+        }
+
     def forecast_next_n_sim_days(
         self,
         horizon: int = 7,
