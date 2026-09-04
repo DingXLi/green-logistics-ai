@@ -1,19 +1,22 @@
 /**
- * CohortRetentionByPeriod - 按时段看 retention 趋势 (iter #20 + iter #24 unit + iter #25 deep link)
+ * CohortRetentionByPeriod - 按时段看 retention 趋势
+ *   (iter #20 + iter #24 unit + iter #25 deep link + iter #46 material filter)
  *
- * 数据源: GET /api/persistence/cohort-retention-by-period?n_periods=4&period_unit=quartile
+ * 数据源: GET /api/persistence/cohort-retention-by-period?n_periods=4&period_unit=quartile[&material_type=concrete]
  *
  * 显示:
  * - period_unit (iter #24): quartile / day / week / month
  * - n_periods: 可配置 (1-30/52/12/10 per unit)
+ * - material_type (iter #46): optional filter to single material
  * - trend badge: improving / declining / stable / unknown
  * - bar visualization (recharts) 显示每段 retention_rate_pct
  * - 每段详细 KPI (n_supply_ids / n_one_time / n_repeating / one_time_pct)
  *
- * URL state (iter #25): ?period_unit=week&n_periods=8
+ * URL state (iter #25 + iter #46): ?period_unit=week&n_periods=8&material_type=concrete
  * - 可分享: 用户粘贴 URL 给同事, 自动恢复 cohort view 配置
  * - 可收藏: bookmark 当前 view 不用再选
  * - back/forward 工作
+ * - iter #46 新增 material_type 入 URL state, 与 crosstab 保持一致
  */
 
 import { useState, useEffect } from 'react'
@@ -47,12 +50,18 @@ export function CohortRetentionByPeriod() {
   // iter #25: URL-synced state for deep linking
   const [periodUnit, setPeriodUnit] = useUrlState('period_unit', 'quartile')  // iter #24 + iter #25
   const [nPeriods, setNPeriods] = useUrlState('n_periods', 4, 'int')  // iter #25
+  // iter #46: material filter synced to URL too (consistency with crosstab)
+  const [materialType, setMaterialType] = useUrlState('material_type', '')
   const [expandedPeriod, setExpandedPeriod] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`${API_BASE}/persistence/cohort-retention-by-period?n_periods=${nPeriods}&period_unit=${periodUnit}`)
+    // iter #46: append material_type to query when non-empty
+    const matParam = materialType
+      ? `&material_type=${encodeURIComponent(materialType)}`
+      : ''
+    fetch(`${API_BASE}/persistence/cohort-retention-by-period?n_periods=${nPeriods}&period_unit=${periodUnit}${matParam}`)
       .then(r => r.json())
       .then(d => {
         if (!cancelled) {
@@ -67,7 +76,7 @@ export function CohortRetentionByPeriod() {
         }
       })
     return () => { cancelled = true }
-  }, [nPeriods, periodUnit])
+  }, [nPeriods, periodUnit, materialType])
 
   if (loading) return <LoadingSpinner label={`Loading cohort retention (${nPeriods} ${periodUnit} periods)…`} />
   if (error) return <div className="error-banner">⚠️ {error}</div>
@@ -107,6 +116,9 @@ export function CohortRetentionByPeriod() {
       <p className="chart-subtitle">
         Split {data.total_supply_ids} supplies across {data.periods.length} time periods.
         Compare early vs late retention to detect churn trends.
+        {materialType && (
+          <> · filtered to material <code>{materialType}</code></>
+        )}
       </p>
 
       {/* Trend badge + controls */}
@@ -178,6 +190,27 @@ export function CohortRetentionByPeriod() {
             )}
           </select>
         </label>
+        {/* iter #46: material type filter (consistency with crosstab) */}
+        <label className="cohort-periods-label">
+          Material:
+          <input
+            type="text"
+            className="cohort-periods-select"
+            placeholder="(all)"
+            value={materialType}
+            onChange={e => setMaterialType(e.target.value.trim())}
+            style={{ width: '110px' }}
+          />
+        </label>
+        {materialType && (
+          <button
+            className="cohort-periods-select"
+            style={{ background: '#334155', color: '#e2e8f0', border: '1px solid #475569', cursor: 'pointer' }}
+            onClick={() => setMaterialType('')}
+          >
+            clear
+          </button>
+        )}
       </div>
 
       {/* Bar chart */}
