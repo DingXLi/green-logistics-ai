@@ -216,6 +216,13 @@ green-logistics-ai/
 | POST   | `/api/admin/runtime-config/reset` | Reset all runtime config to defaults (admin, iter #43) |
 | GET    | `/api/persistence/export/cycles.csv` | Download cycles as CSV (iter #11) |
 | GET    | `/api/persistence/export/supplies.csv` | Download supplies as CSV (iter #17) |
+| GET    | `/api/persistence/export/perturbed-supplies.csv?only_perturbed=true` | Download supplies with iter #38 perturbation columns (15 cols incl. multiplier_ratio) (iter #47) |
+| GET    | `/api/persistence/export/cycle-detail/{cycle_id}.csv` | Download one cycle's full detail (5-section combined CSV) (iter #48) |
+| GET    | `/api/persistence/llm-cost-by-type` | LLM usage breakdown by decision_type (iter #48) |
+| GET    | `/api/persistence/llm-decision-targets` | Per-target LLM call stats (most-called DEM/SUP targets) (iter #48) |
+| GET    | `/api/persistence/material-supply-demand-balance` | Supply vs demand balance per material (oversupply / shortage) (iter #49) |
+| GET    | `/api/persistence/anomalous-cycles?z_threshold=2.0` | Statistical z-score outlier detection across KPIs (iter #47) |
+| GET    | `/api/regions` | Swedish region profiles (Borås/Göteborg/Stockholm) with SCB population data (iter #47) |
 | GET    | `/api/persistence/export/matches.csv` | Download matches as CSV (iter #17) |
 | GET    | `/api/persistence/export/routes.csv` | Download routes as CSV (iter #17) |
 | GET    | `/api/persistence/export/cycles.parquet` | Download cycles as Apache Parquet (iter #27) |
