@@ -683,6 +683,61 @@ class Persistence:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_llm_decision_targets(
+        self,
+        decision_type: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        iter #48: List unique LLM call targets with stats.
+
+        Groups llm_decisions by target_id, returns per-target stats:
+        - decision_type
+        - n_calls
+        - n_real_llm / n_fallback
+        - last_called_sim_day
+        - avg_multiplier (across calls)
+        - avg_confidence
+
+        Args:
+            decision_type: optional filter ('demand_prediction' / etc.)
+            limit: max targets to return (default 50)
+
+        Returns:
+            [{
+              target_id, decision_type, target_type,
+              n_calls, n_real_llm, n_fallback,
+              last_called_sim_day, first_called_sim_day,
+              avg_multiplier, avg_confidence,
+            }, ...]
+            Sorted by n_calls DESC (most-called targets first).
+        """
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if decision_type:
+            where_clauses.append("decision_type = ?")
+            params.append(decision_type)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT target_id, decision_type, target_type,
+                          COUNT(*) AS n_calls,
+                          SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) AS n_real_llm,
+                          SUM(CASE WHEN source='fallback' THEN 1 ELSE 0 END) AS n_fallback,
+                          MAX(sim_day) AS last_called_sim_day,
+                          MIN(sim_day) AS first_called_sim_day,
+                          ROUND(AVG(multiplier), 3) AS avg_multiplier,
+                          ROUND(AVG(confidence), 3) AS avg_confidence
+                   FROM llm_decisions
+                   {where_sql}
+                   GROUP BY target_id, decision_type
+                   ORDER BY n_calls DESC
+                   LIMIT ?""",
+                params + [int(limit)],
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def get_llm_cost_by_decision_type(
         self,
         since_sim_day: Optional[int] = None,

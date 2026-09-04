@@ -297,6 +297,9 @@ check_endpoint "/api/persistence/export/cycle-detail/c1.csv (iter #48, 404 expec
 check_endpoint "/api/persistence/llm-cost-by-type (iter #48)" 200 GET "/api/persistence/llm-cost-by-type"
 check_json_field "/api/persistence/llm-cost-by-type has by_type" GET "/api/persistence/llm-cost-by-type" ".by_type | type" "array"
 check_endpoint "/api/persistence/llm-cost-by-type?since=0&until=999 (iter #48)" 200 GET "/api/persistence/llm-cost-by-type?since_sim_day=0&until_sim_day=999"
+# iter #48: per-target LLM stats
+check_endpoint "/api/persistence/llm-decision-targets (iter #48)" 200 GET "/api/persistence/llm-decision-targets"
+check_json_field "/api/persistence/llm-decision-targets has targets" GET "/api/persistence/llm-decision-targets" ".targets | type" "array"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 
