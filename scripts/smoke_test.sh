@@ -293,6 +293,10 @@ check_endpoint "/api/persistence/export/perturbed-supplies.csv?only_perturbed=tr
 # iter #48: cycle-detail CSV export (combined 5-section CSV)
 check_endpoint "/api/persistence/export/cycle-detail/c1.csv (iter #48, 404 expected)" 404 GET "/api/persistence/export/cycle-detail/nonexistent.csv"
 # Note: 200 check skipped because depends on having a real cycle_id; the 404 confirms endpoint is wired
+# iter #48: LLM cost by decision type
+check_endpoint "/api/persistence/llm-cost-by-type (iter #48)" 200 GET "/api/persistence/llm-cost-by-type"
+check_json_field "/api/persistence/llm-cost-by-type has by_type" GET "/api/persistence/llm-cost-by-type" ".by_type | type" "array"
+check_endpoint "/api/persistence/llm-cost-by-type?since=0&until=999 (iter #48)" 200 GET "/api/persistence/llm-cost-by-type?since_sim_day=0&until_sim_day=999"
 # iter #27: WS origin allowlist metadata
 check_endpoint "/api/ws/stats" 200 GET "/api/ws/stats" "${ADMIN_HEADER_ARGS[@]}"
 

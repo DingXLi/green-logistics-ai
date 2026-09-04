@@ -3242,6 +3242,49 @@ async def get_llm_cost_timeseries(
     }
 
 
+@app.get("/api/persistence/llm-cost-by-type")
+async def get_llm_cost_by_type(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #48: LLM usage breakdown by decision_type.
+
+    Aggregates llm_decisions table by decision_type (e.g.
+    'demand_prediction', 'supply_prediction') to show which call type
+    uses LLM the most + fallback rate per type.
+
+    Returns:
+        {
+          since_sim_day, until_sim_day,
+          by_type: [
+            {decision_type, n_total, n_llm, n_fallback, llm_rate_pct,
+             avg_multiplier, avg_confidence, n_unique_targets,
+             first_decision_sim_day, last_decision_sim_day},
+            ...
+          ],
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and since_sim_day < 0:
+        raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
+    if until_sim_day is not None and until_sim_day < 0:
+        raise HTTPException(status_code=400, detail="until_sim_day must be >= 0")
+    if since_sim_day is not None and until_sim_day is not None and since_sim_day > until_sim_day:
+        raise HTTPException(
+            status_code=400,
+            detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+        )
+    return {
+        "since_sim_day": since_sim_day,
+        "until_sim_day": until_sim_day,
+        "by_type": coordinator.persistence.get_llm_cost_by_decision_type(
+            since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+        ),
+    }
+
+
 @app.get("/api/persistence/llm-cost-forecast")
 async def get_llm_cost_forecast(
     horizon: int = 7,
