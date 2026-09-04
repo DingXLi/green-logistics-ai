@@ -181,6 +181,11 @@ check_endpoint "/api/admin/auth/status" 200 GET "/api/admin/auth/status"
 check_json_field "/api/admin/auth/status has auth_enabled bool" GET "/api/admin/auth/status" ".auth_enabled | type" "boolean"
 check_json_field "/api/admin/auth/status has header_formats list" GET "/api/admin/auth/status" ".protected_endpoint_count" "13"
 
+# ---- iter #46: auth status with token preview when auth enabled ----
+# When auth is enabled (GL_ADMIN_TOKEN set), token_preview should be a string
+# with masked format. When disabled, it should be null.
+check_json_field "/api/admin/auth/status token_preview type" GET "/api/admin/auth/status" ".token_preview | type" "string"
+
 # ---- Persistence endpoints ----
 check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
 check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence/match-distance-stats"
@@ -309,6 +314,10 @@ check_endpoint "/api/facilities/distance-matrix" 200 GET "/api/facilities/distan
 
 # ---- Seasonal / external ----
 check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
+# iter #46: per-material seasonal time-series
+check_endpoint "/api/persistence/seasonal-timeseries-by-material (iter #46)" 200 GET "/api/persistence/seasonal-timeseries-by-material"
+check_json_field "/api/persistence/seasonal-timeseries-by-material has materials" GET "/api/persistence/seasonal-timeseries-by-material" ".materials | type" "array"
+check_json_field "/api/persistence/seasonal-timeseries-by-material has matrix" GET "/api/persistence/seasonal-timeseries-by-material" ".matrix | type" "array"
 # iter #28: LLM cost timeseries
 check_endpoint "/api/persistence/llm-cost-timeseries" 200 GET "/api/persistence/llm-cost-timeseries"
 check_endpoint "/api/persistence/llm-cost-timeseries?since_sim_day=0" 200 GET "/api/persistence/llm-cost-timeseries?since_sim_day=0"

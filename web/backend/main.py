@@ -3093,6 +3093,23 @@ async def get_seasonal_timeseries():
     return coordinator.persistence.get_seasonal_timeseries()
 
 
+@app.get("/api/persistence/seasonal-timeseries-by-material")
+async def get_seasonal_timeseries_by_material():
+    """
+    iter #46: Seasonal time-series cross-tab (material × month).
+
+    Returns a 2D matrix showing seasonal_multiplier + total_tons for
+    each (material, month) cell. Useful for spotting which materials
+    are most / least affected by seasonal swings.
+
+    Response shape:
+        n_materials, n_months, materials, month_labels, matrix: [...]
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_seasonal_timeseries_by_material()
+
+
 # ============================================
 # iter #38: Perturbation impact analytics
 # ============================================
