@@ -2794,6 +2794,109 @@ class Persistence:
             "until_sim_day": until_sim_day,
         }
 
+    # iter #54: standard CO2 emission factors for transport modes (kg CO2 per ton-km)
+    # Source: European Environment Agency (EEA) 2023, well-to-wheel estimates
+    CO2_FACTORS_KG_PER_TON_KM = {
+        # Heavy-duty truck (>12t), Euro VI diesel, average load factor
+        "truck_heavy": 0.062,
+        # Medium truck (3.5-12t)
+        "truck_medium": 0.110,
+        # Light commercial vehicle (<3.5t)
+        "truck_light": 0.180,
+        # Baseline reference: traditional non-optimized individual truck transport
+        # (assumed heavy truck but with poor load factor, ~50% empty)
+        "traditional_baseline": 0.124,
+        # Optimized fleet: heavy truck with full backhauls
+        "optimized_fleet": 0.062,
+    }
+
+    def get_carbon_savings_summary(self, since_sim_day: Optional[int] = None,
+                                    until_sim_day: Optional[int] = None,
+                                    baseline_factor_key: str = "traditional_baseline") -> Dict[str, Any]:
+        """
+        iter #54: Carbon savings vs traditional baseline transport.
+
+        Compares actual CO2 emitted by the multi-agent optimization system
+        vs a hypothetical "traditional baseline" where all material was
+        transported by individual trucks without optimization.
+
+        Args:
+            since_sim_day, until_sim_day: optional time window
+            baseline_factor_key: which CO2 factor to use as baseline
+                (key in CO2_FACTORS_KG_PER_TON_KM)
+
+        Returns:
+          {
+            n_cycles, total_tons, total_distance_km, actual_co2_kg,
+            baseline_co2_kg, savings_co2_kg, savings_pct,
+            baseline_factor_kg_per_ton_km, baseline_factor_key,
+            co2_per_ton_actual_kg, co2_per_ton_baseline_kg,
+            since_sim_day, until_sim_day,
+          }
+
+        Use cases:
+        - Quantify environmental impact ("we saved X tons of CO2")
+        - Compare different baseline assumptions
+        - Marketing/narrative for green logistics
+        """
+        if baseline_factor_key not in self.CO2_FACTORS_KG_PER_TON_KM:
+            valid = sorted(self.CO2_FACTORS_KG_PER_TON_KM.keys())
+            raise ValueError(f"Unknown baseline_factor_key {baseline_factor_key!r}. Valid: {valid}")
+
+        where_clauses: List[str] = []
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        with self._conn() as conn:
+            row = conn.execute(
+                f"""SELECT COUNT(*) as n_cycles,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_distance_km) as total_distance_km,
+                          SUM(total_co2_kg) as actual_co2_kg
+                FROM optimization_cycles
+                {where_sql}""",
+                params,
+            ).fetchone()
+
+        n_cycles = row["n_cycles"] or 0
+        total_tons = float(row["total_tons"] or 0)
+        total_distance = float(row["total_distance_km"] or 0)
+        actual_co2 = float(row["actual_co2_kg"] or 0)
+
+        # Baseline CO2 = total_tons * total_distance * baseline_factor
+        # (吨 km 总和 乘以 baseline 排放系数)
+        baseline_factor = self.CO2_FACTORS_KG_PER_TON_KM[baseline_factor_key]
+        baseline_co2 = total_tons * total_distance * baseline_factor
+
+        savings_co2 = max(0.0, baseline_co2 - actual_co2)
+        if baseline_co2 > 0:
+            savings_pct = round(savings_co2 / baseline_co2 * 100, 2)
+        else:
+            savings_pct = 0.0
+
+        return {
+            "n_cycles": n_cycles,
+            "total_tons": round(total_tons, 2),
+            "total_distance_km": round(total_distance, 2),
+            "actual_co2_kg": round(actual_co2, 2),
+            "baseline_co2_kg": round(baseline_co2, 2),
+            "savings_co2_kg": round(savings_co2, 2),
+            "savings_pct": savings_pct,
+            "co2_per_ton_actual_kg": round(actual_co2 / total_tons, 3) if total_tons > 0 else None,
+            "co2_per_ton_baseline_kg": round(baseline_co2 / total_tons, 3) if total_tons > 0 else None,
+            "baseline_factor_kg_per_ton_km": baseline_factor,
+            "baseline_factor_key": baseline_factor_key,
+            "available_factors": sorted(self.CO2_FACTORS_KG_PER_TON_KM.keys()),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+
     def get_vehicle_stats(
         self,
         vehicle_id: Optional[str] = None,
