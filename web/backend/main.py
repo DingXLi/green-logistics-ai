@@ -1179,6 +1179,8 @@ async def health_check_deep():
     - scheduler: enabled / running / cycle_count / dry_run
     - llm: GOOGLE_API_KEY 是否设置 + 最近一次调用是否成功
     - agents: supply/demand/vehicle 计数
+    - signals (iter #54): Eurostat 3 indicators (construction / industrial /
+      business confidence) availability + source
 
     Status 总体:
     - all_ok = 所有子系统都 ok
@@ -1300,6 +1302,40 @@ async def health_check_deep():
     except Exception as e:
         checks["agents"] = {"status": "degraded", "error": str(e)[:200]}
         overall_status = "degraded"
+
+    # 7. External signals (iter #54) — check if Eurostat fetch works
+    try:
+        from data.external_signals import (
+            get_construction_index,
+            get_industrial_index,
+            get_business_confidence,
+        )
+        construction = get_construction_index(country="SE", use_cache=True)
+        industrial = get_industrial_index(country="SE", use_cache=True)
+        confidence = get_business_confidence(country="SE", use_cache=True)
+        # All three should return valid latest_value
+        ok_count = sum(
+            1 for ind in (construction, industrial, confidence)
+            if ind.get("latest_value") is not None
+        )
+        all_source_ok = all(
+            ind.get("source") in ("eurostat", "cache") for ind in (construction, industrial, confidence)
+        )
+        signals_status = "ok" if (ok_count == 3 and all_source_ok) else "degraded"
+        checks["signals"] = {
+            "status": signals_status,
+            "construction_source": construction.get("source"),
+            "industrial_source": industrial.get("source"),
+            "business_confidence_source": confidence.get("source"),
+            "n_indicators_ok": ok_count,
+            "n_indicators_total": 3,
+        }
+        if signals_status == "degraded" and overall_status == "ok":
+            overall_status = "degraded"
+    except Exception as e:
+        checks["signals"] = {"status": "degraded", "error": str(e)[:200]}
+        if overall_status == "ok":
+            overall_status = "degraded"
 
     return {
         "status": overall_status,
