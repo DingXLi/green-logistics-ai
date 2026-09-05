@@ -223,6 +223,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/material-supply-demand-balance` | Supply vs demand balance per material (oversupply / shortage) (iter #49) |
 | GET    | `/api/persistence/anomalous-cycles?z_threshold=2.0` | Statistical z-score outlier detection across KPIs (iter #47) |
 | GET    | `/api/regions` | Swedish region profiles (Borås/Göteborg/Stockholm) with SCB population data (iter #47) |
+| GET    | `/api/weather?lat=X&lon=Y` | SMHI weather forecast (current + 24h avg) for the depot location (iter #50) |
 | GET    | `/api/persistence/export/matches.csv` | Download matches as CSV (iter #17) |
 | GET    | `/api/persistence/export/routes.csv` | Download routes as CSV (iter #17) |
 | GET    | `/api/persistence/export/cycles.parquet` | Download cycles as Apache Parquet (iter #27) |
