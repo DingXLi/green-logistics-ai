@@ -2702,6 +2702,98 @@ class Persistence:
             "until_sim_day": until_sim_day,
         }
 
+    def get_cohort_by_hour_of_day(self, since_sim_day: Optional[int] = None,
+                                   until_sim_day: Optional[int] = None) -> Dict[str, Any]:
+        """
+        iter #53: Cohort analysis grouped by sim_hour (hour of day, 0-23).
+
+        Each cycle has a sim_hour field representing the hour at which the
+        simulation step was taken. This endpoint groups cycles by sim_hour and
+        returns KPI aggregates per hour bucket:
+        - hour, n_cycles, total_tons, total_cost_sek, total_co2_kg
+        - avg_match_count, avg_fleet_utilization_pct
+
+        Useful for:
+        - Identify which hours of day are most productive
+        - Detect off-peak patterns (simulations typically run at fixed hour)
+
+        Returns:
+          {
+            n_hours_buckets: int,
+            n_cycles: int,
+            hour_buckets: [
+              {hour, hour_label, n_cycles, total_tons, total_cost_sek,
+               total_co2_kg, avg_matches_per_cycle, avg_fleet_utilization_pct,
+               time_of_day: 'night'|'morning'|'afternoon'|'evening'},
+              ...
+            ] sorted by hour ASC,
+            since_sim_day, until_sim_day,
+          }
+        """
+        where_clauses: List[str] = ["sim_hour IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT sim_hour,
+                          COUNT(*) as n_cycles,
+                          SUM(total_tons) as total_tons,
+                          SUM(total_cost_sek) as total_cost_sek,
+                          SUM(total_co2_kg) as total_co2_kg,
+                          SUM(n_matches) as total_matches,
+                          AVG(fleet_utilization_pct) as avg_util
+                FROM optimization_cycles
+                WHERE {where_sql}
+                GROUP BY sim_hour
+                ORDER BY sim_hour ASC""",
+                params,
+            ).fetchall()
+
+        def _time_of_day(h):
+            if 0 <= h <= 5:
+                return "night"
+            if 6 <= h <= 11:
+                return "morning"
+            if 12 <= h <= 17:
+                return "afternoon"
+            return "evening"
+
+        def _hour_label(h):
+            return f"{h:02d}:00"
+
+        buckets = []
+        n_total = 0
+        for r in rows:
+            h = int(r["sim_hour"])
+            n = r["n_cycles"] or 0
+            n_total += n
+            buckets.append({
+                "hour": h,
+                "hour_label": _hour_label(h),
+                "time_of_day": _time_of_day(h),
+                "n_cycles": n,
+                "total_tons": round(r["total_tons"] or 0, 2),
+                "total_cost_sek": round(r["total_cost_sek"] or 0, 2),
+                "total_co2_kg": round(r["total_co2_kg"] or 0, 2),
+                "avg_matches_per_cycle": round((r["total_matches"] or 0) / n, 2) if n > 0 else 0,
+                "avg_fleet_utilization_pct": round(r["avg_util"] or 0, 2),
+            })
+
+        return {
+            "n_hours_buckets": len(buckets),
+            "n_cycles": n_total,
+            "hour_buckets": buckets,
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+
     def get_vehicle_stats(
         self,
         vehicle_id: Optional[str] = None,

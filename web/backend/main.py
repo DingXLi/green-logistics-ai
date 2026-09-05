@@ -4940,6 +4940,47 @@ async def get_match_distance_buckets(
     )
 
 
+@app.get("/api/persistence/cohort-by-hour")
+async def get_cohort_by_hour(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    Cohort analysis grouped by sim_hour (iter #53).
+
+    Groups cycles by hour of day (0-23) and returns per-hour KPI aggregates.
+
+    Query:
+    - since_sim_day, until_sim_day: optional time window
+
+    Returns:
+      {
+        n_hours_buckets, n_cycles,
+        hour_buckets: [
+          {hour, hour_label, time_of_day ('night'|'morning'|'afternoon'|'evening'),
+           n_cycles, total_tons, total_cost_sek, total_co2_kg,
+           avg_matches_per_cycle, avg_fleet_utilization_pct},
+          ...
+        ]
+      }
+
+    Use cases:
+    - Identify peak simulation hours
+    - Detect off-peak patterns
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_cohort_by_hour_of_day(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,
