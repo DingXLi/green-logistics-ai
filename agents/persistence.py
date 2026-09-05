@@ -2495,6 +2495,213 @@ class Persistence:
             "until_sim_day": until_sim_day,
         }
 
+    def get_cycle_duration_stats(self, since_sim_day: Optional[int] = None,
+                                  until_sim_day: Optional[int] = None) -> Dict[str, Any]:
+        """
+        iter #53: Solver wall-time distribution stats (milliseconds).
+
+        Aggregates optimization_cycles.wall_duration_ms across cycles:
+        - mean / median / min / max / stddev
+        - percentiles p25 / p50 / p75 / p90 / p95 / p99
+        - slow_cycles count (≥ 5000 ms, i.e. > 5s)
+        - fast_cycles count (≤ 100 ms, near-instant)
+        - n_total cycles sampled
+        - total_solver_time_seconds = sum(duration) / 1000
+
+        Args:
+            since_sim_day, until_sim_day: optional time window
+
+        Use cases:
+        - Identify slow solver runs (potential OR-Tools timeout issues)
+        - Track solver performance regression over time
+        - Capacity planning (how many cycles / hour)
+        """
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT wall_duration_ms
+                FROM optimization_cycles
+                WHERE {where_sql}
+                ORDER BY wall_duration_ms""",
+                params,
+            ).fetchall()
+
+        if not rows:
+            return {
+                "n_cycles": 0,
+                "mean_ms": None, "median_ms": None, "min_ms": None, "max_ms": None, "stddev_ms": None,
+                "p25_ms": None, "p50_ms": None, "p75_ms": None, "p90_ms": None, "p95_ms": None, "p99_ms": None,
+                "slow_cycles_count": 0,
+                "fast_cycles_count": 0,
+                "total_solver_time_seconds": 0.0,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            }
+
+        values = sorted(float(r["wall_duration_ms"]) for r in rows)
+        n = len(values)
+
+        def _pct(p):
+            if n == 1:
+                return values[0]
+            idx = (p / 100) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return values[lo] * (1 - frac) + values[hi] * frac
+
+        mean = sum(values) / n
+        variance = sum((v - mean) ** 2 for v in values) / n
+        stddev = variance ** 0.5
+        median = _pct(50)
+
+        return {
+            "n_cycles": n,
+            "mean_ms": round(mean, 2),
+            "median_ms": round(median, 2),
+            "min_ms": round(min(values), 2),
+            "max_ms": round(max(values), 2),
+            "stddev_ms": round(stddev, 2),
+            "p25_ms": round(_pct(25), 2),
+            "p50_ms": round(median, 2),
+            "p75_ms": round(_pct(75), 2),
+            "p90_ms": round(_pct(90), 2),
+            "p95_ms": round(_pct(95), 2),
+            "p99_ms": round(_pct(99), 2),
+            "slow_cycles_count": sum(1 for v in values if v >= 5000),  # > 5s
+            "fast_cycles_count": sum(1 for v in values if v <= 100),  # < 100ms
+            "total_solver_time_seconds": round(sum(values) / 1000, 2),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+
+    def get_match_distance_buckets(self, since_sim_day: Optional[int] = None,
+                                    until_sim_day: Optional[int] = None) -> Dict[str, Any]:
+        """
+        iter #53: Match distance distribution histogram.
+
+        Aggregates matches.distance_km into 8 buckets:
+        - 0-5 km (local)
+        - 5-10 km (intra-city)
+        - 10-25 km (inter-city short)
+        - 25-50 km (inter-city medium)
+        - 50-100 km (regional)
+        - 100-200 km (long haul)
+        - 200-500 km (very long haul)
+        - 500+ km (extreme)
+
+        Also returns:
+        - total_matches: total matches sampled
+        - total_distance_km: sum of all distances
+        - avg_distance_km: mean per-match distance
+        - median_distance_km: 50th percentile distance
+        - p95_distance_km: 95th percentile distance
+
+        Args:
+            since_sim_day, until_sim_day: optional time window
+
+        Use cases:
+        - Identify long-distance matches (potential CO2 hotspots)
+        - Compare intra-city vs regional patterns
+        - Validate against expected regional logistics patterns
+        """
+        where_clauses: List[str] = ["distance_km IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            # join with optimization_cycles for sim_day filter
+            where_clauses.append("oc.sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("oc.sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = " AND ".join(where_clauses)
+
+        # Join with cycles for sim_day filter (use LEFT JOIN if no filter)
+        join_clause = (
+            "JOIN optimization_cycles oc ON oc.cycle_id = matches.cycle_id"
+            if (since_sim_day is not None or until_sim_day is not None)
+            else ""
+        )
+
+        bucket_bounds = [
+            (0, 5), (5, 10), (10, 25), (25, 50),
+            (50, 100), (100, 200), (200, 500), (500, float("inf")),
+        ]
+        bucket_labels = [
+            "0-5", "5-10", "10-25", "25-50",
+            "50-100", "100-200", "200-500", "500+",
+        ]
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT distance_km FROM matches
+                {join_clause}
+                WHERE {where_sql}""",
+                params,
+            ).fetchall()
+
+        if not rows:
+            return {
+                "total_matches": 0,
+                "total_distance_km": 0.0,
+                "avg_distance_km": None,
+                "median_distance_km": None,
+                "p95_distance_km": None,
+                "buckets": [
+                    {"label": label, "lower_km": lo, "upper_km": (hi if hi != float("inf") else None),
+                     "count": 0, "share": 0.0}
+                    for (lo, hi), label in zip(bucket_bounds, bucket_labels)
+                ],
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            }
+
+        distances = sorted(float(r["distance_km"]) for r in rows)
+        n = len(distances)
+        total = sum(distances)
+        mean = total / n
+
+        def _pct(p):
+            if n == 1:
+                return distances[0]
+            idx = (p / 100) * (n - 1)
+            lo_i = int(idx)
+            hi_i = min(lo_i + 1, n - 1)
+            frac = idx - lo_i
+            return distances[lo_i] * (1 - frac) + distances[hi_i] * frac
+
+        # Bucket counts
+        buckets = []
+        for (lo, hi), label in zip(bucket_bounds, bucket_labels):
+            count = sum(1 for d in distances if lo <= d < hi)
+            buckets.append({
+                "label": label,
+                "lower_km": lo,
+                "upper_km": None if hi == float("inf") else hi,
+                "count": count,
+                "share": round(count / n, 3),
+            })
+
+        return {
+            "total_matches": n,
+            "total_distance_km": round(total, 2),
+            "avg_distance_km": round(mean, 2),
+            "median_distance_km": round(_pct(50), 2),
+            "p95_distance_km": round(_pct(95), 2),
+            "buckets": buckets,
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+
     def get_vehicle_stats(
         self,
         vehicle_id: Optional[str] = None,
