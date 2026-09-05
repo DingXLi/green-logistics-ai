@@ -100,6 +100,8 @@ const ExternalSignalsPanel = lazy(() => import('./ExternalSignalsPanel').then(m 
 const DemandAggregates = lazy(() => import('./DemandAggregates').then(m => ({ default: m.DemandAggregates })))
 // iter #52: efficiency metrics panel (per-ton / per-match)
 const EfficiencyPanel = lazy(() => import('./EfficiencyPanel').then(m => ({ default: m.EfficiencyPanel })))
+// iter #53: solver perf + distance distribution panel
+const SolverPerfPanel = lazy(() => import('./SolverPerfPanel').then(m => ({ default: m.SolverPerfPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -719,6 +721,11 @@ export default function Dashboard() {
           {/* iter #52: Efficiency metrics panel (cost/CO2 per ton, supply/demand ratio trends) */}
           <Suspense fallback={<LoadingSpinner label="Loading efficiency metrics…" />}>
             <EfficiencyPanel />
+          </Suspense>
+
+          {/* iter #53: Solver perf + distance distribution */}
+          <Suspense fallback={<LoadingSpinner label="Loading solver perf…" />}>
+            <SolverPerfPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
