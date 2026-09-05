@@ -4296,3 +4296,23 @@ td.no-matches {
 .link-btn:hover {
   color: var(--primary-hover);
 }
+
+/* ============================================
+   iter #52: EfficiencyPanel styles
+   ============================================ */
+.efficiency-panel {
+  /* extends .card */
+}
+
+.efficiency-panel .card-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.efficiency-panel .kpi-sub {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
