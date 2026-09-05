@@ -4316,3 +4316,73 @@ td.no-matches {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================
+   iter #53: SolverPerfPanel styles
+   ============================================ */
+.solver-perf-panel {
+  /* extends .card */
+}
+
+.distance-summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.distance-summary strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.distance-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.distance-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.distance-bar-label {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.distance-bar-track {
+  height: 18px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.distance-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  min-width: 1px;
+}
+
+.distance-bar-count {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: left;
+}
+
+.distance-bar-share {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
