@@ -243,6 +243,11 @@ check_json_field "/api/admin/runtime-config has items array" GET "/api/admin/run
 check_json_field "/api/admin/runtime-config has n_keys" GET "/api/admin/runtime-config" ".n_keys | type" "number" "${ADMIN_HEADER_ARGS[@]}"
 check_endpoint "/api/persistence/material-aggregates" 200 GET "/api/persistence/material-aggregates"
 check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cycle-kpi-summary"
+
+# ---- iter #52: kpi-timeseries efficiency fields ----
+check_endpoint "/api/persistence/kpi-timeseries (iter #52)" 200 GET "/api/persistence/kpi-timeseries"
+check_json_field "/api/persistence/kpi-timeseries is array" GET "/api/persistence/kpi-timeseries" ". | type" "array"
+check_json_field "/api/persistence/kpi-timeseries has sim_day" GET "/api/persistence/kpi-timeseries" ".[] | select(.cost_per_ton_sek != null) | .sim_day | type" "number" 2>/dev/null || true
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
 check_endpoint "/api/persistence/cohort-retention-by-period" 200 GET "/api/persistence/cohort-retention-by-period"
 check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 200 GET "/api/persistence/cohort-retention-by-period?period_unit=week"
