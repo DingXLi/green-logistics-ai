@@ -192,6 +192,12 @@ check_endpoint "/api/persistence/summary" 200 GET "/api/persistence/summary"
 check_endpoint "/api/persistence/match-distance-stats" 200 GET "/api/persistence/match-distance-stats"
 check_endpoint "/api/persistence/supply-aggregates" 200 GET "/api/persistence/supply-aggregates"
 
+# ---- iter #52: per-demand aggregates (mirror of supply-aggregates) ----
+check_endpoint "/api/persistence/demand-aggregates (iter #52)" 200 GET "/api/persistence/demand-aggregates"
+check_json_field "/api/persistence/demand-aggregates is array" GET "/api/persistence/demand-aggregates" ". | type" "array"
+check_endpoint "/api/persistence/demand-aggregates filter material" 200 GET "/api/persistence/demand-aggregates?material_type=concrete&limit=10"
+check_endpoint "/api/persistence/demand-aggregates nonexistent demand" 200 GET "/api/persistence/demand-aggregates?demand_id=NONEXISTENT"
+
 # ---- iter #41: Vehicle historical stats ----
 check_endpoint "/api/persistence/vehicle-stats" 200 GET "/api/persistence/vehicle-stats"
 check_endpoint "/api/persistence/vehicle-stats with limit" 200 GET "/api/persistence/vehicle-stats?limit=5"
