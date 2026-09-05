@@ -1860,6 +1860,54 @@ async def get_seasonal_factors(sim_day: Optional[int] = None):
 
 
 @app.get("/api/optimize/last")
+@app.get("/api/weather")
+async def get_weather(
+    lat: float = 57.7089,
+    lon: float = 14.1618,
+    use_cache: bool = True,
+):
+    """
+    iter #50: SMHI weather forecast endpoint (Borås by default).
+
+    Returns the current weather + next 24h average for the given
+    lat/lon (default Borås depot). Caches results in
+    data/weather_cache.json for 30 min.
+
+    Note: SMHI is a free public API. The module handles network failures
+    gracefully and falls back to deterministic defaults.
+
+    Query:
+    - lat: latitude (default 57.7089 = Borås)
+    - lon: longitude (default 14.1618 = Borås)
+    - use_cache: bool, default true (avoid SMHI rate limits)
+
+    Returns:
+        {current: {temperature_c, precipitation_mm_h, wind_m_s, ...},
+         next_24h_avg: {...}, summary: "cold & light rain",
+         source: "smhi" | "fallback" | "cache", timestamp: "..."}
+    """
+    # Validate lat/lon
+    if lat < -90 or lat > 90:
+        raise HTTPException(status_code=400, detail="lat must be in [-90, 90]")
+    if lon < -180 or lon > 180:
+        raise HTTPException(status_code=400, detail="lon must be in [-180, 180]")
+
+    try:
+        from data.weather_smhi import get_forecast
+        result = get_forecast(lat=lat, lon=lon, use_cache=use_cache)
+        return result
+    except Exception as e:
+        # Last-ditch fallback: return unknown without raising
+        return {
+            "current": None,
+            "next_24h_avg": None,
+            "summary": "unknown",
+            "source": "fallback",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)[:200],
+        }
+
+
 async def get_last_optimization():
     """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'
 

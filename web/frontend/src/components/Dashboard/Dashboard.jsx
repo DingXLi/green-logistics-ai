@@ -92,6 +92,8 @@ const LLMCostByType = lazy(() => import('./LLMCostByType').then(m => ({ default:
 const MaterialBalance = lazy(() => import('./MaterialBalance').then(m => ({ default: m.MaterialBalance })))
 // iter #49: per-target LLM call stats
 const LLMDecisionTargets = lazy(() => import('./LLMDecisionTargets').then(m => ({ default: m.LLMDecisionTargets })))
+// iter #50: SMHI weather widget
+const WeatherWidget = lazy(() => import('./WeatherWidget').then(m => ({ default: m.WeatherWidget })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -720,6 +722,8 @@ export default function Dashboard() {
             <AnomalousCycles />
             {/* iter #47: SCB region profiles */}
             <RegionProfiles />
+            {/* iter #50: SMHI weather widget */}
+            <WeatherWidget />
             <SimulationControlPanel />
           </Suspense>
         </>

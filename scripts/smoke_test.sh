@@ -351,6 +351,10 @@ check_json_field "/api/regions has total_population" GET "/api/regions" ".total_
 
 # ---- Seasonal / external ----
 check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
+# iter #50: SMHI weather endpoint
+check_endpoint "/api/weather (iter #50, Borås default)" 200 GET "/api/weather"
+check_json_field "/api/weather has source field" GET "/api/weather" ".source | type" "string"
+check_endpoint "/api/weather?lat=59.3&lon=18.07 (iter #50, Stockholm)" 200 GET "/api/weather?lat=59.3293&lon=18.0686"
 # iter #46: per-material seasonal time-series
 check_endpoint "/api/persistence/seasonal-timeseries-by-material (iter #46)" 200 GET "/api/persistence/seasonal-timeseries-by-material"
 check_json_field "/api/persistence/seasonal-timeseries-by-material has materials" GET "/api/persistence/seasonal-timeseries-by-material" ".materials | type" "array"
