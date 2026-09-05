@@ -4981,6 +4981,57 @@ async def get_cohort_by_hour(
     )
 
 
+@app.get("/api/persistence/carbon-savings")
+async def get_carbon_savings(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    baseline_factor_key: str = "traditional_baseline",
+):
+    """
+    Carbon savings vs traditional baseline transport (iter #54).
+
+    Compares actual CO2 emitted by the multi-agent optimization system
+    vs a hypothetical baseline where all material was transported by
+    individual trucks without optimization.
+
+    Query:
+    - since_sim_day: optional start sim_day
+    - until_sim_day: optional end sim_day
+    - baseline_factor_key: CO2 factor to compare against. Default
+      'traditional_baseline' (0.124 kg/ton-km, ~50% empty trucks).
+      Other options: 'truck_heavy', 'truck_medium', 'truck_light',
+      'optimized_fleet'.
+
+    Returns:
+      {
+        n_cycles, total_tons, total_distance_km, actual_co2_kg,
+        baseline_co2_kg, savings_co2_kg, savings_pct,
+        baseline_factor_kg_per_ton_km, baseline_factor_key,
+        co2_per_ton_actual_kg, co2_per_ton_baseline_kg,
+        available_factors,
+        since_sim_day, until_sim_day,
+      }
+
+    Source for emission factors: EEA 2023, well-to-wheel estimates.
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    try:
+        return coordinator.persistence.get_carbon_savings_summary(
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            baseline_factor_key=baseline_factor_key,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,
