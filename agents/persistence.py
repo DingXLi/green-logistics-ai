@@ -911,6 +911,14 @@ class Persistence:
         Args (iter #18 新增):
             since_sim_day: 起始 sim_day (含)
             until_sim_day: 结束 sim_day (含)
+
+        iter #52 新增 efficiency 指标 (per-ton / per-match efficiency):
+  - cost_per_ton_sek: cost_sek / tons (运输每吨成本)
+  - co2_per_ton_kg: co2_kg / tons (运输每吨 CO2)
+  - cost_per_match_sek: cost_sek / matches (单次匹配成本)
+  - n_supply_offers: 该 sim_day 总供应数
+  - n_demand_requests: 该 sim_day 总需求数
+  - supply_demand_ratio: matches / max(supply, demand) (供需匹配率, 0-1)
         """
         where_clauses: List[str] = []
         params: List[Any] = []
@@ -923,23 +931,41 @@ class Persistence:
         where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
         with self._conn() as conn:
+            # iter #52: 加入 supply/demand counts 和 efficiency metrics
             rows = conn.execute(
-                f"""SELECT sim_day,
-                          SUM(total_tons) as tons,
-                          SUM(total_cost_sek) as cost_sek,
-                          SUM(total_co2_kg) as co2_kg,
-                          AVG(fleet_utilization_pct) as util_pct,
-                          SUM(n_matches) as matches,
-                          COUNT(*) as n_cycles_in_day
-                   FROM optimization_cycles
+                f"""SELECT oc.sim_day,
+                          SUM(oc.total_tons) as tons,
+                          SUM(oc.total_cost_sek) as cost_sek,
+                          SUM(oc.total_co2_kg) as co2_kg,
+                          AVG(oc.fleet_utilization_pct) as util_pct,
+                          SUM(oc.n_matches) as matches,
+                          COUNT(*) as n_cycles_in_day,
+                          COALESCE(SUM(oc.n_supply_offers), 0) as n_supply_offers,
+                          COALESCE(SUM(oc.n_demand_requests), 0) as n_demand_requests
+                   FROM optimization_cycles oc
                    {where_sql}
-                   GROUP BY sim_day
-                   ORDER BY sim_day ASC""",
+                   GROUP BY oc.sim_day
+                   ORDER BY oc.sim_day ASC""",
                 params,
             ).fetchall()
             result = []
             for r in rows:
                 d = dict(r)
+                tons = d.get("tons") or 0
+                cost = d.get("cost_sek") or 0
+                co2 = d.get("co2_kg") or 0
+                matches = d.get("matches") or 0
+                supply = d.get("n_supply_offers") or 0
+                demand = d.get("n_demand_requests") or 0
+
+                # iter #52: per-ton efficiency (None if no transport)
+                d["cost_per_ton_sek"] = round(cost / tons, 3) if tons > 0 else None
+                d["co2_per_ton_kg"] = round(co2 / tons, 3) if tons > 0 else None
+                d["cost_per_match_sek"] = round(cost / matches, 2) if matches > 0 else None
+                # supply_demand_ratio: 供需匹配效率
+                denom = max(supply, demand)
+                d["supply_demand_ratio"] = round(matches / denom, 3) if denom > 0 else None
+
                 for k in ("tons", "cost_sek", "co2_kg", "util_pct"):
                     if d.get(k) is not None:
                         d[k] = round(d[k], 2)
