@@ -1860,6 +1860,85 @@ async def get_seasonal_factors(sim_day: Optional[int] = None):
 
 
 @app.get("/api/optimize/last")
+
+
+@app.get("/api/signals/external")
+async def get_external_signals(
+    country: str = "SE",
+    use_cache: bool = True,
+):
+    """
+    iter #51: Eurostat external economic signals endpoint.
+
+    Aggregates construction index (sts_copr_m) + industrial index (sts_inpr_m)
+    + business confidence (ei_bcs) into one response for the dashboard.
+
+    Query:
+        country:  ISO2 country code (default "SE")
+        use_cache: read from cache if available (default True)
+
+    Returns:
+        {
+          "country": "SE",
+          "construction": {latest_time, latest_value, source, multiplier},
+          "industrial":   {latest_time, latest_value, source, multiplier},
+          "business_confidence": {latest_time, latest_value, source, multiplier},
+          "composite_demand_multiplier": float,  # construction * confidence
+          "composite_supply_multiplier": float,  # industrial * confidence
+          "fetched_at": ISO timestamp,
+        }
+
+    Each multiplier is in [0.85, 1.20] range; composite multiplies the two.
+    Source field per indicator is one of: "eurostat" (live) | "cache" | "fallback".
+    """
+    from data.external_signals import (
+        get_construction_index,
+        get_industrial_index,
+        get_business_confidence,
+        construction_demand_multiplier,
+        industrial_supply_multiplier,
+        business_confidence_multiplier,
+    )
+    from datetime import datetime, timezone
+
+    try:
+        construction = get_construction_index(country=country, use_cache=use_cache)
+        industrial = get_industrial_index(country=country, use_cache=use_cache)
+        confidence = get_business_confidence(country=country, use_cache=use_cache)
+    except Exception as e:
+        logger.warning(f"external signals partial failure: {e}")
+        # 至少返回 fallback 数据 (每个 getter 内部都有 fallback, 不太可能 raise,
+        # 但极端情况下兜底)
+        raise HTTPException(
+            status_code=503,
+            detail=f"External signals temporarily unavailable: {e}",
+        )
+
+    d_mult = construction_demand_multiplier(construction.get("latest_value"))
+    s_mult = industrial_supply_multiplier(industrial.get("latest_value"))
+    c_mult = business_confidence_multiplier(confidence.get("latest_value"))
+
+    return {
+        "country": country,
+        "construction": {
+            **construction,
+            "multiplier": d_mult,
+        },
+        "industrial": {
+            **industrial,
+            "multiplier": s_mult,
+        },
+        "business_confidence": {
+            **confidence,
+            "multiplier": c_mult,
+        },
+        # iter #51: composite multipliers 用于动态 supply/demand 调整
+        "composite_demand_multiplier": round(d_mult * c_mult, 4),
+        "composite_supply_multiplier": round(s_mult * c_mult, 4),
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/api/weather")
 async def get_weather(
     lat: float = 57.7089,
