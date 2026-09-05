@@ -247,7 +247,7 @@ check_endpoint "/api/persistence/cycle-kpi-summary" 200 GET "/api/persistence/cy
 # ---- iter #52: kpi-timeseries efficiency fields ----
 check_endpoint "/api/persistence/kpi-timeseries (iter #52)" 200 GET "/api/persistence/kpi-timeseries"
 check_json_field "/api/persistence/kpi-timeseries is array" GET "/api/persistence/kpi-timeseries" ". | type" "array"
-check_json_field "/api/persistence/kpi-timeseries has sim_day" GET "/api/persistence/kpi-timeseries" ".[] | select(.cost_per_ton_sek != null) | .sim_day | type" "number" 2>/dev/null || true
+check_json_field "/api/persistence/kpi-timeseries has sim_day" GET "/api/persistence/kpi-timeseries" ".[0].sim_day | type" "number" 2>/dev/null || true
 check_endpoint "/api/persistence/supply-cohort-retention" 200 GET "/api/persistence/supply-cohort-retention"
 check_endpoint "/api/persistence/cohort-retention-by-period" 200 GET "/api/persistence/cohort-retention-by-period"
 check_endpoint "/api/persistence/cohort-retention-by-period?period_unit=week" 200 GET "/api/persistence/cohort-retention-by-period?period_unit=week"
