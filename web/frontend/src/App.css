@@ -9,18 +9,84 @@
 }
 
 :root {
+  /* iter #51: 引入更多语义化 CSS 变量以便 dark mode override */
   --primary: #2563eb;
+  --primary-hover: #1d4ed8;
   --success: #22c55e;
   --warning: #eab308;
   --danger: #ef4444;
   --bg-primary: #f8fafc;
   --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-header: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
   --text-primary: #1e293b;
   --text-secondary: #64748b;
+  --text-inverse: #ffffff;
   --border: #e2e8f0;
+  --border-strong: #cbd5e1;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
   --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+  --shadow-color: rgba(0,0,0,0.1);
+  --grid-stroke: #e2e8f0;
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #cbd5e1;
+  --tooltip-text: #1e293b;
+  --hover-bg: #f1f5f9;
   --radius: 8px;
+}
+
+/* iter #51: dark mode 覆盖 — 通过 [data-theme="dark"] 强制启用 */
+[data-theme="dark"] {
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --bg-primary: #0f172a;
+  --bg-card: #1e293b;
+  --bg-elevated: #334155;
+  --bg-header: linear-gradient(135deg, #0c1e3f 0%, #1e3a8a 100%);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-inverse: #0f172a;
+  --border: #334155;
+  --border-strong: #475569;
+  --shadow: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.6);
+  --shadow-color: rgba(0,0,0,0.5);
+  --grid-stroke: #334155;
+  --tooltip-bg: #1e293b;
+  --tooltip-border: #475569;
+  --tooltip-text: #f1f5f9;
+  --hover-bg: #334155;
+}
+
+/* iter #51: 自动跟随 OS — 仅当用户未显式选 light 时生效 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --bg-elevated: #334155;
+    --bg-header: linear-gradient(135deg, #0c1e3f 0%, #1e3a8a 100%);
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-inverse: #0f172a;
+    --border: #334155;
+    --border-strong: #475569;
+    --shadow: 0 1px 3px rgba(0,0,0,0.5);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.6);
+    --shadow-color: rgba(0,0,0,0.5);
+    --grid-stroke: #334155;
+    --tooltip-bg: #1e293b;
+    --tooltip-border: #475569;
+    --tooltip-text: #f1f5f9;
+    --hover-bg: #334155;
+  }
 }
 
 body {
@@ -42,10 +108,32 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-  color: white;
+  background: var(--bg-header);
+  color: var(--text-inverse);
   padding: 1.5rem 2rem;
   box-shadow: var(--shadow-lg);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* iter #51: ThemeToggle 嵌入 header (右上角) */
+.App-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.App-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.App-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
 }
 
 .App-header h1 {

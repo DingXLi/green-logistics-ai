@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { MapContainer } from './components/Map'
 import Dashboard from './components/Dashboard/Dashboard'
 import { LoadingSpinner } from './components/common/LoadingSpinner'
+import { ThemeToggle } from './components/common/ThemeToggle'
 import './App.css'
 
 // API base: Vite env var > localhost fallback
@@ -63,17 +64,24 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>♻️ Green Logistics AI</h1>
-        <p>Multi-Agent System for Green Logistics Optimization</p>
-        
+        <div className="App-header-row">
+          <div className="App-header-text">
+            <h1>♻️ Green Logistics AI</h1>
+            <p>Multi-Agent System for Green Logistics Optimization</p>
+          </div>
+          <div className="App-header-actions">
+            <ThemeToggle />
+          </div>
+        </div>
+
         <nav className="tab-nav">
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'map' ? 'active' : ''}`}
             onClick={() => setActiveTab('map')}
           >
             🗺️ Map
           </button>
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
