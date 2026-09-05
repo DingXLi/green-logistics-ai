@@ -4882,6 +4882,44 @@ async def get_supply_aggregates(
     )
 
 
+@app.get("/api/persistence/demand-aggregates")
+async def get_demand_aggregates(
+    demand_id: Optional[str] = None,
+    material_type: Optional[str] = None,
+    limit: int = 100,
+):
+    """
+    Demand 聚合统计 (iter #52) — 每个 demand_id 的累计 KPI。
+
+    Mirror of /api/persistence/supply-aggregates on demand side:
+    - top demands by required_tons (which demand sites require most?)
+    - fulfillment_rate = matched / required (demand met or unmet?)
+    - per-material demand patterns
+
+    Query:
+    - demand_id: 可选, 查单个 demand
+    - material_type: 可选, 按 material_type 过滤
+    - limit: 最多返回多少 demand (default 100, max 500)
+
+    Returns:
+        [{demand_id, material_type, n_cycles_with_demand,
+          total_required_tons, total_matched_tons, fulfillment_rate,
+          avg_required_tons, n_matches, avg_match_tons,
+          last_cycle_id, first_cycle_id, last_sim_day, first_sim_day}, ...]
+
+    fulfillment_rate: 0.0 (fully unmet) → 1.0 (perfectly met),
+    clamped to [0.0, 2.0] (rarely >1 = oversupply).
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    return coordinator.persistence.get_demand_aggregates(
+        demand_id=demand_id,
+        material_type=material_type,
+        limit_demands=limit,
+    )
+
+
 @app.get("/api/persistence/material-aggregates")
 async def get_material_aggregates(
     material_type: Optional[str] = None,

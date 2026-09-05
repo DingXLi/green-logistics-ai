@@ -2630,6 +2630,105 @@ class Persistence:
                 result.append(d)
         return result
 
+    def get_demand_aggregates(self, demand_id: Optional[str] = None,
+                              material_type: Optional[str] = None,
+                              limit_demands: int = 100) -> List[Dict[str, Any]]:
+        """
+        Demand 聚合统计 (iter #52) — 每个 demand_id 的累计 KPI。
+
+        Mirror of get_supply_aggregates but on demand side. Useful for:
+        - Top demands by required_tons (which demand sites receive most supply?)
+        - Demand fulfillment rate (how often is required_tons fully met?)
+        - Per-material demand patterns
+
+        Args:
+            demand_id: 可选, 只查某个 demand_id (否则返回 top demands)
+            material_type: 可选, 按 material_type 过滤
+            limit_demands: 最多返回多少个 demand (default 100)
+
+        Returns:
+            [{demand_id, material_type, n_cycles_with_demand,
+              total_required_tons, total_matched_tons, fulfillment_rate,
+              avg_required_tons, n_matches, avg_match_tons,
+              last_cycle_id, first_cycle_id, last_sim_day, first_sim_day}, ...]
+            按 total_required_tons DESC 排序
+
+        fulfillment_rate: matched / required (0.0 = 完全未满足, 1.0 = 完美)
+        """
+        with self._conn() as conn:
+            where_clauses: List[str] = []
+            params: List[Any] = []
+            if material_type:
+                where_clauses.append("d.material_type = ?")
+                params.append(material_type)
+
+            if demand_id:
+                where_clauses.append("d.demand_id = ?")
+                params.append(demand_id)
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+                sql = f"""SELECT d.demand_id, d.material_type,
+                                 COUNT(DISTINCT d.cycle_id) as n_cycles,
+                                 SUM(d.required_tons) as total_required,
+                                 MAX(d.cycle_id) as last_cycle,
+                                 MIN(d.cycle_id) as first_cycle,
+                                 MAX(c.sim_day) as last_sim_day,
+                                 MIN(c.sim_day) as first_sim_day
+                          FROM demand_requests d
+                          JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                          {where_sql}
+                          GROUP BY d.demand_id
+                          ORDER BY total_required DESC
+                          LIMIT 1"""
+                rows = conn.execute(sql, params).fetchall()
+            else:
+                where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+                sql = f"""SELECT d.demand_id, d.material_type,
+                                 COUNT(DISTINCT d.cycle_id) as n_cycles,
+                                 SUM(d.required_tons) as total_required,
+                                 MAX(d.cycle_id) as last_cycle,
+                                 MIN(d.cycle_id) as first_cycle,
+                                 MAX(c.sim_day) as last_sim_day,
+                                 MIN(c.sim_day) as first_sim_day
+                          FROM demand_requests d
+                          JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                          {where_sql}
+                          GROUP BY d.demand_id
+                          ORDER BY total_required DESC
+                          LIMIT ?"""
+                params.append(limit_demands)
+                rows = conn.execute(sql, params).fetchall()
+
+            result: List[Dict[str, Any]] = []
+            for r in rows:
+                did = r["demand_id"]
+                # 拿该 demand 的 match stats
+                match_row = conn.execute(
+                    """SELECT COUNT(*) as n_matches, SUM(tons) as total_matched,
+                              AVG(tons) as avg_match_tons
+                       FROM matches WHERE demand_id = ?""",
+                    (did,)
+                ).fetchone()
+                total_required = r["total_required"] or 0
+                total_matched = match_row["total_matched"] or 0
+                # fulfillment_rate: 截断到 [0.0, 2.0] (允许 >1 表示超额供应, 罕见)
+                if total_required > 0:
+                    fulfillment = round(min(2.0, total_matched / total_required), 3)
+                else:
+                    fulfillment = 0.0
+
+                d = dict(r)
+                d["n_matches"] = match_row["n_matches"] or 0
+                d["total_matched_tons"] = round(total_matched, 2)
+                d["total_required_tons"] = round(total_required, 2)
+                d["avg_required_tons"] = round(total_required / max(1, r["n_cycles"]), 2)
+                d["avg_match_tons"] = round(match_row["avg_match_tons"] or 0, 2)
+                d["fulfillment_rate"] = fulfillment
+                d["n_cycles_with_demand"] = d.pop("n_cycles")
+                d["last_cycle_id"] = d.pop("last_cycle")
+                d["first_cycle_id"] = d.pop("first_cycle")
+                result.append(d)
+        return result
+
     def get_material_supply_demand_balance(
         self,
         since_sim_day: Optional[int] = None,
