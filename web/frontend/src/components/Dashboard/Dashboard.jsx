@@ -98,6 +98,8 @@ const WeatherWidget = lazy(() => import('./WeatherWidget').then(m => ({ default:
 const ExternalSignalsPanel = lazy(() => import('./ExternalSignalsPanel').then(m => ({ default: m.ExternalSignalsPanel })))
 // iter #52: per-demand aggregates panel
 const DemandAggregates = lazy(() => import('./DemandAggregates').then(m => ({ default: m.DemandAggregates })))
+// iter #52: efficiency metrics panel (per-ton / per-match)
+const EfficiencyPanel = lazy(() => import('./EfficiencyPanel').then(m => ({ default: m.EfficiencyPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -712,6 +714,11 @@ export default function Dashboard() {
           {/* iter #52: Per-demand aggregates (mirror of supply-aggregates on demand side) */}
           <Suspense fallback={<LoadingSpinner label="Loading demand aggregates…" />}>
             <DemandAggregates />
+          </Suspense>
+
+          {/* iter #52: Efficiency metrics panel (cost/CO2 per ton, supply/demand ratio trends) */}
+          <Suspense fallback={<LoadingSpinner label="Loading efficiency metrics…" />}>
+            <EfficiencyPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
