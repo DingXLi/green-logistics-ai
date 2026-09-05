@@ -3173,11 +3173,17 @@ async def get_kpi_timeseries(
     since_sim_day: Optional[int] = None,
     until_sim_day: Optional[int] = None,
 ):
-    """KPI 时间序列 (iter #8 + iter #18 时间窗口) — 按 sim_day 聚合。
+    """KPI 时间序列 (iter #8 + iter #18 时间窗口 + iter #52 efficiency) — 按 sim_day 聚合。
 
     Query (iter #18):
     - since_sim_day: 起始 sim_day (含)
     - until_sim_day: 结束 sim_day (含)
+
+    Response fields (iter #52 新增):
+    - cost_per_ton_sek, co2_per_ton_kg: per-ton efficiency
+    - cost_per_match_sek: per-match efficiency
+    - n_supply_offers, n_demand_requests: supply/demand counts per day
+    - supply_demand_ratio: matches / max(supply, demand), 0-1
     """
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
