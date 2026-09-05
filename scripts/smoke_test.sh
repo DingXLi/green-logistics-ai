@@ -355,6 +355,17 @@ check_endpoint "/api/seasonal-factors" 200 GET "/api/seasonal-factors"
 check_endpoint "/api/weather (iter #50, Borås default)" 200 GET "/api/weather"
 check_json_field "/api/weather has source field" GET "/api/weather" ".source | type" "string"
 check_endpoint "/api/weather?lat=59.3&lon=18.07 (iter #50, Stockholm)" 200 GET "/api/weather?lat=59.3293&lon=18.0686"
+
+# iter #51: Eurostat external signals (construction / industrial / business confidence)
+check_endpoint "/api/signals/external (iter #51)" 200 GET "/api/signals/external"
+check_json_field "/api/signals/external has country" GET "/api/signals/external" ".country | type" "string"
+check_json_field "/api/signals/external has construction" GET "/api/signals/external" ".construction | type" "object"
+check_json_field "/api/signals/external has construction multiplier" GET "/api/signals/external" ".construction.multiplier | type" "number"
+check_json_field "/api/signals/external has industrial" GET "/api/signals/external" ".industrial | type" "object"
+check_json_field "/api/signals/external has business_confidence" GET "/api/signals/external" ".business_confidence | type" "object"
+check_json_field "/api/signals/external has composite_demand_multiplier" GET "/api/signals/external" ".composite_demand_multiplier | type" "number"
+check_json_field "/api/signals/external has composite_supply_multiplier" GET "/api/signals/external" ".composite_supply_multiplier | type" "number"
+check_endpoint "/api/signals/external?country=SE&use_cache=true" 200 GET "/api/signals/external?country=SE&use_cache=true"
 # iter #46: per-material seasonal time-series
 check_endpoint "/api/persistence/seasonal-timeseries-by-material (iter #46)" 200 GET "/api/persistence/seasonal-timeseries-by-material"
 check_json_field "/api/persistence/seasonal-timeseries-by-material has materials" GET "/api/persistence/seasonal-timeseries-by-material" ".materials | type" "array"
