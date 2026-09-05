@@ -3988,3 +3988,185 @@ td.no-matches {
   color: var(--primary);
   font-weight: 600;
 }
+
+/* ============================================
+   iter #51: ExternalSignalsPanel styles
+   ============================================ */
+.ext-signals-panel {
+  /* extends .card */
+}
+
+.ext-signals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.ext-signals-header h3 {
+  margin: 0;
+}
+
+.ext-signals-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.ext-signals-time {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.ext-signals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ext-signal-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ext-signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ext-signal-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ext-signal-source {
+  font-size: 0.7rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ext-signal-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ext-signal-unit {
+  font-size: 0.7em;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ext-signal-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ext-signal-multiplier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+
+.ext-signal-mult-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ext-signal-mult-value {
+  font-weight: 700;
+}
+
+.ext-signals-composite {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+  .ext-signals-composite {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ext-signal-composite-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ext-signal-comp-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ext-signal-comp-bar {
+  position: relative;
+  height: 28px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.ext-signal-comp-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+
+.ext-signal-comp-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  mix-blend-mode: difference;
+  /* ensure visibility over both light and dark fill */
+}
+
+.ext-signals-error {
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: rgba(245, 158, 11, 0.1);
+  color: #ea580c;
+  font-size: 0.85rem;
+}

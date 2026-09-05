@@ -94,6 +94,8 @@ const MaterialBalance = lazy(() => import('./MaterialBalance').then(m => ({ defa
 const LLMDecisionTargets = lazy(() => import('./LLMDecisionTargets').then(m => ({ default: m.LLMDecisionTargets })))
 // iter #50: SMHI weather widget
 const WeatherWidget = lazy(() => import('./WeatherWidget').then(m => ({ default: m.WeatherWidget })))
+// iter #51: Eurostat external economic signals panel
+const ExternalSignalsPanel = lazy(() => import('./ExternalSignalsPanel').then(m => ({ default: m.ExternalSignalsPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -722,6 +724,8 @@ export default function Dashboard() {
             <AnomalousCycles />
             {/* iter #47: SCB region profiles */}
             <RegionProfiles />
+            {/* iter #51: Eurostat external economic signals (construction/industrial/confidence) */}
+            <ExternalSignalsPanel />
             {/* iter #50: SMHI weather widget */}
             <WeatherWidget />
             <SimulationControlPanel />
