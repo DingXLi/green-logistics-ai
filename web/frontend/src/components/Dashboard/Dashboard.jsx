@@ -96,6 +96,8 @@ const LLMDecisionTargets = lazy(() => import('./LLMDecisionTargets').then(m => (
 const WeatherWidget = lazy(() => import('./WeatherWidget').then(m => ({ default: m.WeatherWidget })))
 // iter #51: Eurostat external economic signals panel
 const ExternalSignalsPanel = lazy(() => import('./ExternalSignalsPanel').then(m => ({ default: m.ExternalSignalsPanel })))
+// iter #52: per-demand aggregates panel
+const DemandAggregates = lazy(() => import('./DemandAggregates').then(m => ({ default: m.DemandAggregates })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -705,6 +707,11 @@ export default function Dashboard() {
           {/* iter #16: Material aggregates table */}
           <Suspense fallback={<LoadingSpinner label="Loading material aggregates…" />}>
             <MaterialAggregates />
+          </Suspense>
+
+          {/* iter #52: Per-demand aggregates (mirror of supply-aggregates on demand side) */}
+          <Suspense fallback={<LoadingSpinner label="Loading demand aggregates…" />}>
+            <DemandAggregates />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

@@ -4170,3 +4170,129 @@ td.no-matches {
   color: #ea580c;
   font-size: 0.85rem;
 }
+
+/* ============================================
+   iter #52: DemandAggregates panel styles
+   ============================================ */
+.demand-aggregates-panel {
+  /* extends .card */
+}
+
+.card-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.filter-input {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  min-width: 180px;
+}
+
+.filter-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.card-footnote {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+}
+
+.data-table thead {
+  background: var(--bg-primary);
+}
+
+.data-table th {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.data-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+.data-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+.fulfillment-badge {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+
+.error-card,
+.empty-card {
+  /* extends .card */
+}
+
+.error {
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: rgba(245, 158, 11, 0.1);
+  color: #ea580c;
+  font-size: 0.85rem;
+}
+
+.empty-state {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--primary-hover);
+}
