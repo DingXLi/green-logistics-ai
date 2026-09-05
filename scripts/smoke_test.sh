@@ -330,6 +330,14 @@ check_json_field "/api/persistence/match-distance-buckets has total_matches" GET
 check_endpoint "/api/persistence/cohort-by-hour (iter #53)" 200 GET "/api/persistence/cohort-by-hour"
 check_json_field "/api/persistence/cohort-by-hour has hour_buckets" GET "/api/persistence/cohort-by-hour" ".hour_buckets | type" "array"
 check_json_field "/api/persistence/cohort-by-hour has n_hours_buckets" GET "/api/persistence/cohort-by-hour" ".n_hours_buckets | type" "number"
+
+# ---- iter #54: carbon savings vs baseline ----
+check_endpoint "/api/persistence/carbon-savings (iter #54)" 200 GET "/api/persistence/carbon-savings"
+check_json_field "/api/persistence/carbon-savings has actual_co2_kg" GET "/api/persistence/carbon-savings" ".actual_co2_kg | type" "number"
+check_json_field "/api/persistence/carbon-savings has baseline_co2_kg" GET "/api/persistence/carbon-savings" ".baseline_co2_kg | type" "number"
+check_json_field "/api/persistence/carbon-savings has savings_co2_kg" GET "/api/persistence/carbon-savings" ".savings_co2_kg | type" "number"
+check_endpoint "/api/persistence/carbon-savings?baseline_factor_key=truck_heavy" 200 GET "/api/persistence/carbon-savings?baseline_factor_key=truck_heavy"
+check_endpoint "/api/persistence/carbon-savings invalid factor" 400 GET "/api/persistence/carbon-savings?baseline_factor_key=invalid"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

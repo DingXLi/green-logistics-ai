@@ -203,6 +203,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/cycle-duration-stats` | Solver wall-time distribution (mean/p50/p95/slow_cycles) (iter #53) |
 | GET    | `/api/persistence/match-distance-buckets` | Match distance histogram (8 buckets 0-5 / 5-10 / ... / 500+ km) (iter #53) |
 | GET    | `/api/persistence/cohort-by-hour` | Cycles grouped by sim_hour with KPIs and time_of_day bucket (iter #53) |
+| GET    | `/api/persistence/carbon-savings` | CO2 savings vs traditional baseline (5 emission factors from EEA 2023) (iter #54) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |

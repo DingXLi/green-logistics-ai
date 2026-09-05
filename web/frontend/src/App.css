@@ -4386,3 +4386,74 @@ td.no-matches {
   font-weight: 400;
   font-size: 0.75rem;
 }
+
+/* ============================================
+   iter #54: CarbonSavingsPanel styles
+   ============================================ */
+.carbon-savings-panel {
+  /* extends .card */
+}
+
+.carbon-savings-panel .baseline-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.savings-bar-wrapper {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.savings-bar-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.savings-bar-track {
+  position: relative;
+  height: 28px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.savings-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+
+.savings-bar-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  mix-blend-mode: difference;
+}
+
+.savings-bar-meta {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.savings-bar-meta strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}

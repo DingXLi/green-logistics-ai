@@ -102,6 +102,8 @@ const DemandAggregates = lazy(() => import('./DemandAggregates').then(m => ({ de
 const EfficiencyPanel = lazy(() => import('./EfficiencyPanel').then(m => ({ default: m.EfficiencyPanel })))
 // iter #53: solver perf + distance distribution panel
 const SolverPerfPanel = lazy(() => import('./SolverPerfPanel').then(m => ({ default: m.SolverPerfPanel })))
+// iter #54: carbon savings vs baseline panel
+const CarbonSavingsPanel = lazy(() => import('./CarbonSavingsPanel').then(m => ({ default: m.CarbonSavingsPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -726,6 +728,11 @@ export default function Dashboard() {
           {/* iter #53: Solver perf + distance distribution */}
           <Suspense fallback={<LoadingSpinner label="Loading solver perf…" />}>
             <SolverPerfPanel />
+          </Suspense>
+
+          {/* iter #54: Carbon savings vs baseline */}
+          <Suspense fallback={<LoadingSpinner label="Loading carbon savings…" />}>
+            <CarbonSavingsPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
