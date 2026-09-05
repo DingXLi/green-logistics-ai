@@ -284,3 +284,84 @@ class TestMatchDistanceBucketsEndpoint(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestCohortByHourEndpoint(unittest.TestCase):
+    """Persistence.get_cohort_by_hour_of_day() + endpoint."""
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir="/tmp")
+        self.tmp.close()
+        self.db_path = self.tmp.name
+        from agents.persistence import Persistence
+        self.p = Persistence(db_path=self.db_path)
+        self._seed()
+
+    def tearDown(self):
+        try:
+            os.unlink(self.db_path)
+        except Exception:
+            pass
+
+    def _seed(self):
+        """3 cycles: 2 at hour 8 (morning), 1 at hour 14 (afternoon)."""
+        for cycle_idx, hour in enumerate([8, 8, 14]):
+            cid = f"hr-{cycle_idx+1}"
+            self.p.begin_cycle(
+                cycle_id=cid, sim_day=cycle_idx+1, sim_hour=hour, activity_factor=1.0,
+                n_supply_offers=2, n_demand_requests=1,
+            )
+            self.p.commit_cycle(
+                cycle_id=cid,
+                kpi={"n_matches": 2, "total_tons": 5, "total_cost_sek": 50,
+                     "total_co2_kg": 25, "total_distance_km": 10,
+                     "n_vehicles_used": 1, "n_vehicles_available": 5,
+                     "fleet_utilization_pct": 20, "solver_status": "OPTIMAL"},
+                wall_duration_ms=100,
+            )
+
+    def test_buckets_present(self):
+        result = self.p.get_cohort_by_hour_of_day()
+        self.assertEqual(result["n_hours_buckets"], 2)
+        self.assertEqual(result["n_cycles"], 3)
+
+    def test_hour_8_has_2_cycles(self):
+        result = self.p.get_cohort_by_hour_of_day()
+        hour8 = next(b for b in result["hour_buckets"] if b["hour"] == 8)
+        self.assertEqual(hour8["n_cycles"], 2)
+        self.assertEqual(hour8["time_of_day"], "morning")
+
+    def test_hour_14_has_1_cycle(self):
+        result = self.p.get_cohort_by_hour_of_day()
+        hour14 = next(b for b in result["hour_buckets"] if b["hour"] == 14)
+        self.assertEqual(hour14["n_cycles"], 1)
+        self.assertEqual(hour14["time_of_day"], "afternoon")
+
+    def test_time_of_day_buckets(self):
+        result = self.p.get_cohort_by_hour_of_day()
+        # All known hour buckets
+        hour_to_tod = {b["hour"]: b["time_of_day"] for b in result["hour_buckets"]}
+        self.assertEqual(hour_to_tod[8], "morning")
+        self.assertEqual(hour_to_tod[14], "afternoon")
+
+    def test_empty_db(self):
+        from agents.persistence import Persistence
+        empty = Persistence(db_path=self.db_path + ".empty")
+        result = empty.get_cohort_by_hour_of_day()
+        self.assertEqual(result["n_hours_buckets"], 0)
+        self.assertEqual(result["n_cycles"], 0)
+        try:
+            os.unlink(self.db_path + ".empty")
+        except Exception:
+            pass
+
+    def test_endpoint(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        client = TestClient(app)
+        resp = client.get("/api/persistence/cohort-by-hour")
+        self.assertIn(resp.status_code, (200, 503))
+        if resp.status_code == 200:
+            data = resp.json()
+            self.assertIn("hour_buckets", data)
+            self.assertIsInstance(data["hour_buckets"], list)
