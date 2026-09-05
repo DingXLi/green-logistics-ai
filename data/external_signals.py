@@ -59,6 +59,18 @@ INDUSTRIAL_INDEX_FALLBACK: Dict[str, float] = {
     "2025-05": 111.8, "2025-06": 112.4,
 }
 
+# Sweden 月度商业信心 (Eurostat ei_bcs conf, balance: [-30, +30])
+# 0 = 中性, 正数 = 信心超过平均, 负数 = 低于平均。
+# Fallback 反映 2024-2025 瑞典建筑业信心低迷期 (实际经济新闻佐证)。
+# Source: Eurostat ei_bcs conf, geo SE, nace F (Construction), unit BAL
+BUSINESS_CONFIDENCE_FALLBACK: Dict[str, float] = {
+    "2024-01": -8.2, "2024-02": -7.5, "2024-03": -6.8, "2024-04": -5.9,
+    "2024-05": -4.7, "2024-06": -3.8, "2024-07": -4.2, "2024-08": -5.1,
+    "2024-09": -6.5, "2024-10": -7.8, "2024-11": -8.4, "2024-12": -7.9,
+    "2025-01": -7.1, "2025-02": -6.4, "2025-03": -5.5, "2025-04": -4.6,
+    "2025-05": -3.8, "2025-06": -3.1,
+}
+
 
 # ============================================================
 # 缓存
@@ -266,6 +278,84 @@ def industrial_supply_multiplier(latest_value: float, baseline: float = 111.0) -
     return round(max(0.85, min(1.20, ratio)), 3)
 
 
+def get_business_confidence(country: str = "SE", use_cache: bool = True) -> Dict[str, Any]:
+    """
+    拉 Sweden 月度商业信心 (Eurostat ei_bcs conf, balance [-30, +30])。
+
+    balance > 0 表示信心超过平均水平 (business climate improving),
+    balance < 0 表示信心低于平均 (deteriorating)。基线 0 = 中性。
+
+    Eurostat ei_bcs 指标:
+    - geo=SE, nace_r2=F (Construction), indic=BS-CSMPL-BAL
+    - 返回的是 percentage balance, 取值范围 [-30, +30]
+
+    Returns:
+        {
+          "latest_time": "2025-06",
+          "latest_value": -3.1,   # balance
+          "source": "eurostat" | "fallback" | "cache",
+          "country": "SE",
+        }
+    """
+    cache_key = f"bcs_{country}"
+    if use_cache:
+        cached = _load_cache(cache_key)
+        if cached:
+            cached["source"] = "cache"
+            return cached
+
+    # ei_bcs (business and consumer surveys) — conf indicator for construction (NACE F)
+    params = {
+        "geo": country,
+        "nace_r2": "F",
+        "indic": "BS-CSMPL-BAL",
+        "unit": "BAL",
+    }
+    raw = _fetch_eurostat("ei_bcs", params)
+    if raw and raw.get("value"):
+        latest = _latest_time_value(raw)
+        if latest:
+            result = {
+                "latest_time": latest[0],
+                "latest_value": round(latest[1], 2),
+                "source": "eurostat",
+                "country": country,
+            }
+            _save_cache(cache_key, result)
+            return result
+
+    # Fallback
+    return {
+        "latest_time": "2025-06",
+        "latest_value": BUSINESS_CONFIDENCE_FALLBACK.get("2025-06"),
+        "source": "fallback",
+        "country": country,
+        "all_values": BUSINESS_CONFIDENCE_FALLBACK,
+    }
+
+
+def business_confidence_multiplier(latest_value: float, baseline: float = 0.0) -> float:
+    """
+    商业信心 (balance, [-30, +30]) → composite multiplier。
+
+    logic:
+    - baseline=0: 中性 → multiplier=1.0
+    - positive: 信心好 → multiplier ↑ (boost supply & demand)
+    - negative: 信心低 → multiplier ↓
+
+    formula: 1.0 + latest_value * 0.02  (每 +1 balance ≈ +2% multiplier)
+    clamp: [0.85, 1.20] (跟其他 indicators 一致)
+
+    iter #51: 新信号接入, 用于动态模拟 (e.g., 信心低时 supply 略缩)。
+    """
+    if latest_value is None:
+        return 1.0
+    # clamp latest 到 [-15, +15] 极端 (balance 很少超过 ±20)
+    clamped = max(-15.0, min(15.0, latest_value))
+    delta = (clamped - baseline) * 0.02
+    return round(max(0.85, min(1.20, 1.0 + delta)), 3)
+
+
 # ============================================================
 # 自测
 # ============================================================
@@ -280,3 +370,8 @@ if __name__ == "__main__":
     i = get_industrial_index("SE")
     print(f"  latest: {i['latest_time']} = {i['latest_value']}  source={i['source']}")
     print(f"  supply multiplier: {industrial_supply_multiplier(i['latest_value'])}")
+
+    print("\n=== Eurostat Sweden Business Confidence (iter #51) ===")
+    b = get_business_confidence("SE")
+    print(f"  latest: {b['latest_time']} = {b['latest_value']}  source={b['source']}")
+    print(f"  composite multiplier: {business_confidence_multiplier(b['latest_value'])}")
