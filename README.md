@@ -200,6 +200,9 @@ green-logistics-ai/
 | GET    | `/api/persistence/vehicle-stats` | Per-vehicle historical aggregates: routes, km, cost, CO₂, efficiency (iter #41) |
 | GET    | `/api/persistence/supply-aggregates` | Per-supply cumulative KPIs (iter #15) |
 | GET    | `/api/persistence/demand-aggregates` | Per-demand cumulative KPIs + fulfillment rate (iter #52) |
+| GET    | `/api/persistence/cycle-duration-stats` | Solver wall-time distribution (mean/p50/p95/slow_cycles) (iter #53) |
+| GET    | `/api/persistence/match-distance-buckets` | Match distance histogram (8 buckets 0-5 / 5-10 / ... / 500+ km) (iter #53) |
+| GET    | `/api/persistence/cohort-by-hour` | Cycles grouped by sim_hour with KPIs and time_of_day bucket (iter #53) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |

@@ -325,6 +325,11 @@ check_json_field "/api/persistence/cycle-duration-stats has mean_ms" GET "/api/p
 check_endpoint "/api/persistence/match-distance-buckets (iter #53)" 200 GET "/api/persistence/match-distance-buckets"
 check_json_field "/api/persistence/match-distance-buckets has buckets" GET "/api/persistence/match-distance-buckets" ".buckets | type" "array"
 check_json_field "/api/persistence/match-distance-buckets has total_matches" GET "/api/persistence/match-distance-buckets" ".total_matches | type" "number"
+
+# ---- iter #53: cohort-by-hour ----
+check_endpoint "/api/persistence/cohort-by-hour (iter #53)" 200 GET "/api/persistence/cohort-by-hour"
+check_json_field "/api/persistence/cohort-by-hour has hour_buckets" GET "/api/persistence/cohort-by-hour" ".hour_buckets | type" "array"
+check_json_field "/api/persistence/cohort-by-hour has n_hours_buckets" GET "/api/persistence/cohort-by-hour" ".n_hours_buckets | type" "number"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
