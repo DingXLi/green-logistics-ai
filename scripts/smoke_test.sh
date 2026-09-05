@@ -317,6 +317,14 @@ check_json_field "/api/persistence/material-supply-demand-balance has by_materia
 # iter #49: fleet utilization percentiles
 check_endpoint "/api/persistence/fleet-utilization-summary (iter #49)" 200 GET "/api/persistence/fleet-utilization-summary"
 check_json_field "/api/persistence/fleet-utilization-summary has n_cycles" GET "/api/persistence/fleet-utilization-summary" ".n_cycles | type" "number"
+
+# ---- iter #53: solver wall-time + match distance distribution ----
+check_endpoint "/api/persistence/cycle-duration-stats (iter #53)" 200 GET "/api/persistence/cycle-duration-stats"
+check_json_field "/api/persistence/cycle-duration-stats has n_cycles" GET "/api/persistence/cycle-duration-stats" ".n_cycles | type" "number"
+check_json_field "/api/persistence/cycle-duration-stats has mean_ms" GET "/api/persistence/cycle-duration-stats" ".mean_ms | type" "number"
+check_endpoint "/api/persistence/match-distance-buckets (iter #53)" 200 GET "/api/persistence/match-distance-buckets"
+check_json_field "/api/persistence/match-distance-buckets has buckets" GET "/api/persistence/match-distance-buckets" ".buckets | type" "array"
+check_json_field "/api/persistence/match-distance-buckets has total_matches" GET "/api/persistence/match-distance-buckets" ".total_matches | type" "number"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

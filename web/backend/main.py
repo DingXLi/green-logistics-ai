@@ -4859,6 +4859,87 @@ async def get_fleet_utilization_summary(
     )
 
 
+@app.get("/api/persistence/cycle-duration-stats")
+async def get_cycle_duration_stats(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    Solver wall-time distribution stats (iter #53).
+
+    Aggregates optimization_cycles.wall_duration_ms across cycles.
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles, mean_ms, median_ms, min_ms, max_ms, stddev_ms,
+        p25_ms, p50_ms, p75_ms, p90_ms, p95_ms, p99_ms,
+        slow_cycles_count (≥5s), fast_cycles_count (≤100ms),
+        total_solver_time_seconds,
+        since_sim_day, until_sim_day,
+      }
+
+    Use cases:
+    - Identify slow solver runs (potential OR-Tools issues)
+    - Track solver performance trends
+    - Capacity planning
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_cycle_duration_stats(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
+@app.get("/api/persistence/match-distance-buckets")
+async def get_match_distance_buckets(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    Match distance distribution histogram (iter #53).
+
+    Aggregates matches.distance_km into 8 buckets (0-5, 5-10, 10-25, 25-50,
+    50-100, 100-200, 200-500, 500+ km).
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        total_matches, total_distance_km, avg_distance_km,
+        median_distance_km, p95_distance_km,
+        buckets: [{label, lower_km, upper_km, count, share}, ...],
+        since_sim_day, until_sim_day,
+      }
+
+    Use cases:
+    - Identify long-distance matches (CO2 hotspots)
+    - Validate regional logistics patterns
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_match_distance_buckets(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,
