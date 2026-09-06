@@ -5201,6 +5201,63 @@ async def get_top_vehicles(
     }
 
 
+@app.get("/api/persistence/top-cycles")
+async def get_top_cycles(
+    metric: str = "co2_per_ton",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    min_matches: int = 1,
+    limit: int = 10,
+):
+    """
+    Top optimization cycles ranked by efficiency metrics (iter #56).
+
+    Query:
+    - metric: which efficiency to rank by. One of:
+      - 'co2_per_ton' (kg CO2 / ton delivered, lower = better)
+      - 'cost_per_ton' (SEK / ton delivered, lower = better)
+      - 'co2_per_km' (kg CO2 / km, lower = better)
+      - 'cost_per_km' (SEK / km, lower = better)
+      - 'fleet_utilization' (% capacity used, higher = better)
+      - 'match_rate_vs_offers' (matches / supply offers, higher = better)
+      - 'tons_per_cycle' (tons matched, higher = better)
+    - since_sim_day: optional lower bound (inclusive) on sim_day
+    - until_sim_day: optional upper bound (inclusive) on sim_day
+    - min_matches: skip cycles with fewer than this many matches (default 1)
+    - limit: top N (default 10, max 100)
+
+    Returns:
+      {
+        metric, metric_description, direction ('lower_is_better' / 'higher_is_better'),
+        n_cycles_evaluated, n_cycles_returned,
+        sim_day_window: {since_sim_day, until_sim_day},
+        top_cycles: [{cycle_id, sim_day, sim_hour, wall_timestamp,
+                      value, n_matches, n_supply_offers, n_demand_requests,
+                      total_tons, total_cost_sek, total_co2_kg,
+                      total_distance_km, fleet_utilization_pct,
+                      solver_status, wall_duration_ms}, ...]
+      }
+
+    Use cases:
+    - Identify greenest cycles (low co2_per_ton)
+    - Identify most cost-efficient cycles (low cost_per_ton)
+    - Identify best-utilized cycles (high fleet_utilization)
+    - Identify most productive cycles (high tons_per_cycle)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    try:
+        return coordinator.persistence.get_top_cycles_by_efficiency(
+            metric=metric,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            min_matches=min_matches,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,

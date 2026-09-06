@@ -3113,6 +3113,159 @@ class Persistence:
             "top_suppliers": results[:max(1, min(100, limit))],
         }
 
+    def get_top_cycles_by_efficiency(
+        self,
+        metric: str = "co2_per_ton",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        min_matches: int = 1,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #56: Top optimization cycles ranked by efficiency metrics.
+
+        Args:
+            metric: which efficiency metric to rank by. One of:
+                - 'co2_per_ton' (kg CO2 / ton delivered, lower = better)
+                - 'cost_per_ton' (SEK / ton delivered, lower = better)
+                - 'co2_per_km' (kg CO2 / km, lower = better)
+                - 'cost_per_km' (SEK / km, lower = better)
+                - 'fleet_utilization' (% capacity used, higher = better)
+                - 'match_rate_vs_offers' (matches / supply_offers, higher = better)
+                - 'tons_per_cycle' (avg tons matched, higher = better)
+            since_sim_day: optional lower bound (inclusive) on sim_day
+            until_sim_day: optional upper bound (inclusive) on sim_day
+            min_matches: skip cycles with fewer than this many matches (default 1)
+            limit: top N (default 10, max 100)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            n_cycles_evaluated, n_cycles_returned,
+            sim_day_window: {since_sim_day, until_sim_day},
+            top_cycles: [{cycle_id, sim_day, sim_hour, wall_timestamp,
+                          value, n_matches, n_supply_offers, n_demand_requests,
+                          total_tons, total_cost_sek, total_co2_kg,
+                          total_distance_km, fleet_utilization_pct,
+                          solver_status, wall_duration_ms}, ...]
+          }
+
+        Use cases:
+        - Identify greenest cycles (low co2_per_ton)
+        - Identify most cost-efficient cycles (low cost_per_ton)
+        - Identify best-utilized cycles (high fleet_utilization)
+        - Identify most productive cycles (high tons_per_cycle)
+        """
+        valid_metrics = {
+            "co2_per_ton": ("lower_is_better", "kg CO2 per ton delivered"),
+            "cost_per_ton": ("lower_is_better", "SEK per ton delivered"),
+            "co2_per_km": ("lower_is_better", "kg CO2 per km"),
+            "cost_per_km": ("lower_is_better", "SEK per km"),
+            "fleet_utilization": ("higher_is_better", "fleet utilization %"),
+            "match_rate_vs_offers": ("higher_is_better",
+                                     "matches per supply offer"),
+            "tons_per_cycle": ("higher_is_better", "tons matched per cycle"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT cycle_id, sim_day, sim_hour, wall_timestamp,
+                          n_matches, n_supply_offers, n_demand_requests,
+                          total_tons, total_cost_sek, total_co2_kg,
+                          total_distance_km, n_vehicles_used,
+                          n_vehicles_available, fleet_utilization_pct,
+                          solver_status, wall_duration_ms
+                FROM optimization_cycles
+                WHERE {where_sql} AND n_matches >= ?
+                ORDER BY sim_day DESC""",
+                params + [max(0, int(min_matches))],
+            ).fetchall()
+
+        results = []
+        for r in rows:
+            total_tons = float(r["total_tons"] or 0)
+            total_co2 = float(r["total_co2_kg"] or 0)
+            total_cost = float(r["total_cost_sek"] or 0)
+            total_dist = float(r["total_distance_km"] or 0)
+            n_matches = int(r["n_matches"] or 0)
+            n_offers = int(r["n_supply_offers"] or 0)
+            util = float(r["fleet_utilization_pct"] or 0)
+
+            if metric == "co2_per_ton":
+                value = round(total_co2 / total_tons, 3) if total_tons > 0 else None
+            elif metric == "cost_per_ton":
+                value = round(total_cost / total_tons, 3) if total_tons > 0 else None
+            elif metric == "co2_per_km":
+                value = round(total_co2 / total_dist, 3) if total_dist > 0 else None
+            elif metric == "cost_per_km":
+                value = round(total_cost / total_dist, 3) if total_dist > 0 else None
+            elif metric == "fleet_utilization":
+                value = round(util, 2)
+            elif metric == "match_rate_vs_offers":
+                value = round(n_matches / n_offers, 3) if n_offers > 0 else None
+            elif metric == "tons_per_cycle":
+                value = round(total_tons, 2)
+            else:
+                value = None
+
+            # Skip cycles where the metric is undefined (e.g., zero tons for
+            # ton-based metrics).
+            if value is None:
+                continue
+
+            results.append({
+                "cycle_id": r["cycle_id"],
+                "sim_day": int(r["sim_day"]),
+                "sim_hour": int(r["sim_hour"]) if r["sim_hour"] is not None else None,
+                "wall_timestamp": r["wall_timestamp"],
+                "value": value,
+                "n_matches": n_matches,
+                "n_supply_offers": n_offers,
+                "n_demand_requests": int(r["n_demand_requests"] or 0),
+                "total_tons": round(total_tons, 2),
+                "total_cost_sek": round(total_cost, 2),
+                "total_co2_kg": round(total_co2, 3),
+                "total_distance_km": round(total_dist, 2),
+                "fleet_utilization_pct": round(util, 2),
+                "solver_status": r["solver_status"],
+                "wall_duration_ms": r["wall_duration_ms"],
+            })
+
+        # Sort by value with direction
+        if direction == "lower_is_better":
+            results.sort(key=lambda x: x["value"])
+        else:
+            results.sort(key=lambda x: -x["value"])
+
+        return {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "n_cycles_evaluated": len(results),
+            "n_cycles_returned": min(limit, len(results)),
+            "sim_day_window": {
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+            "top_cycles": results[:max(1, min(100, limit))],
+        }
+
     def get_supply_aggregates(self, supply_id: Optional[str] = None,
                               material_type: Optional[str] = None,
                               limit_supplies: int = 100) -> List[Dict[str, Any]]:
