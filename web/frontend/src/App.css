@@ -4542,3 +4542,78 @@ td.no-matches {
   font-weight: 400;
   margin-left: 0.25rem;
 }
+
+/* ============================================
+   iter #56: TopCyclesPanel styles
+   (shares most styling with top-performers-panel via generic classes)
+   ============================================ */
+.top-cycles-panel {
+  /* extends .card */
+}
+
+.top-cycles-panel .rank-cell {
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  width: 32px;
+}
+
+.top-cycles-panel .metric-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.top-cycles-panel .metric-unit {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.top-cycles-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.top-cycles-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.top-cycles-panel .filter-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.top-cycles-panel .filter-input-narrow {
+  min-width: 60px;
+  width: 80px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.top-cycles-panel .card-badge {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}

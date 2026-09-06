@@ -106,6 +106,8 @@ const SolverPerfPanel = lazy(() => import('./SolverPerfPanel').then(m => ({ defa
 const CarbonSavingsPanel = lazy(() => import('./CarbonSavingsPanel').then(m => ({ default: m.CarbonSavingsPanel })))
 // iter #55: top performers panel (suppliers/vehicles by efficiency)
 const TopPerformersPanel = lazy(() => import('./TopPerformersPanel').then(m => ({ default: m.TopPerformersPanel })))
+// iter #56: top cycles panel (cycles ranked by efficiency metrics)
+const TopCyclesPanel = lazy(() => import('./TopCyclesPanel').then(m => ({ default: m.TopCyclesPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -740,6 +742,11 @@ export default function Dashboard() {
           {/* iter #55: Top performers (suppliers + vehicles by efficiency) */}
           <Suspense fallback={<LoadingSpinner label="Loading top performers…" />}>
             <TopPerformersPanel />
+          </Suspense>
+
+          {/* iter #56: Top cycles (cycles ranked by efficiency metrics) */}
+          <Suspense fallback={<LoadingSpinner label="Loading top cycles…" />}>
+            <TopCyclesPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
