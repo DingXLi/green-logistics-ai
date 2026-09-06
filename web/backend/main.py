@@ -5068,6 +5068,51 @@ async def get_carbon_savings(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/top-suppliers")
+async def get_top_suppliers(
+    metric: str = "co2_per_ton",
+    material_type: Optional[str] = None,
+    limit: int = 10,
+):
+    """
+    Top suppliers ranked by efficiency metrics (iter #55).
+
+    Query:
+    - metric: which efficiency to rank by. One of:
+      - 'co2_per_ton' (kg CO2 / ton delivered, lower = better)
+      - 'cost_per_ton' (SEK / ton delivered, lower = better)
+      - 'co2_per_match' (kg CO2 / match, lower = better)
+      - 'match_rate' (matches / cycle, higher = better)
+      - 'avg_distance' (avg km per match, lower = better)
+    - material_type: optional filter (e.g., 'concrete', 'metal_scrap')
+    - limit: top N (default 10, max 100)
+
+    Returns:
+      {
+        metric, metric_description, direction ('lower_is_better' / 'higher_is_better'),
+        n_suppliers_evaluated, n_suppliers_returned,
+        top_suppliers: [{supply_id, material_type, value, n_matches,
+                          total_matched_tons, total_available_tons,
+                          avg_quality_score, n_cycles_with_supply,
+                          avg_distance_km}, ...]
+      }
+
+    Use cases:
+    - Identify greenest suppliers (low co2_per_ton)
+    - Identify most cost-efficient (low cost_per_ton)
+    - Identify most reliable (high match_rate)
+    - Identify shortest-distance matches
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    try:
+        return coordinator.persistence.get_top_suppliers_by_efficiency(
+            metric=metric, material_type=material_type, limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,

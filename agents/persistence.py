@@ -2977,6 +2977,142 @@ class Persistence:
             })
         return results
 
+    def get_top_suppliers_by_efficiency(
+        self,
+        metric: str = "co2_per_ton",
+        material_type: Optional[str] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #55: Top suppliers ranked by efficiency metrics.
+
+        Args:
+            metric: which efficiency metric to rank by. One of:
+                - 'co2_per_ton' (kg CO2 / ton delivered, lower = better)
+                - 'cost_per_ton' (SEK / ton delivered, lower = better)
+                - 'co2_per_match' (kg CO2 / match, lower = better)
+                - 'match_rate' (matches / supply_offers, higher = better)
+                - 'avg_distance' (avg distance per match, lower = better)
+            material_type: optional filter
+            limit: top N (default 10, max 100)
+
+        Returns:
+          {
+            metric, direction ('lower_is_better' or 'higher_is_better'),
+            n_suppliers_evaluated, n_suppliers_returned,
+            top_suppliers: [{supply_id, material_type, value, ...context}, ...]
+          }
+
+        Use cases:
+        - Identify greenest suppliers (low co2_per_ton)
+        - Identify most cost-efficient (low cost_per_ton)
+        - Identify best match-rate (high match_rate)
+        - Identify shortest-distance (low avg_distance)
+        """
+        valid_metrics = {
+            "co2_per_ton": ("lower_is_better", "kg CO2 per ton delivered"),
+            "cost_per_ton": ("lower_is_better", "SEK per ton delivered"),
+            "co2_per_match": ("lower_is_better", "kg CO2 per match"),
+            "match_rate": ("higher_is_better", "matches per supply offer"),
+            "avg_distance": ("lower_is_better", "avg km per match"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}")
+
+        direction, _desc = valid_metrics[metric]
+
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if material_type:
+            where_clauses.append("s.material_type = ?")
+            params.append(material_type)
+        where_sql = " AND ".join(where_clauses)
+
+        # Aggregate per supply_id: total_available, total_matched, sum matches,
+        # sum of all match distances/co2/cost for ratio calc
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT s.supply_id, s.material_type,
+                          SUM(s.available_tons) as total_available,
+                          COUNT(DISTINCT s.cycle_id) as n_cycles,
+                          AVG(s.quality_score) as avg_quality
+                FROM supply_offers s
+                WHERE {where_sql}
+                GROUP BY s.supply_id""",
+                params,
+            ).fetchall()
+
+            results = []
+            for r in rows:
+                sid = r["supply_id"]
+                match_data = conn.execute(
+                    """SELECT COUNT(*) as n_matches,
+                              COALESCE(SUM(m.tons), 0) as total_matched_tons,
+                              COALESCE(AVG(m.distance_km), 0) as avg_distance,
+                              COALESCE(SUM(m.distance_km), 0) as total_distance,
+                              COALESCE(SUM(r2.co2_kg), 0) as total_co2,
+                              COALESCE(SUM(r2.cost_sek), 0) as total_cost
+                    FROM matches m
+                    LEFT JOIN routes r2 ON r2.cycle_id = m.cycle_id AND r2.vehicle_id IS NOT NULL
+                    WHERE m.supply_id = ?""",
+                    (sid,)
+                ).fetchone()
+
+                n_matches = match_data["n_matches"] or 0
+                total_matched = float(match_data["total_matched_tons"] or 0)
+                avg_distance = float(match_data["avg_distance"] or 0)
+                total_co2 = float(match_data["total_co2"] or 0)
+                total_cost = float(match_data["total_cost"] or 0)
+                total_available = float(r["total_available"] or 0)
+
+                # Compute efficiency value based on metric
+                if metric == "co2_per_ton":
+                    value = round(total_co2 / total_matched, 3) if total_matched > 0 else None
+                elif metric == "cost_per_ton":
+                    value = round(total_cost / total_matched, 3) if total_matched > 0 else None
+                elif metric == "co2_per_match":
+                    value = round(total_co2 / n_matches, 3) if n_matches > 0 else None
+                elif metric == "match_rate":
+                    value = round(n_matches / max(1, r["n_cycles"]), 3) if r["n_cycles"] > 0 else None
+                elif metric == "avg_distance":
+                    value = round(avg_distance, 2) if n_matches > 0 else None
+                else:
+                    value = None
+
+                # Skip supplies without matches for ton-based metrics
+                if metric in ("co2_per_ton", "cost_per_ton") and total_matched == 0:
+                    continue
+                if metric == "co2_per_match" and n_matches == 0:
+                    continue
+                if metric == "avg_distance" and n_matches == 0:
+                    continue
+
+                results.append({
+                    "supply_id": sid,
+                    "material_type": r["material_type"],
+                    "value": value,
+                    "n_matches": n_matches,
+                    "total_matched_tons": round(total_matched, 2),
+                    "total_available_tons": round(total_available, 2),
+                    "avg_quality_score": round(r["avg_quality"] or 0, 1),
+                    "n_cycles_with_supply": r["n_cycles"],
+                    "avg_distance_km": round(avg_distance, 2),
+                })
+
+        # Sort: lower_is_better → ascending, higher_is_better → descending
+        results.sort(key=lambda x: x["value"] if x["value"] is not None else float("inf")
+                     if direction == "lower_is_better"
+                     else -(x["value"] if x["value"] is not None else 0))
+
+        return {
+            "metric": metric,
+            "metric_description": _desc,
+            "direction": direction,
+            "n_suppliers_evaluated": len(results),
+            "n_suppliers_returned": min(limit, len(results)),
+            "top_suppliers": results[:max(1, min(100, limit))],
+        }
+
     def get_supply_aggregates(self, supply_id: Optional[str] = None,
                               material_type: Optional[str] = None,
                               limit_supplies: int = 100) -> List[Dict[str, Any]]:
