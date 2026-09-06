@@ -110,6 +110,8 @@ const TopPerformersPanel = lazy(() => import('./TopPerformersPanel').then(m => (
 const TopCyclesPanel = lazy(() => import('./TopCyclesPanel').then(m => ({ default: m.TopCyclesPanel })))
 // iter #57: top demands panel (demands ranked by fulfillment metrics)
 const TopDemandsPanel = lazy(() => import('./TopDemandsPanel').then(m => ({ default: m.TopDemandsPanel })))
+// iter #58: prediction accuracy panel (per-day forecast accuracy + lead-time breakdown)
+const PredictionAccuracyPanel = lazy(() => import('./PredictionAccuracyPanel').then(m => ({ default: m.PredictionAccuracyPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -754,6 +756,11 @@ export default function Dashboard() {
           {/* iter #57: Top demands (demands ranked by fulfillment metrics) */}
           <Suspense fallback={<LoadingSpinner label="Loading top demands…" />}>
             <TopDemandsPanel />
+          </Suspense>
+
+          {/* iter #58: Prediction accuracy (per-day MAPE + lead-time breakdown) */}
+          <Suspense fallback={<LoadingSpinner label="Loading prediction accuracy…" />}>
+            <PredictionAccuracyPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

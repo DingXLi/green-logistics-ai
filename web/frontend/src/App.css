@@ -4682,3 +4682,61 @@ td.no-matches {
   color: var(--text-primary);
   font-family: inherit;
 }
+
+/* ============================================
+   iter #58: PredictionAccuracyPanel styles
+   ============================================ */
+.prediction-accuracy-panel {
+  /* extends .card */
+}
+
+.prediction-accuracy-panel .metric-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.prediction-accuracy-panel .metric-unit {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.prediction-accuracy-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.prediction-accuracy-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prediction-accuracy-panel .filter-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.prediction-accuracy-panel .filter-input-narrow {
+  min-width: 60px;
+  width: 80px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}

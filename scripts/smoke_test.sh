@@ -362,6 +362,14 @@ check_json_field "/api/persistence/top-demands has top_demands array" GET "/api/
 check_endpoint "/api/persistence/top-demands?metric=unmet_demand_tons" 200 GET "/api/persistence/top-demands?metric=unmet_demand_tons"
 check_endpoint "/api/persistence/top-demands?metric=match_rate" 200 GET "/api/persistence/top-demands?metric=match_rate"
 check_endpoint "/api/persistence/top-demands?metric=avg_match_distance_km" 200 GET "/api/persistence/top-demands?metric=avg_match_distance_km"
+# iter #58: prediction-accuracy-by-day endpoint
+check_endpoint "/api/persistence/prediction-accuracy-by-day (iter #58)" 200 GET "/api/persistence/prediction-accuracy-by-day"
+check_json_field "/api/persistence/prediction-accuracy-by-day has by_day" GET "/api/persistence/prediction-accuracy-by-day" ".by_day | type" "array"
+check_json_field "/api/persistence/prediction-accuracy-by-day has overall" GET "/api/persistence/prediction-accuracy-by-day" ".overall | type" "object"
+check_json_field "/api/persistence/prediction-accuracy-by-day has lead_time_buckets" GET "/api/persistence/prediction-accuracy-by-day" ".lead_time_buckets | type" "array"
+check_endpoint "/api/persistence/prediction-accuracy-by-day?metric=co2_kg" 200 GET "/api/persistence/prediction-accuracy-by-day?metric=co2_kg"
+check_endpoint "/api/persistence/prediction-accuracy-by-day?method=linear" 200 GET "/api/persistence/prediction-accuracy-by-day?method=linear"
+check_endpoint "/api/persistence/prediction-accuracy-by-day?lead_time_buckets=1-1,2-7,8-30" 200 GET "/api/persistence/prediction-accuracy-by-day?lead_time_buckets=1-1,2-7,8-30"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
