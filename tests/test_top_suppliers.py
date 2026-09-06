@@ -226,3 +226,52 @@ class TestTopSuppliersEndpoint(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestTopVehiclesEndpoint(unittest.TestCase):
+    """/api/persistence/top-vehicles FastAPI endpoint."""
+
+    def test_endpoint_returns_200(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        client = TestClient(app)
+        resp = client.get("/api/persistence/top-vehicles")
+        self.assertIn(resp.status_code, (200, 503))
+        if resp.status_code == 200:
+            data = resp.json()
+            self.assertIn("metric", data)
+            self.assertIn("direction", data)
+            self.assertIn("top_vehicles", data)
+            self.assertIsInstance(data["top_vehicles"], list)
+
+    def test_endpoint_with_metric(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        client = TestClient(app)
+        resp = client.get("/api/persistence/top-vehicles?metric=co2_per_km&limit=5")
+        self.assertIn(resp.status_code, (200, 503))
+        if resp.status_code == 200:
+            data = resp.json()
+            self.assertEqual(data["metric"], "co2_per_km")
+            self.assertEqual(data["direction"], "lower_is_better")
+
+    def test_endpoint_invalid_metric(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        client = TestClient(app)
+        resp = client.get("/api/persistence/top-vehicles?metric=bogus_metric")
+        self.assertIn(resp.status_code, (400, 503))
+
+    def test_endpoint_utilization_metric(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        client = TestClient(app)
+        resp = client.get("/api/persistence/top-vehicles?metric=utilization")
+        self.assertIn(resp.status_code, (200, 503))
+        if resp.status_code == 200:
+            data = resp.json()
+            self.assertEqual(data["metric"], "utilization")
+            self.assertEqual(data["direction"], "higher_is_better")

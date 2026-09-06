@@ -338,6 +338,16 @@ check_json_field "/api/persistence/carbon-savings has baseline_co2_kg" GET "/api
 check_json_field "/api/persistence/carbon-savings has savings_co2_kg" GET "/api/persistence/carbon-savings" ".savings_co2_kg | type" "number"
 check_endpoint "/api/persistence/carbon-savings?baseline_factor_key=truck_heavy" 200 GET "/api/persistence/carbon-savings?baseline_factor_key=truck_heavy"
 check_endpoint "/api/persistence/carbon-savings invalid factor" 400 GET "/api/persistence/carbon-savings?baseline_factor_key=invalid"
+
+# ---- iter #55: top suppliers/vehicles by efficiency ----
+check_endpoint "/api/persistence/top-suppliers (iter #55)" 200 GET "/api/persistence/top-suppliers"
+check_json_field "/api/persistence/top-suppliers has metric" GET "/api/persistence/top-suppliers" ".metric | type" "string"
+check_json_field "/api/persistence/top-suppliers has top_suppliers array" GET "/api/persistence/top-suppliers" ".top_suppliers | type" "array"
+check_endpoint "/api/persistence/top-suppliers?metric=cost_per_ton" 200 GET "/api/persistence/top-suppliers?metric=cost_per_ton"
+check_endpoint "/api/persistence/top-suppliers?metric=match_rate" 200 GET "/api/persistence/top-suppliers?metric=match_rate"
+check_endpoint "/api/persistence/top-vehicles (iter #55)" 200 GET "/api/persistence/top-vehicles"
+check_endpoint "/api/persistence/top-vehicles?metric=co2_per_km" 200 GET "/api/persistence/top-vehicles?metric=co2_per_km"
+check_endpoint "/api/persistence/top-vehicles?metric=utilization" 200 GET "/api/persistence/top-vehicles?metric=utilization"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

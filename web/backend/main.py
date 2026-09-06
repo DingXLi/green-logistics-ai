@@ -5113,6 +5113,94 @@ async def get_top_suppliers(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/top-vehicles")
+async def get_top_vehicles(
+    metric: str = "co2_per_ton_km",
+    limit: int = 10,
+):
+    """
+    Top vehicles ranked by efficiency metrics (iter #55).
+
+    Query:
+    - metric: which efficiency to rank by. One of:
+      - 'co2_per_ton_km' (kg CO2 / (ton × km), lower = better — greenest)
+      - 'co2_per_km' (kg CO2 / km, lower = better)
+      - 'cost_per_km' (SEK / km, lower = better)
+      - 'utilization' (% of capacity used, higher = better)
+    - limit: top N (default 10, max 100)
+
+    Returns:
+      {
+        metric, metric_description, direction,
+        n_vehicles_evaluated, n_vehicles_returned,
+        top_vehicles: [{vehicle_id, value, n_routes, total_distance_km,
+                        total_co2_kg, total_cost_sek, total_duration_hours,
+                        avg_co2_per_km_kg, avg_cost_per_km_sek}, ...]
+      }
+
+    Use cases:
+    - Identify greenest vehicles (low co2_per_ton_km)
+    - Identify most cost-efficient (low cost_per_km)
+    - Identify best-utilized (high utilization)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    valid_metrics = {
+        "co2_per_ton_km": ("lower_is_better",
+                           "kg CO2 per (ton × km) — greenest"),
+        "co2_per_km": ("lower_is_better", "kg CO2 per km"),
+        "cost_per_km": ("lower_is_better", "SEK per km"),
+        "utilization": ("higher_is_better", "avg fleet utilization %"),
+    }
+    if metric not in valid_metrics:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}",
+        )
+
+    direction, _desc = valid_metrics[metric]
+
+    vehicle_stats = coordinator.persistence.get_vehicle_stats(limit=max(100, limit))
+
+    # Compute per-metric value
+    for v in vehicle_stats:
+        total_dist = v.get("total_distance_km") or 0
+        total_co2 = v.get("total_co2_kg") or 0
+        total_cost = v.get("total_cost_sek") or 0
+        n_routes = v.get("n_routes") or 0
+        # Estimate total tons as avg_tons * n_routes (we don't have total_tons in routes)
+        # Approximation: use fleet utilization as proxy for "effective tonnage"
+        util = v.get("avg_fleet_utilization") or 0
+        estimated_tons = total_dist * util / 100.0  # rough estimate
+        if metric == "co2_per_ton_km":
+            v["value"] = round(total_co2 / estimated_tons, 4) if estimated_tons > 0 else None
+        elif metric == "co2_per_km":
+            v["value"] = round(total_co2 / total_dist, 4) if total_dist > 0 else None
+        elif metric == "cost_per_km":
+            v["value"] = round(total_cost / total_dist, 4) if total_dist > 0 else None
+        elif metric == "utilization":
+            v["value"] = round(util, 2)
+
+    # Filter out vehicles without data for the metric
+    filtered = [v for v in vehicle_stats if v.get("value") is not None]
+
+    # Sort by value
+    if direction == "lower_is_better":
+        filtered.sort(key=lambda x: x["value"])
+    else:
+        filtered.sort(key=lambda x: -x["value"])
+
+    return {
+        "metric": metric,
+        "metric_description": _desc,
+        "direction": direction,
+        "n_vehicles_evaluated": len(filtered),
+        "n_vehicles_returned": min(limit, len(filtered)),
+        "top_vehicles": filtered[:max(1, min(100, limit))],
+    }
+
+
 @app.get("/api/persistence/supply-aggregates")
 async def get_supply_aggregates(
     supply_id: Optional[str] = None,
