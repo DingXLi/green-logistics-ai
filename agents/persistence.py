@@ -3446,6 +3446,163 @@ class Persistence:
                 result.append(d)
         return result
 
+    def get_top_demands_by_fulfillment(
+        self,
+        metric: str = "fulfillment_rate",
+        material_type: Optional[str] = None,
+        min_required_tons: float = 0.0,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #57: Top demands ranked by fulfillment metrics.
+
+        Args:
+            metric: which fulfillment metric to rank by. One of:
+                - 'fulfillment_rate' (matched / required, higher = better, capped at 2.0)
+                - 'total_matched_tons' (sum of all matched tons, higher = better)
+                - 'unmet_demand_tons' (required - matched, lower = better — gap analysis)
+                - 'match_rate' (n_matches / n_cycles_with_demand, higher = better)
+                - 'avg_match_distance_km' (avg km per match, lower = better)
+            material_type: optional filter
+            min_required_tons: skip demands with less than this required tonnage
+                (default 0.0 — include all)
+            limit: top N (default 10, max 100)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            n_demands_evaluated, n_demands_returned,
+            top_demands: [{demand_id, material_type, value,
+                           n_matches, n_cycles_with_demand,
+                           total_required_tons, total_matched_tons,
+                           fulfillment_rate, avg_match_distance_km,
+                           avg_match_tons}, ...]
+          }
+
+        Use cases:
+        - Identify best-served demands (high fulfillment_rate)
+        - Identify biggest unmet gaps (high unmet_demand_tons)
+        - Identify most-matched demands (high total_matched_tons)
+        - Identify hardest-to-reach (high avg_match_distance_km)
+        """
+        valid_metrics = {
+            "fulfillment_rate": ("higher_is_better",
+                                 "fulfillment rate (matched/required)"),
+            "total_matched_tons": ("higher_is_better",
+                                   "total matched tons"),
+            "unmet_demand_tons": ("lower_is_better",
+                                  "unmet tons (required - matched)"),
+            "match_rate": ("higher_is_better",
+                           "matches per cycle"),
+            "avg_match_distance_km": ("lower_is_better",
+                                      "avg km per match"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if material_type:
+            where_clauses.append("d.material_type = ?")
+            params.append(material_type)
+        where_sql = " AND ".join(where_clauses)
+
+        # HAVING clause must reference aggregates; min_required_tons can't go in WHERE
+        having_clauses = ["SUM(d.required_tons) > 0"]
+        if min_required_tons > 0:
+            having_clauses.append("SUM(d.required_tons) >= ?")
+            params.append(float(min_required_tons))
+        having_sql = " AND ".join(having_clauses)
+
+        # Aggregate per demand_id
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT d.demand_id, d.material_type,
+                          COUNT(DISTINCT d.cycle_id) as n_cycles,
+                          SUM(d.required_tons) as total_required
+                FROM demand_requests d
+                WHERE {where_sql}
+                GROUP BY d.demand_id
+                HAVING {having_sql}""",
+                params,
+            ).fetchall()
+
+            results = []
+            for r in rows:
+                did = r["demand_id"]
+                match_row = conn.execute(
+                    """SELECT COUNT(*) as n_matches,
+                              COALESCE(SUM(tons), 0) as total_matched,
+                              COALESCE(AVG(distance_km), 0) as avg_distance,
+                              COALESCE(AVG(tons), 0) as avg_match_tons
+                    FROM matches WHERE demand_id = ?""",
+                    (did,)
+                ).fetchone()
+
+                n_matches = match_row["n_matches"] or 0
+                total_matched = float(match_row["total_matched"] or 0)
+                total_required = float(r["total_required"] or 0)
+                avg_distance = float(match_row["avg_distance"] or 0)
+                n_cycles = int(r["n_cycles"] or 0)
+
+                # Compute metric value
+                if metric == "fulfillment_rate":
+                    value = round(
+                        min(2.0, total_matched / total_required), 3
+                    ) if total_required > 0 else 0.0
+                elif metric == "total_matched_tons":
+                    value = round(total_matched, 2)
+                elif metric == "unmet_demand_tons":
+                    value = round(max(0.0, total_required - total_matched), 2)
+                elif metric == "match_rate":
+                    value = round(
+                        n_matches / n_cycles, 3
+                    ) if n_cycles > 0 else 0.0
+                elif metric == "avg_match_distance_km":
+                    value = round(avg_distance, 2) if n_matches > 0 else None
+                else:
+                    value = None
+
+                # Skip demands where metric is undefined (e.g., no matches for distance)
+                if value is None:
+                    continue
+
+                results.append({
+                    "demand_id": did,
+                    "material_type": r["material_type"],
+                    "value": value,
+                    "n_matches": n_matches,
+                    "n_cycles_with_demand": n_cycles,
+                    "total_required_tons": round(total_required, 2),
+                    "total_matched_tons": round(total_matched, 2),
+                    "fulfillment_rate": round(
+                        min(2.0, total_matched / total_required), 3
+                    ) if total_required > 0 else 0.0,
+                    "avg_match_distance_km": round(avg_distance, 2),
+                    "avg_match_tons": round(
+                        match_row["avg_match_tons"] or 0, 2
+                    ),
+                })
+
+        # Sort
+        if direction == "lower_is_better":
+            results.sort(key=lambda x: x["value"])
+        else:
+            results.sort(key=lambda x: -x["value"])
+
+        return {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "n_demands_evaluated": len(results),
+            "n_demands_returned": min(limit, len(results)),
+            "top_demands": results[:max(1, min(100, limit))],
+        }
+
     def get_material_supply_demand_balance(
         self,
         since_sim_day: Optional[int] = None,

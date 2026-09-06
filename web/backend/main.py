@@ -5287,6 +5287,52 @@ async def get_supply_aggregates(
     )
 
 
+@app.get("/api/persistence/top-demands")
+async def get_top_demands(
+    metric: str = "fulfillment_rate",
+    material_type: Optional[str] = None,
+    min_required_tons: float = 0.0,
+    limit: int = 10,
+):
+    """
+    Top demands ranked by fulfillment metrics (iter #57).
+
+    Query:
+    - metric: which fulfillment metric to rank by. One of:
+      - 'fulfillment_rate' (matched/required, higher = better, capped at 2.0)
+      - 'total_matched_tons' (higher = better)
+      - 'unmet_demand_tons' (required - matched, lower = better — gap analysis)
+      - 'match_rate' (matches per cycle, higher = better)
+      - 'avg_match_distance_km' (lower = better)
+    - material_type: optional filter
+    - min_required_tons: skip demands with less than this required tonnage
+    - limit: top N (default 10, max 100)
+
+    Returns:
+      {
+        metric, metric_description, direction,
+        n_demands_evaluated, n_demands_returned,
+        top_demands: [{demand_id, material_type, value, ...}, ...]
+      }
+
+    Use cases:
+    - Identify best-served demands (high fulfillment_rate)
+    - Identify biggest unmet gaps (high unmet_demand_tons)
+    - Identify hardest-to-reach (high avg_match_distance_km)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    try:
+        return coordinator.persistence.get_top_demands_by_fulfillment(
+            metric=metric,
+            material_type=material_type,
+            min_required_tons=min_required_tons,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/demand-aggregates")
 async def get_demand_aggregates(
     demand_id: Optional[str] = None,
