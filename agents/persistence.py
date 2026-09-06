@@ -20,7 +20,7 @@ import io
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from contextlib import contextmanager
 
 from loguru import logger
@@ -5280,6 +5280,201 @@ class Persistence:
                 "cumulative_bias": round(bias, 4),
             })
         return results
+
+    def get_prediction_accuracy_by_day(
+        self,
+        metric: Optional[str] = None,
+        method: Optional[str] = None,
+        lead_time_buckets: Optional[List[Tuple[int, int]]] = None,
+        since_created_day: Optional[int] = None,
+        until_created_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #58: Per-day prediction accuracy with lead-time breakdown.
+
+        Unlike get_forecast_calibration_trend (which is cumulative and bucketed
+        by forecast_sim_day), this endpoint buckets by **created_at_sim_day**
+        (the day the prediction was generated) and reports non-cumulative
+        per-day accuracy, optionally broken down by lead-time buckets.
+
+        Args:
+            metric: optional filter on metric
+            method: optional filter on method
+            lead_time_buckets: optional list of (min_lead, max_lead) tuples
+                (inclusive ranges). If None, default buckets are used:
+                [(1, 1), (2, 3), (4, 7), (8, 14), (15, 30)].
+            since_created_day: optional lower bound on created_at_sim_day
+            until_created_day: optional upper bound on created_at_sim_day
+
+        Returns:
+          {
+            metric_filter, method_filter,
+            lead_time_buckets: [{label, min_lead, max_lead}, ...],
+            day_range: {since_created_day, until_created_day},
+            by_day: [{
+              created_at_sim_day: int,
+              n_predictions: int,           # predictions made that day
+              n_evaluated: int,             # those with actual_value set
+              n_pending: int,               # those waiting for actual
+              overall_mape_pct: float,      # over all lead times
+              by_lead_time: {<bucket_label>: {n_evaluated, mape_pct, mae, bias}},
+            }, ...]
+            overall: {n_predictions, n_evaluated, n_pending, overall_mape_pct},
+          }
+        """
+        if lead_time_buckets is None:
+            lead_time_buckets = [
+                (1, 1), (2, 3), (4, 7), (8, 14), (15, 30),
+            ]
+
+        # Validate bucket ranges and convert to labels
+        bucket_defs: List[Dict[str, Any]] = []
+        for (lo, hi) in lead_time_buckets:
+            if lo > hi:
+                raise ValueError(
+                    f"Invalid bucket: min_lead {lo} > max_lead {hi}"
+                )
+            label = f"{lo}-{hi}d"
+            bucket_defs.append({"label": label, "min_lead": lo, "max_lead": hi})
+
+        # Base where clause for filters
+        where_clauses: List[str] = ["1=1"]
+        params: List[Any] = []
+        if metric:
+            where_clauses.append("metric = ?")
+            params.append(metric)
+        if method:
+            where_clauses.append("method = ?")
+            params.append(method)
+        if since_created_day is not None:
+            where_clauses.append("created_at_sim_day >= ?")
+            params.append(int(since_created_day))
+        if until_created_day is not None:
+            where_clauses.append("created_at_sim_day <= ?")
+            params.append(int(until_created_day))
+        where_sql = " AND ".join(where_clauses)
+
+        # Pull all relevant rows (regardless of evaluation status)
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT created_at_sim_day, forecast_sim_day,
+                           error, abs_pct_error,
+                           (actual_value IS NOT NULL) as evaluated
+                FROM forecast_predictions
+                WHERE {where_sql}
+                ORDER BY created_at_sim_day ASC, id ASC""",
+                params,
+            ).fetchall()
+
+        # Group by created_at_sim_day
+        from collections import defaultdict
+        by_day: Dict[int, List[Any]] = defaultdict(list)
+        for r in rows:
+            by_day[int(r["created_at_sim_day"])].append(r)
+
+        # Build per-day breakdown
+        results: List[Dict[str, Any]] = []
+        grand_total = 0
+        grand_evaluated = 0
+        grand_pending = 0
+        all_abs_pct: List[float] = []
+
+        for day in sorted(by_day.keys()):
+            day_rows = by_day[day]
+            n_predictions = len(day_rows)
+            n_evaluated = sum(1 for r in day_rows if r["evaluated"])
+            n_pending = n_predictions - n_evaluated
+
+            # Overall day stats (regardless of lead time)
+            day_abs_pct = [
+                r["abs_pct_error"] for r in day_rows
+                if r["evaluated"] and r["abs_pct_error"] is not None
+            ]
+            day_errors = [
+                r["error"] for r in day_rows if r["evaluated"]
+            ]
+            day_overall_mape = (
+                round(sum(day_abs_pct) / len(day_abs_pct), 2)
+                if day_abs_pct else None
+            )
+            day_mae = (
+                round(sum(abs(e) for e in day_errors) / len(day_errors), 4)
+                if day_errors else None
+            )
+            day_bias = (
+                round(sum(day_errors) / len(day_errors), 4)
+                if day_errors else None
+            )
+
+            # Per-lead-time bucket breakdown
+            by_lead_time: Dict[str, Dict[str, Any]] = {}
+            for bd in bucket_defs:
+                lo, hi, label = bd["min_lead"], bd["max_lead"], bd["label"]
+                bucket_rows = [
+                    r for r in day_rows
+                    if r["evaluated"]
+                    and lo <= (int(r["forecast_sim_day"]) - int(r["created_at_sim_day"])) <= hi
+                ]
+                b_abs_pct = [
+                    r["abs_pct_error"] for r in bucket_rows
+                    if r["abs_pct_error"] is not None
+                ]
+                b_errors = [r["error"] for r in bucket_rows]
+                if bucket_rows:
+                    by_lead_time[label] = {
+                        "n_evaluated": len(bucket_rows),
+                        "mape_pct": round(sum(b_abs_pct) / len(b_abs_pct), 2)
+                                    if b_abs_pct else None,
+                        "mae": round(sum(abs(e) for e in b_errors) / len(b_errors), 4)
+                               if b_errors else None,
+                        "bias": round(sum(b_errors) / len(b_errors), 4)
+                                if b_errors else None,
+                    }
+                else:
+                    by_lead_time[label] = {
+                        "n_evaluated": 0,
+                        "mape_pct": None,
+                        "mae": None,
+                        "bias": None,
+                    }
+
+            results.append({
+                "created_at_sim_day": day,
+                "n_predictions": n_predictions,
+                "n_evaluated": n_evaluated,
+                "n_pending": n_pending,
+                "overall_mape_pct": day_overall_mape,
+                "overall_mae": day_mae,
+                "overall_bias": day_bias,
+                "by_lead_time": by_lead_time,
+            })
+
+            grand_total += n_predictions
+            grand_evaluated += n_evaluated
+            grand_pending += n_pending
+            all_abs_pct.extend(day_abs_pct)
+
+        overall_mape = (
+            round(sum(all_abs_pct) / len(all_abs_pct), 2)
+            if all_abs_pct else None
+        )
+
+        return {
+            "metric_filter": metric,
+            "method_filter": method,
+            "lead_time_buckets": bucket_defs,
+            "day_range": {
+                "since_created_day": since_created_day,
+                "until_created_day": until_created_day,
+            },
+            "by_day": results,
+            "overall": {
+                "n_predictions": grand_total,
+                "n_evaluated": grand_evaluated,
+                "n_pending": grand_pending,
+                "overall_mape_pct": overall_mape,
+            },
+        }
 
 
     # ====================================================================

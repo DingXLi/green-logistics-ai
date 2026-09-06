@@ -3977,6 +3977,102 @@ async def get_forecast_calibration_trend(
     }
 
 
+@app.get("/api/persistence/prediction-accuracy-by-day")
+async def get_prediction_accuracy_by_day(
+    metric: Optional[str] = None,
+    method: Optional[str] = None,
+    lead_time_buckets: Optional[str] = None,
+    since_created_day: Optional[int] = None,
+    until_created_day: Optional[int] = None,
+):
+    """
+    iter #58: Per-day prediction accuracy with lead-time breakdown.
+
+    Unlike /forecast-calibration/trend (cumulative, bucketed by
+    forecast_sim_day), this endpoint buckets by **created_at_sim_day**
+    (the day the prediction was generated) and reports non-cumulative
+    per-day accuracy, broken down by lead-time buckets (forecast_sim_day -
+    created_at_sim_day).
+
+    Query params:
+    - metric: optional filter (cost_sek / co2_kg / util_pct / matches)
+    - method: optional filter (linear / moving_average / exponential_smoothing)
+    - lead_time_buckets: optional comma-separated list of "lo-hi" pairs
+      (e.g. "1-1,2-7,8-30"). Default buckets: 1d, 2-3d, 4-7d, 8-14d, 15-30d.
+    - since_created_day / until_created_day: optional day range filter.
+
+    Returns:
+      {
+        metric_filter, method_filter,
+        lead_time_buckets: [{label, min_lead, max_lead}, ...],
+        day_range: {since_created_day, until_created_day},
+        by_day: [{
+          created_at_sim_day: int,
+          n_predictions: int,
+          n_evaluated: int,
+          n_pending: int,
+          overall_mape_pct: float | null,
+          overall_mae: float | null,
+          overall_bias: float | null,
+          by_lead_time: {<bucket_label>: {n_evaluated, mape_pct, mae, bias}},
+        }, ...],
+        overall: {n_predictions, n_evaluated, n_pending, overall_mape_pct},
+      }
+
+    Use cases:
+    - Track forecast quality over time (per-day accuracy trend)
+    - Detect accuracy degradation at specific lead times (e.g. 1-day-ahead vs 7-day-ahead)
+    - Identify which days had high pending predictions (still awaiting actuals)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if metric and metric not in {"cost_sek", "co2_kg", "util_pct", "matches"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid metric: {metric}",
+        )
+    if method and method not in {"linear", "moving_average", "exponential_smoothing"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method}",
+        )
+
+    # Parse lead_time_buckets CSV into list of tuples
+    parsed_buckets: Optional[List[Tuple[int, int]]] = None
+    if lead_time_buckets:
+        try:
+            parsed_buckets = []
+            for token in lead_time_buckets.split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                lo_s, hi_s = token.split("-", 1)
+                parsed_buckets.append((int(lo_s.strip()), int(hi_s.strip())))
+        except (ValueError, AttributeError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"invalid lead_time_buckets format: {lead_time_buckets!r}. "
+                    f"Expected comma-separated 'lo-hi' pairs (e.g. '1-1,2-7,8-30'). "
+                    f"Error: {e}"
+                ),
+            )
+
+    # Backfill any new actuals first
+    try:
+        coordinator.persistence.backfill_forecast_actuals()
+    except Exception as e:
+        logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+
+    return coordinator.persistence.get_prediction_accuracy_by_day(
+        metric=metric,
+        method=method,
+        lead_time_buckets=parsed_buckets,
+        since_created_day=since_created_day,
+        until_created_day=until_created_day,
+    )
+
+
 # ============================================
 # iter #37: Seasonal perturbation endpoints (admin)
 # ============================================
