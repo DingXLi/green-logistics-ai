@@ -355,6 +355,13 @@ check_json_field "/api/persistence/top-cycles has top_cycles array" GET "/api/pe
 check_endpoint "/api/persistence/top-cycles?metric=fleet_utilization" 200 GET "/api/persistence/top-cycles?metric=fleet_utilization"
 check_endpoint "/api/persistence/top-cycles?metric=cost_per_ton" 200 GET "/api/persistence/top-cycles?metric=cost_per_ton"
 check_endpoint "/api/persistence/top-cycles?metric=match_rate_vs_offers" 200 GET "/api/persistence/top-cycles?metric=match_rate_vs_offers"
+# iter #57: top-demands-by-fulfillment endpoint
+check_endpoint "/api/persistence/top-demands (iter #57)" 200 GET "/api/persistence/top-demands"
+check_json_field "/api/persistence/top-demands has metric" GET "/api/persistence/top-demands" ".metric | type" "string"
+check_json_field "/api/persistence/top-demands has top_demands array" GET "/api/persistence/top-demands" ".top_demands | type" "array"
+check_endpoint "/api/persistence/top-demands?metric=unmet_demand_tons" 200 GET "/api/persistence/top-demands?metric=unmet_demand_tons"
+check_endpoint "/api/persistence/top-demands?metric=match_rate" 200 GET "/api/persistence/top-demands?metric=match_rate"
+check_endpoint "/api/persistence/top-demands?metric=avg_match_distance_km" 200 GET "/api/persistence/top-demands?metric=avg_match_distance_km"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

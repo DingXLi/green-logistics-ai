@@ -207,6 +207,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/top-suppliers` | Top suppliers ranked by efficiency (co2_per_ton / cost_per_ton / match_rate / etc.) (iter #55) |
 | GET    | `/api/persistence/top-vehicles` | Top vehicles ranked by efficiency (co2_per_ton_km / co2_per_km / utilization) (iter #55) |
 | GET    | `/api/persistence/top-cycles` | Top optimization cycles ranked by efficiency (co2_per_ton / cost_per_ton / fleet_utilization / tons_per_cycle / etc.) with optional sim_day window filter (iter #56) |
+| GET    | `/api/persistence/top-demands` | Top demands ranked by fulfillment (fulfillment_rate / unmet_demand_tons / match_rate / avg_match_distance_km) with optional material + min_required_tons filters (iter #57) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
