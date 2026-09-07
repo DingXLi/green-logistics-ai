@@ -209,6 +209,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/top-cycles` | Top optimization cycles ranked by efficiency (co2_per_ton / cost_per_ton / fleet_utilization / tons_per_cycle / etc.) with optional sim_day window filter (iter #56) |
 | GET    | `/api/persistence/top-demands` | Top demands ranked by fulfillment (fulfillment_rate / unmet_demand_tons / match_rate / avg_match_distance_km) with optional material + min_required_tons filters (iter #57) |
 | GET    | `/api/persistence/prediction-accuracy-by-day` | Per-day forecast accuracy with lead-time breakdown (default buckets: 1d / 2-3d / 4-7d / 8-14d / 15-30d). Buckets by created_at_sim_day (non-cumulative, vs cumulative trend endpoint). Custom buckets via `?lead_time_buckets=1-1,2-7,8-30`. (iter #58) |
+| GET    | `/api/persistence/top-facilities` | Top real Sweden facilities ranked by supply-distance metrics (avg_distance / min_distance / max_distance / total_matched_tons / match_count / match_rate / utilization_pct / co2_per_ton) with city / facility_type / material / sim_day window filters. Enriches each row with facility metadata (name, operator, processing_capacity_tons_per_day). (iter #59) |
 | GET    | `/api/persistence/material-aggregates` | Per-material-type cumulative KPIs (iter #16) |
 | GET    | `/api/persistence/cycle-kpi-summary` | Overall KPI rollup + best/worst/last cycle (iter #16 + iter #17 time window filters) |
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |

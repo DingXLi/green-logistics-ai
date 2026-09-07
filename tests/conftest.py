@@ -90,3 +90,34 @@ def _reset_ws_broadcaster_singleton(request):
     ws_broadcaster._clients.clear()
     ws_broadcaster._client_meta.clear()
     ws_broadcaster.reset_stats()
+
+# ============================================
+# iter #59: Auto-snapshot coordinator singleton around every test
+# ============================================
+# 问题: 多個 endpoint test 文件 (~15+) 在 setUp 里手动赋值
+#   backend_main.coordinator = fake_coord
+# 但 tearDown 不还原, 导致后续 test 文件继续看到 stale fake_coord。
+# 表现: 后续 endpoint test 收到 200 (fake coord), 但 fake_coord.persistence
+# 指向已 unlinked 的 tmp DB, SQLite "no such table" 报错。
+#
+# 解决方案: 在每个 test 前后 snapshot/restore backend_main.coordinator,
+# 把所有 test 的 setUp/tearDown responsibility 统一到 conftest fixture。
+@pytest.fixture(autouse=True)
+def _snapshot_backend_coordinator(request):
+    """
+    Auto fixture: snapshot web.backend.main.coordinator before each test,
+    restore after. Catches stale-coordinator pollution from any test that
+    mutates the singleton without restoring it.
+    """
+    try:
+        from web.backend import main as _backend_main
+    except (ImportError, Exception):
+        yield
+        return
+
+    saved = getattr(_backend_main, "coordinator", None)
+    yield
+    try:
+        _backend_main.coordinator = saved
+    except Exception:
+        pass
