@@ -384,14 +384,22 @@ check_endpoint "/api/persistence/top-facilities?facility_ids=GBG_RENOVA_SYA,GBG_
 check_endpoint "/api/persistence/top-facilities?since_sim_day=1&until_sim_day=30" 200 GET "/api/persistence/top-facilities?since_sim_day=1&until_sim_day=30"
 check_endpoint "/api/persistence/top-facilities?invalid=metric&city=Bor%C3%A5s" 200 GET "/api/persistence/top-facilities?city=Bor%C3%A5s&limit=5"
 # iter #59: compare-cycles endpoint
-check_endpoint "/api/persistence/compare-cycles (iter #59, default cycles)" 200 GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002"
-check_json_field "/api/persistence/compare-cycles has cycle_a" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".cycle_a | type" "object"
-check_json_field "/api/persistence/compare-cycles has cycle_b" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".cycle_b | type" "object"
-check_json_field "/api/persistence/compare-cycles has differences" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences | type" "object"
-check_json_field "/api/persistence/compare-cycles has winner" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".winner | type" "object"
-check_json_field "/api/persistence/compare-cycles has absolute diffs" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.absolute | type" "object"
-check_json_field "/api/persistence/compare-cycles has pct_change" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.pct_change | type" "object"
-check_json_field "/api/persistence/compare-cycles winner has 5 axes" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".winner | keys | length" "5"
+# iter #62: pick 2 existing cycles dynamically (avoids failing on fresh DBs
+# with only 1 cycle after deploy restart).
+_CYCLE_A=$(curl -sS "${BASE}/api/persistence/cycle-history?limit=2" | jq -r 'if (.|length) >= 2 then .[0].cycle_id else "" end' 2>/dev/null)
+_CYCLE_B=$(curl -sS "${BASE}/api/persistence/cycle-history?limit=2" | jq -r 'if (.|length) >= 2 then .[1].cycle_id else "" end' 2>/dev/null)
+if [ -n "$_CYCLE_A" ] && [ -n "$_CYCLE_B" ]; then
+  check_endpoint "/api/persistence/compare-cycles (iter #59)" 200 GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}"
+  check_json_field "/api/persistence/compare-cycles has cycle_a" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".cycle_a | type" "object"
+  check_json_field "/api/persistence/compare-cycles has cycle_b" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".cycle_b | type" "object"
+  check_json_field "/api/persistence/compare-cycles has differences" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".differences | type" "object"
+  check_json_field "/api/persistence/compare-cycles has winner" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".winner | type" "object"
+  check_json_field "/api/persistence/compare-cycles has absolute diffs" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".differences.absolute | type" "object"
+  check_json_field "/api/persistence/compare-cycles has pct_change" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".differences.pct_change | type" "object"
+  check_json_field "/api/persistence/compare-cycles winner has 5 axes" GET "/api/persistence/compare-cycles?cycle_id_a=${_CYCLE_A}&cycle_id_b=${_CYCLE_B}" ".winner | keys | length" "5"
+else
+  echo -e "  ${YELLOW}~${NC} compare-cycles skipped (need >=2 cycles; only 1 found)"
+fi
 # iter #60: deep-health extension (simulation + weather subsystems)
 check_endpoint "/api/health/deep (iter #60, 9 subsystems)" 200 GET "/api/health/deep"
 check_json_field "/api/health/deep has n_subsystems=9" GET "/api/health/deep" ".n_subsystems" "9"
