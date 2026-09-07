@@ -70,6 +70,18 @@ class TestOptimizeLastExtended(unittest.TestCase):
         self.client = TestClient(backend_main.app)
 
     def tearDown(self):
+        # Restore the singleton coordinator so subsequent tests that hit the
+        # FastAPI app see a fresh / unmutated state. iter #59: previously the
+        # fake_coord remained attached after this test class ran, which caused
+        # downstream endpoint tests (test_cycle_duration_stats,
+        # test_demand_aggregates, test_efficiency_timeseries) to fail with
+        # "no such table" because the tmp DB was unlinked but coordinator
+        # still pointed to it.
+        try:
+            if hasattr(self, "backend_main"):
+                self.backend_main.coordinator = None
+        except Exception:
+            pass
         try:
             os.unlink(self.db_path)
         except Exception:
