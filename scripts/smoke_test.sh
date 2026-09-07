@@ -412,6 +412,15 @@ check_json_field "/api/health/deep include filter excludes others" GET "/api/hea
 # iter #61: persistence TTL cache admin endpoints (require GL_ADMIN_TOKEN)
 check_endpoint "/api/admin/persistence/cache (iter #61)" 200 GET "/api/admin/persistence/cache" || echo "    (skipped: GL_ADMIN_TOKEN not set on HF Space)"
 check_endpoint "/api/admin/persistence/cache/clear (iter #61)" 200 POST "/api/admin/persistence/cache/clear" || echo "    (skipped: GL_ADMIN_TOKEN not set on HF Space)"
+# iter #62: dashboard-top-summary aggregate endpoint
+check_endpoint "/api/dashboard-top-summary (iter #62)" 200 GET "/api/dashboard-top-summary"
+check_json_field "/api/dashboard-top-summary has top_suppliers" GET "/api/dashboard-top-summary" ".top_suppliers | type" "object"
+check_json_field "/api/dashboard-top-summary has top_cycles" GET "/api/dashboard-top-summary" ".top_cycles | type" "object"
+check_json_field "/api/dashboard-top-summary has top_demands" GET "/api/dashboard-top-summary" ".top_demands | type" "object"
+check_json_field "/api/dashboard-top-summary has top_facilities" GET "/api/dashboard-top-summary" ".top_facilities | type" "object"
+check_json_field "/api/dashboard-top-summary has compare_preview" GET "/api/dashboard-top-summary" ".compare_preview | type" "object"
+check_json_field "/api/dashboard-top-summary has cache block" GET "/api/dashboard-top-summary" ".cache | type" "object"
+check_json_field "/api/dashboard-top-summary source is aggregate" GET "/api/dashboard-top-summary" ".source" "aggregate"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

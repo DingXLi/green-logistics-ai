@@ -1538,6 +1538,157 @@ async def health_check_deep(include: Optional[str] = None):
     }
 
 
+@app.get("/api/dashboard-top-summary")
+async def get_dashboard_top_summary(
+    limit_per_panel: int = 5,
+    material: Optional[str] = None,
+    city: Optional[str] = None,
+):
+    """
+    iter #62: Aggregate top-X previews in one fetch (5 panels).
+
+    Returns the default view for each of the 4 top-X panels (limit 5 each by
+    default), plus the 5th 'compare-cycles preview' (last 2 cycles for
+    quick A/B compare). Lets the dashboard render a Top-X overview without
+    firing 5 separate fetches.
+
+    Query:
+    - limit_per_panel (default 5, max 20): items per top-X panel
+    - material: optional material filter (applied to top-suppliers + top-demands)
+    - city: optional city filter (applied to top-facilities)
+
+    Returns:
+      {
+        timestamp, source='aggregate',
+        top_suppliers: {metric, top: [...5 items...]},
+        top_cycles: {metric, top: [...5 items...]},
+        top_demands: {metric, top: [...5 items...]},
+        top_facilities: {metric, top: [...5 items...]},
+        compare_preview: {cycle_a, cycle_b, winner}  // last 2 cycles
+        cache: {n_entries, n_expired, n_active, ttl_seconds}
+      }
+
+    Each top-X entry uses the default 'best' metric:
+    - top_suppliers: co2_per_ton (greenest suppliers)
+    - top_cycles: co2_per_ton (greenest cycles)
+    - top_demands: fulfillment_rate (best-served demands)
+    - top_facilities: avg_distance (closest suppliers)
+
+    Errors in one panel don't fail the whole request — each panel is
+    wrapped in try/except and the panel becomes {"error": str(e)} on failure.
+    """
+    limit_per_panel = max(1, min(20, limit_per_panel))
+    result: Dict[str, Any] = {
+        "timestamp": datetime.now().isoformat(),
+        "source": "aggregate",
+        "limit_per_panel": limit_per_panel,
+    }
+    if coordinator is None or coordinator.persistence is None:
+        result["error"] = "Persistence not initialized"
+        return result
+
+    p = coordinator.persistence
+
+    # Helper to safely call a top-X method
+    def _safe(method_name: str, **kwargs):
+        try:
+            method = getattr(p, method_name)
+            return method(**kwargs)
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+
+    # 1. top_suppliers
+    try:
+        full = _safe("get_top_suppliers_by_efficiency",
+                     metric="co2_per_ton", material_type=material,
+                     limit=limit_per_panel)
+        result["top_suppliers"] = {
+            "metric": "co2_per_ton",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_suppliers_evaluated", 0),
+            "top": full.get("top_suppliers", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_suppliers"] = full
+    except Exception as e:
+        result["top_suppliers"] = {"error": str(e)}
+
+    # 2. top_cycles
+    try:
+        full = _safe("get_top_cycles_by_efficiency",
+                     metric="co2_per_ton", limit=limit_per_panel)
+        result["top_cycles"] = {
+            "metric": "co2_per_ton",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_cycles_evaluated", 0),
+            "top": full.get("top_cycles", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_cycles"] = full
+    except Exception as e:
+        result["top_cycles"] = {"error": str(e)}
+
+    # 3. top_demands
+    try:
+        full = _safe("get_top_demands_by_fulfillment",
+                     metric="fulfillment_rate", material_type=material,
+                     limit=limit_per_panel)
+        result["top_demands"] = {
+            "metric": "fulfillment_rate",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_demands_evaluated", 0),
+            "top": full.get("top_demands", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_demands"] = full
+    except Exception as e:
+        result["top_demands"] = {"error": str(e)}
+
+    # 4. top_facilities
+    try:
+        full = _safe("get_top_facilities_by_distance",
+                     metric="avg_distance", city=city,
+                     limit=limit_per_panel)
+        result["top_facilities"] = {
+            "metric": "avg_distance",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_facilities_evaluated", 0),
+            "top": full.get("top_facilities", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_facilities"] = full
+    except Exception as e:
+        result["top_facilities"] = {"error": str(e)}
+
+    # 5. compare-cycles preview (last 2 cycles for quick A/B)
+    try:
+        recent = p.get_recent_cycles(limit=2) or []
+        if len(recent) >= 2:
+            comp = _safe("compare_cycles",
+                         cycle_id_a=recent[0]["cycle_id"],
+                         cycle_id_b=recent[1]["cycle_id"])
+            result["compare_preview"] = {
+                "cycle_a": comp.get("cycle_a", {}).get("cycle_id"),
+                "cycle_b": comp.get("cycle_b", {}).get("cycle_id"),
+                "winner": comp.get("winner"),
+            }
+        else:
+            result["compare_preview"] = {
+                "reason": "need >= 2 cycles",
+                "n_cycles": len(recent),
+            }
+    except Exception as e:
+        result["compare_preview"] = {"error": str(e)}
+
+    # 6. Cache stats (so the dashboard can show 'cached for 18s' badges)
+    try:
+        result["cache"] = p.cache_stats()
+    except Exception as e:
+        result["cache"] = {"error": str(e)}
+
+    return result
+
+
 @app.get("/api/dashboard-summary")
 async def get_dashboard_summary():
     """
