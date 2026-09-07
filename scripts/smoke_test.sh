@@ -401,6 +401,9 @@ check_json_field "/api/health/deep simulation has batch_tasks" GET "/api/health/
 check_endpoint "/api/health/deep?include=simulation" 200 GET "/api/health/deep?include=simulation"
 check_endpoint "/api/health/deep?include=weather" 200 GET "/api/health/deep?include=weather"
 check_json_field "/api/health/deep include filter excludes others" GET "/api/health/deep?include=simulation" ".checks.database // null" "null"
+# iter #61: persistence TTL cache admin endpoints (require GL_ADMIN_TOKEN)
+check_endpoint "/api/admin/persistence/cache (iter #61)" 200 GET "/api/admin/persistence/cache" || echo "    (skipped: GL_ADMIN_TOKEN not set on HF Space)"
+check_endpoint "/api/admin/persistence/cache/clear (iter #61)" 200 POST "/api/admin/persistence/cache/clear" || echo "    (skipped: GL_ADMIN_TOKEN not set on HF Space)"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

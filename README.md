@@ -250,6 +250,8 @@ green-logistics-ai/
 | GET    | `/api/facilities/distance-matrix` | N×N facility distance matrix (iter #15) |
 | POST   | `/api/optimize/batch` | Parallel multi-scenario optimization (iter #13) |
 | GET    | `/api/health/deep` | Multi-subsystem health check (9 subsystems: database / websocket / osm / scheduler / llm / agents / signals / simulation / weather). Optional `?include=db,simulation,weather` to filter. (iter #14 + iter #60) |
+| GET    | `/api/admin/persistence/cache` | Top-X TTL cache stats (n_entries / n_active / n_expired / ttl_seconds). Admin auth via `GL_ADMIN_TOKEN` (iter #34). (iter #61) |
+| POST   | `/api/admin/persistence/cache/clear` | Manually clear the persistence cache (e.g. after batch sim). Returns `{cleared: int}`. Admin auth. (iter #61) |
 | GET    | `/api/scheduler/status` | Background scheduler status |
 | POST   | `/api/scheduler/control` | start / stop / restart scheduler |
 | WS     | `/ws` | WebSocket: cycle_update + fleet metrics (iter #27 origin allowlist) |
