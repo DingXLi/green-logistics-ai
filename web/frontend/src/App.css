@@ -4740,3 +4740,94 @@ td.no-matches {
   color: var(--text-primary);
   font-family: inherit;
 }
+
+/* iter #59: TopFacilitiesPanel styles
+   Real Sweden facilities ranked by supply-distance metrics.
+   Mirrors top-demands-panel layout with facility-specific columns (city/type/cap). */
+.top-facilities-panel .rank-cell {
+  font-weight: 700;
+  color: var(--accent);
+  font-feature-settings: "tnum";
+}
+
+.top-facilities-panel .metric-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.top-facilities-panel .metric-unit {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.top-facilities-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.top-facilities-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.top-facilities-panel .filter-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.top-facilities-panel .filter-input {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  min-width: 120px;
+}
+
+.top-facilities-panel .filter-input-narrow {
+  min-width: 60px;
+  width: 80px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.top-facilities-panel .card-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-accent);
+  color: var(--text-secondary);
+  border-radius: var(--radius);
+}
+
+.top-facilities-panel .facility-id {
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+}
+
+.top-facilities-panel .facility-name {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.1rem;
+}
