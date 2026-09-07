@@ -6570,6 +6570,246 @@ async def reset_llm_stats(_: None = Depends(require_admin)):
     return {"reset": True}
 
 
+# ============================================
+# iter #59: Auto-simulation admin endpoint (fire-and-forget batch)
+# ============================================
+# 背景: 生产环境需要 fill cycle data (top-* analytics 要 10+ cycles 才好看).
+# 同步 /api/simulate/run 会 block HTTP request 直到 days=7 跑完 (~30-60s),
+# 容易 timeout. 后台 batch 让 admin 触发后立即返回 task_id, 后台继续跑。
+#
+# 接口:
+# - POST /api/admin/simulate/batch?days=N&max_concurrent=1
+#   → 立即返回 {task_id, status: 'pending', days_requested}
+#   → 后台 asyncio.Task 跳 coordinator.simulate_day(days)
+# - GET /api/admin/simulate/batch?limit=20
+#   → 列出最近 N 个任务 (包含 running / completed / failed)
+# - GET /api/admin/simulate/batch/{task_id}
+#   → 查单个任务状态 (含 progress: cycles_completed / days_requested)
+#
+# Admin token 门控: 设 GL_ADMIN_TOKEN 后需要 Bearer / X-Admin-Token header。
+
+import asyncio
+import time as _time_mod
+import uuid as _uuid
+
+_BATCH_TASKS: Dict[str, Dict[str, Any]] = {}
+_BATCH_LOCK = asyncio.Lock()
+_MAX_BATCH_TASKS_HISTORY = 50  # 保留最近 N 个 task metadata
+
+
+async def _run_batch_simulation(
+    task_id: str,
+    days: int,
+    dry_run: bool,
+) -> None:
+    """
+    Background coroutine that runs coordinator.simulate_day(days).
+
+    Updates _BATCH_TASKS[task_id] in-place with status / progress.
+    Catches all exceptions and records them; never raises.
+    """
+    task_meta = _BATCH_TASKS[task_id]
+    task_meta["status"] = "running"
+    task_meta["started_at"] = datetime.utcnow().isoformat() + "Z"
+    t0 = _time_mod.time()
+    try:
+        if coordinator is None or not hasattr(coordinator, "simulate_day"):
+            raise RuntimeError("Coordinator not initialized or missing simulate_day")
+        # Run synchronously inside the async function (coordinator methods are async)
+        results = await coordinator.simulate_day(days=days)
+        # Aggregate
+        kpi_summary = {
+            "total_tons": 0.0,
+            "total_cost_sek": 0.0,
+            "total_co2_kg": 0.0,
+            "n_matches_total": 0,
+        }
+        per_day = []
+        for r in results or []:
+            kpi = r.get("kpi", {}) if isinstance(r, dict) else {}
+            if kpi:
+                kpi_summary["total_tons"] += float(kpi.get("total_tons", 0) or 0)
+                kpi_summary["total_cost_sek"] += float(kpi.get("total_cost_sek", 0) or 0)
+                kpi_summary["total_co2_kg"] += float(kpi.get("total_co2_kg", 0) or 0)
+                kpi_summary["n_matches_total"] += int(kpi.get("n_matches", 0) or 0)
+                per_day.append({
+                    "cycle_id": r.get("optimization_id") or r.get("cycle_id"),
+                    "sim_day": r.get("sim_day"),
+                    "n_matches": kpi.get("n_matches"),
+                    "total_tons": kpi.get("total_tons"),
+                    "total_cost_sek": kpi.get("total_cost_sek"),
+                    "total_co2_kg": kpi.get("total_co2_kg"),
+                })
+        task_meta["status"] = "completed"
+        task_meta["cycles_completed"] = len(per_day)
+        task_meta["kpi_summary"] = kpi_summary
+        task_meta["per_day"] = per_day
+    except Exception as e:
+        task_meta["status"] = "failed"
+        task_meta["error"] = f"{type(e).__name__}: {str(e)[:300]}"
+        logger.exception(f"Batch simulation task {task_id} failed")
+    finally:
+        task_meta["finished_at"] = datetime.utcnow().isoformat() + "Z"
+        task_meta["wall_duration_seconds"] = round(_time_mod.time() - t0, 2)
+
+
+@app.post("/api/admin/simulate/batch")
+async def start_batch_simulation(
+    days: int = 7,
+    dry_run: bool = False,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #59: Fire-and-forget batch simulation (admin token required).
+
+    Kicks off `coordinator.simulate_day(days)` in a background asyncio.Task.
+    Returns immediately with a task_id; poll
+    `/api/admin/simulate/batch/{task_id}` for progress.
+
+    Query:
+    - days (default 7): number of simulation days. Clamped to [1, 90].
+    - dry_run (default False): if True, skip persistence (compute-only mode).
+
+    Returns:
+      {task_id, status: 'pending', days_requested, dry_run, submitted_at}
+
+    Use cases:
+    - Production: fill cycle data overnight (e.g. days=30 in one shot)
+    - Dev: kick off a long simulation, then poll for completion
+    - Load testing: concurrent admin calls (max_concurrent enforced by caller)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    if not isinstance(days, int):
+        try:
+            days = int(days)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"days must be int, got {type(days).__name__}",
+            )
+    if days < 1 or days > 90:
+        raise HTTPException(
+            status_code=400,
+            detail=f"days must be in [1, 90]; got {days} "
+            f"(90-day cap to avoid runaway OR-Tools solves)",
+        )
+
+    task_id = _uuid.uuid4().hex[:12]
+    submitted_at = datetime.utcnow().isoformat() + "Z"
+    task_meta: Dict[str, Any] = {
+        "task_id": task_id,
+        "status": "pending",
+        "days_requested": days,
+        "dry_run": dry_run,
+        "submitted_at": submitted_at,
+        "started_at": None,
+        "finished_at": None,
+        "cycles_completed": 0,
+        "wall_duration_seconds": None,
+        "kpi_summary": None,
+        "per_day": [],
+        "error": None,
+    }
+    async with _BATCH_LOCK:
+        _BATCH_TASKS[task_id] = task_meta
+        # Trim history (keep newest N)
+        if len(_BATCH_TASKS) > _MAX_BATCH_TASKS_HISTORY:
+            old_ids = sorted(
+                _BATCH_TASKS.keys(),
+                key=lambda tid: _BATCH_TASKS[tid].get("submitted_at", ""),
+            )[: len(_BATCH_TASKS) - _MAX_BATCH_TASKS_HISTORY]
+            for old in old_ids:
+                _BATCH_TASKS.pop(old, None)
+
+    # Fire background task
+    asyncio.create_task(_run_batch_simulation(task_id, days, dry_run))
+
+    return {
+        "task_id": task_id,
+        "status": "pending",
+        "days_requested": days,
+        "dry_run": dry_run,
+        "submitted_at": submitted_at,
+        "poll_url": f"/api/admin/simulate/batch/{task_id}",
+    }
+
+
+@app.get("/api/admin/simulate/batch")
+async def list_batch_simulations(
+    limit: int = 20,
+    status_filter: Optional[str] = None,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #59: List recent batch simulation tasks (newest first).
+
+    Query:
+    - limit (default 20, max 100): max tasks to return
+    - status_filter (optional): filter by status — 'pending' | 'running' | 'completed' | 'failed'
+
+    Returns:
+      {n_tasks, n_pending, n_running, n_completed, n_failed,
+       tasks: [{task_id, status, days_requested, dry_run, submitted_at,
+                started_at, finished_at, cycles_completed, wall_duration_seconds,
+                error, kpi_summary}, ...]}
+    """
+    limit = max(1, min(100, limit))
+    async with _BATCH_LOCK:
+        tasks = list(_BATCH_TASKS.values())
+    # Sort newest first
+    tasks.sort(key=lambda t: t.get("submitted_at", ""), reverse=True)
+    if status_filter:
+        tasks = [t for t in tasks if t.get("status") == status_filter]
+    tasks = tasks[:limit]
+
+    n_pending = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "pending")
+    n_running = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "running")
+    n_completed = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "completed")
+    n_failed = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "failed")
+
+    return {
+        "n_tasks": len(tasks),
+        "n_pending": n_pending,
+        "n_running": n_running,
+        "n_completed": n_completed,
+        "n_failed": n_failed,
+        "limit": limit,
+        "status_filter": status_filter,
+        "tasks": tasks,
+    }
+
+
+@app.get("/api/admin/simulate/batch/{task_id}")
+async def get_batch_simulation(
+    task_id: str,
+    _: None = Depends(require_admin),
+):
+    """
+    iter #59: Get status of a single batch simulation task.
+
+    Returns full task metadata including:
+    - status: 'pending' | 'running' | 'completed' | 'failed'
+    - cycles_completed: progress (only set when completed)
+    - kpi_summary: aggregated totals
+    - per_day: per-cycle KPIs (only on completion)
+    - error: exception message (only on failure)
+    - wall_duration_seconds: total time
+
+    404 if task_id not found.
+    """
+    async with _BATCH_LOCK:
+        task = _BATCH_TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"task_id {task_id!r} not found (may have been trimmed "
+            f"after {_MAX_BATCH_TASKS_HISTORY} most recent tasks)",
+        )
+    return task
+
+
 @app.get("/api/facilities/distance-matrix")
 async def get_facility_distance_matrix(
     city: Optional[str] = None,
