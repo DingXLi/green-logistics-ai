@@ -5997,30 +5997,61 @@ class Persistence:
                 fid = r["demand_id"]
                 meta = facility_meta.get(fid, {})
 
+                # Build the match-side WHERE clause that respects the sim_day window.
+                # Placeholders: (1) inner subquery demand_id, (2) outer m.demand_id,
+                # (3) outer c2.sim_day >=, (4) outer c2.sim_day <=.
+                match_where = ["m.demand_id = ?"]
+                match_params: List[Any] = []  # outer m.demand_id placeholder #2
+                if since_sim_day is not None:
+                    match_where.append("c2.sim_day >= ?")
+                    match_params.append(int(since_sim_day))
+                if until_sim_day is not None:
+                    match_where.append("c2.sim_day <= ?")
+                    match_params.append(int(until_sim_day))
+                match_where_sql = " AND ".join(match_where)
+
                 match_row = conn.execute(
-                    """SELECT COUNT(*) as n_matches,
+                    f"""SELECT COUNT(*) as n_matches,
                               COALESCE(SUM(m.tons), 0) as total_matched,
                               COALESCE(AVG(m.distance_km), 0) as avg_distance,
                               COALESCE(MIN(m.distance_km), 0) as min_distance,
                               COALESCE(MAX(m.distance_km), 0) as max_distance,
                               COALESCE(AVG(m.tons), 0) as avg_tons,
                               MAX(c2.sim_day) as last_sim_day,
-                              COALESCE(SUM(r2.co2_kg), 0) as total_co2
+                              (SELECT COALESCE(SUM(co2_kg), 0)
+                               FROM routes
+                               WHERE vehicle_id IS NOT NULL
+                                 AND cycle_id IN (
+                                   SELECT DISTINCT cycle_id FROM matches
+                                   WHERE demand_id = ?
+                                 )
+                              ) as total_co2
                     FROM matches m
                     JOIN optimization_cycles c2 ON c2.cycle_id = m.cycle_id
-                    LEFT JOIN routes r2 ON r2.cycle_id = m.cycle_id AND r2.vehicle_id IS NOT NULL
-                    WHERE m.demand_id = ?
+                    WHERE {match_where_sql}
                     GROUP BY m.demand_id""",
-                    (fid,),
+                    (fid, fid, *match_params),
                 ).fetchone()
 
-                n_matches = int(match_row["n_matches"] or 0)
-                total_matched = float(match_row["total_matched"] or 0)
-                total_co2 = float(match_row["total_co2"] or 0)
-                avg_distance = float(match_row["avg_distance"] or 0)
-                min_distance = float(match_row["min_distance"] or 0)
-                max_distance = float(match_row["max_distance"] or 0)
-                last_sim_day = match_row["last_sim_day"]
+                # match_row is None if facility has demand rows but no matches
+                if match_row is None:
+                    n_matches = 0
+                    total_matched = 0.0
+                    total_co2 = 0.0
+                    avg_distance = 0.0
+                    min_distance = 0.0
+                    max_distance = 0.0
+                    last_sim_day = None
+                    avg_match_tons = 0.0
+                else:
+                    n_matches = int(match_row["n_matches"] or 0)
+                    total_matched = float(match_row["total_matched"] or 0)
+                    total_co2 = float(match_row["total_co2"] or 0)
+                    avg_distance = float(match_row["avg_distance"] or 0)
+                    min_distance = float(match_row["min_distance"] or 0)
+                    max_distance = float(match_row["max_distance"] or 0)
+                    last_sim_day = match_row["last_sim_day"]
+                    avg_match_tons = float(match_row["avg_tons"] or 0)
                 total_required = float(r["total_required"] or 0)
                 n_cycles = int(r["n_cycles"] or 0)
                 capacity = float(meta.get("processing_capacity_tons_per_day") or 0)
@@ -6073,7 +6104,7 @@ class Persistence:
                     "avg_match_distance_km": round(avg_distance, 2),
                     "min_match_distance_km": round(min_distance, 2),
                     "max_match_distance_km": round(max_distance, 2),
-                    "avg_match_tons": round(match_row["avg_tons"] or 0, 2),
+                    "avg_match_tons": round(avg_match_tons, 2),
                     "utilization_pct": (
                         round(100 * total_matched / (capacity * max(1, n_cycles)), 2)
                         if capacity > 0 and n_cycles > 0 else None

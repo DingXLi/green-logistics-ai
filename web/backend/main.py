@@ -5427,6 +5427,98 @@ async def get_top_demands(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/top-facilities")
+async def get_top_facilities(
+    metric: str = "avg_distance",
+    facility_ids: Optional[str] = None,
+    city: Optional[str] = None,
+    facility_type: Optional[str] = None,
+    material_type: Optional[str] = None,
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 10,
+):
+    """
+    Top real-Sweden facilities ranked by supply-distance metrics (iter #59).
+
+    Real Sweden facilities (13 hand-curated — Renova, Stena, Suez, harbor_cargo,
+    recycling_center, paper_mill, etc.) are used as demand_ids. Each match links
+    a supply to a facility, so we can aggregate per-facility supply-haul metrics.
+
+    Query:
+    - metric: which facility-distance metric to rank by. One of:
+      - 'avg_distance' (avg km per match, lower = better — closest suppliers)
+      - 'min_distance' (shortest match, lower = better)
+      - 'max_distance' (longest match, lower = better)
+      - 'total_matched_tons' (higher = better)
+      - 'match_count' (higher = better)
+      - 'match_rate' (matches per cycle, higher = better)
+      - 'utilization_pct' (matched / capacity * 100, higher = better)
+      - 'co2_per_ton' (kg CO2 / matched ton, lower = better)
+    - facility_ids: comma-separated list (e.g. "GBG_RENOVA_SYA,GBG_HARBOR")
+    - city: optional filter (Göteborg / Borås / Stockholm)
+    - facility_type: optional filter (recycling_center / metal_recovery / etc)
+    - material_type: optional material filter
+    - since_sim_day, until_sim_day: optional sim_day window
+    - limit: top N (default 10, max 100)
+
+    Returns:
+      {
+        metric, metric_description, direction,
+        filter: {city, facility_type, material_type, facility_ids, sim_day_window},
+        n_facilities_evaluated, n_facilities_returned,
+        top_facilities: [{facility_id, name, city, facility_type,
+                          processing_capacity_tons_per_day, operator, source,
+                          value, n_matches, n_cycles_with_demand,
+                          total_matched_tons, total_required_tons,
+                          avg_match_distance_km, min_match_distance_km,
+                          max_match_distance_km, avg_match_tons,
+                          utilization_pct, last_sim_day}, ...]
+      }
+
+    Use cases:
+    - Identify facilities served by closest suppliers (low avg_distance)
+    - Identify most-supplied facilities (high total_matched_tons)
+    - Identify highest utilization vs declared capacity
+    - Identify hardest-to-reach facilities (high avg_distance)
+    - Geographic analysis: filter by city to compare regional performance
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    # Parse facility_ids CSV → List[str]
+    facility_id_list: Optional[List[str]] = None
+    if facility_ids:
+        facility_id_list = [s.strip() for s in facility_ids.split(",") if s.strip()]
+        if not facility_id_list:
+            raise HTTPException(
+                status_code=400,
+                detail="facility_ids must be non-empty comma-separated IDs",
+            )
+
+    # Validate sim_day window
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail=f"since_sim_day ({since_sim_day}) > until_sim_day ({until_sim_day})",
+            )
+
+    try:
+        return coordinator.persistence.get_top_facilities_by_distance(
+            metric=metric,
+            facility_ids=facility_id_list,
+            city=city,
+            facility_type=facility_type,
+            material_type=material_type,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/demand-aggregates")
 async def get_demand_aggregates(
     demand_id: Optional[str] = None,
