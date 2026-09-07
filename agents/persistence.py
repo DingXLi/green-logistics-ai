@@ -5853,3 +5853,253 @@ class Persistence:
                 "until_sim_day": int(until_sim_day) if until_sim_day is not None else None,
             },
         }
+
+
+    def get_top_facilities_by_distance(
+        self,
+        metric: str = "avg_distance",
+        facility_ids: Optional[List[str]] = None,
+        city: Optional[str] = None,
+        facility_type: Optional[str] = None,
+        material_type: Optional[str] = None,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #59: Top real-Sweden facilities ranked by supply-distance metrics.
+
+        Real Sweden facilities (13 hand-curated facilities in
+        data/real_sweden_facilities.py — Renova, Stena, Suez, harbor_cargo,
+        recycling_center, paper_mill, etc.) are used as demand_ids in
+        demand_requests. Each match links a supply to a facility
+        (demand_id = facility.id), so we can aggregate per-facility
+        supply → facility haul metrics.
+
+        Args:
+            metric: which facility-distance metric to rank by. One of:
+                - 'avg_distance' (avg km per match to facility, lower = better
+                                  — closest suppliers)
+                - 'min_distance' (shortest match to facility, lower = better)
+                - 'max_distance' (longest match to facility, lower = better)
+                - 'total_matched_tons' (sum of matched tons, higher = better)
+                - 'match_count' (n matches, higher = better)
+                - 'match_rate' (matches / cycles_with_demand, higher = better)
+                - 'utilization_pct' (matched_tons / capacity * 100, higher = better — only for
+                                     facilities with capacity metadata; None otherwise)
+                - 'co2_per_ton' (total_co2 / total_matched_tons, lower = better)
+            facility_ids: optional explicit list of facility IDs to include
+                (default: all facilities in data/real_sweden_facilities.ALL_FACILITIES)
+            city: optional city filter (Göteborg / Borås / Stockholm)
+            facility_type: optional facility_type filter (recycling_center,
+                harbor_cargo, metal_recovery, paper_mill, etc.)
+            material_type: optional filter — only count matches of this material
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+            limit: top N (default 10, max 100)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            filter: {city, facility_type, material_type, facility_ids, sim_day_window},
+            n_facilities_evaluated, n_facilities_returned,
+            top_facilities: [{facility_id, name, city, facility_type,
+                              processing_capacity_tons_per_day,
+                              value, n_matches, n_cycles_with_demand,
+                              total_matched_tons, total_required_tons,
+                              avg_match_distance_km, min_match_distance_km,
+                              max_match_distance_km, avg_match_tons,
+                              utilization_pct, operator, source,
+                              last_sim_day}, ...]
+          }
+
+        Use cases:
+        - Identify facilities served by closest suppliers (low avg_distance)
+        - Identify most-supplied facilities (high total_matched_tons)
+        - Identify facilities with highest utilization vs capacity
+        - Identify hardest-to-reach facilities (high avg_distance)
+        """
+        valid_metrics = {
+            "avg_distance": ("lower_is_better", "avg km per match"),
+            "min_distance": ("lower_is_better", "shortest match km"),
+            "max_distance": ("lower_is_better", "longest match km"),
+            "total_matched_tons": ("higher_is_better", "total matched tons"),
+            "match_count": ("higher_is_better", "number of matches"),
+            "match_rate": ("higher_is_better", "matches per cycle"),
+            "utilization_pct": ("higher_is_better", "matched/capacity %"),
+            "co2_per_ton": ("lower_is_better", "kg CO2 per matched ton"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        # Load facility metadata
+        try:
+            from data.real_sweden_facilities import ALL_FACILITIES
+        except Exception:
+            ALL_FACILITIES = []
+        facility_meta = {f["id"]: f for f in (ALL_FACILITIES or [])}
+
+        # Determine facility ID set
+        if facility_ids:
+            ids_to_use = list(facility_ids)
+        else:
+            ids_to_use = list(facility_meta.keys())
+        # Apply city/facility_type filters at metadata level
+        if city or facility_type:
+            ids_to_use = [
+                fid for fid in ids_to_use
+                if fid in facility_meta
+                and (not city or facility_meta[fid].get("city") == city)
+                and (not facility_type or facility_meta[fid].get("facility_type") == facility_type)
+            ]
+
+        # Build SQL to aggregate per facility
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if material_type:
+            where_clauses.append("d.material_type = ?")
+            params.append(material_type)
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            # Use only ids in ids_to_use (handles facility_ids + city/type filters)
+            if ids_to_use:
+                placeholders = ",".join(["?"] * len(ids_to_use))
+                facility_where = f"d.demand_id IN ({placeholders})"
+                facility_params: List[Any] = list(ids_to_use)
+            else:
+                facility_where = "1=0"
+                facility_params = []
+
+            rows = conn.execute(
+                f"""SELECT d.demand_id,
+                          COUNT(DISTINCT d.cycle_id) as n_cycles,
+                          SUM(d.required_tons) as total_required
+                FROM demand_requests d
+                JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                WHERE {where_sql} AND {facility_where}
+                GROUP BY d.demand_id""",
+                (*params, *facility_params),
+            ).fetchall()
+
+            results = []
+            for r in rows:
+                fid = r["demand_id"]
+                meta = facility_meta.get(fid, {})
+
+                match_row = conn.execute(
+                    """SELECT COUNT(*) as n_matches,
+                              COALESCE(SUM(m.tons), 0) as total_matched,
+                              COALESCE(AVG(m.distance_km), 0) as avg_distance,
+                              COALESCE(MIN(m.distance_km), 0) as min_distance,
+                              COALESCE(MAX(m.distance_km), 0) as max_distance,
+                              COALESCE(AVG(m.tons), 0) as avg_tons,
+                              MAX(c2.sim_day) as last_sim_day,
+                              COALESCE(SUM(r2.co2_kg), 0) as total_co2
+                    FROM matches m
+                    JOIN optimization_cycles c2 ON c2.cycle_id = m.cycle_id
+                    LEFT JOIN routes r2 ON r2.cycle_id = m.cycle_id AND r2.vehicle_id IS NOT NULL
+                    WHERE m.demand_id = ?
+                    GROUP BY m.demand_id""",
+                    (fid,),
+                ).fetchone()
+
+                n_matches = int(match_row["n_matches"] or 0)
+                total_matched = float(match_row["total_matched"] or 0)
+                total_co2 = float(match_row["total_co2"] or 0)
+                avg_distance = float(match_row["avg_distance"] or 0)
+                min_distance = float(match_row["min_distance"] or 0)
+                max_distance = float(match_row["max_distance"] or 0)
+                last_sim_day = match_row["last_sim_day"]
+                total_required = float(r["total_required"] or 0)
+                n_cycles = int(r["n_cycles"] or 0)
+                capacity = float(meta.get("processing_capacity_tons_per_day") or 0)
+
+                # Compute metric value
+                if metric == "avg_distance":
+                    value = round(avg_distance, 2) if n_matches > 0 else None
+                elif metric == "min_distance":
+                    value = round(min_distance, 2) if n_matches > 0 else None
+                elif metric == "max_distance":
+                    value = round(max_distance, 2) if n_matches > 0 else None
+                elif metric == "total_matched_tons":
+                    value = round(total_matched, 2)
+                elif metric == "match_count":
+                    value = int(n_matches)
+                elif metric == "match_rate":
+                    value = round(n_matches / n_cycles, 3) if n_cycles > 0 else None
+                elif metric == "utilization_pct":
+                    if capacity > 0 and total_matched > 0:
+                        # n_cycles are the "active days" — capacity is per-day,
+                        # so capacity over n_cycles is total available capacity
+                        capacity_total = capacity * max(1, n_cycles)
+                        value = round(100 * total_matched / capacity_total, 2)
+                    else:
+                        value = None
+                elif metric == "co2_per_ton":
+                    value = round(total_co2 / total_matched, 3) if total_matched > 0 else None
+                else:
+                    value = None
+
+                # Skip facilities where metric is undefined (no matches for distance metrics)
+                if value is None:
+                    continue
+
+                results.append({
+                    "facility_id": fid,
+                    "name": meta.get("name"),
+                    "city": meta.get("city"),
+                    "facility_type": meta.get("facility_type"),
+                    "processing_capacity_tons_per_day": (
+                        int(capacity) if capacity > 0 else None
+                    ),
+                    "operator": meta.get("operator"),
+                    "source": meta.get("source"),
+                    "value": value,
+                    "n_matches": n_matches,
+                    "n_cycles_with_demand": n_cycles,
+                    "total_matched_tons": round(total_matched, 2),
+                    "total_required_tons": round(total_required, 2),
+                    "avg_match_distance_km": round(avg_distance, 2),
+                    "min_match_distance_km": round(min_distance, 2),
+                    "max_match_distance_km": round(max_distance, 2),
+                    "avg_match_tons": round(match_row["avg_tons"] or 0, 2),
+                    "utilization_pct": (
+                        round(100 * total_matched / (capacity * max(1, n_cycles)), 2)
+                        if capacity > 0 and n_cycles > 0 else None
+                    ),
+                    "last_sim_day": int(last_sim_day) if last_sim_day is not None else None,
+                })
+
+        # Sort
+        if direction == "lower_is_better":
+            results.sort(key=lambda x: x["value"])
+        else:
+            results.sort(key=lambda x: -x["value"])
+
+        return {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "filter": {
+                "city": city,
+                "facility_type": facility_type,
+                "material_type": material_type,
+                "facility_ids": facility_ids,
+                "since_sim_day": int(since_sim_day) if since_sim_day is not None else None,
+                "until_sim_day": int(until_sim_day) if until_sim_day is not None else None,
+            },
+            "n_facilities_evaluated": len(results),
+            "n_facilities_returned": min(limit, len(results)),
+            "top_facilities": results[:max(1, min(100, limit))],
+        }
