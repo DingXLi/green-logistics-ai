@@ -1895,9 +1895,6 @@ async def get_seasonal_factors(sim_day: Optional[int] = None):
     }
 
 
-@app.get("/api/optimize/last")
-
-
 @app.get("/api/signals/external")
 async def get_external_signals(
     country: str = "SE",
@@ -2023,6 +2020,7 @@ async def get_weather(
         }
 
 
+@app.get("/api/optimize/last")
 async def get_last_optimization():
     """返回上一次 cycle 的指标 + 多久前跑的, 供前端展示 'Last updated: 5 min ago'
 
