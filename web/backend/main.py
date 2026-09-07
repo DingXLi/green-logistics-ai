@@ -4,7 +4,7 @@ Green Logistics AI - Web Backend
 FastAPI 应用提供 REST API
 """
 
-from fastapi import FastAPI, HTTPException, Request, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Header, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response as FastAPIResponse, JSONResponse
 from pydantic import BaseModel, field_validator
@@ -5517,6 +5517,70 @@ async def get_top_facilities(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/persistence/compare-cycles")
+async def get_compare_cycles(
+    cycle_id_a: str = Query(..., description="First cycle_id (e.g. 'OPT0001')"),
+    cycle_id_b: str = Query(..., description="Second cycle_id (e.g. 'OPT0005')"),
+):
+    """
+    Side-by-side comparison of two optimization cycles (iter #59).
+
+    Compares cycle_a and cycle_b on:
+    - Core KPIs (matches, tons, cost, CO2, distance, fleet utilization)
+    - Derived metrics (cost_per_ton, co2_per_ton, cost_per_km, co2_per_km,
+      avg_tons_per_match)
+    - Seasonal context (seasonal_factor_avg, perturbation_count, etc)
+    - Absolute + pct differences (b - a)
+    - Winner on 5 key axes (lowest CO2/ton, lowest cost/ton, highest utilization,
+      most matches, most tons)
+
+    Query:
+    - cycle_id_a: required, first cycle
+    - cycle_id_b: required, second cycle
+
+    Returns:
+      {
+        cycle_a: {cycle_id, sim_day, ...all KPIs and derived metrics...},
+        cycle_b: {cycle_id, ...},
+        differences: {absolute: {...}, pct_change: {...}},
+        winner: {
+          lowest_co2_per_ton_kg: {cycle_id, direction, by_abs, by_pct, a_value, b_value},
+          lowest_cost_per_ton_sek: {...},
+          highest_fleet_utilization_pct: {...},
+          most_matches: {...},
+          most_tons: {...}
+        } | None
+      }
+
+    Either cycle may be missing (returns null for that side); differences
+    and winner are null/empty in that case.
+
+    Use cases:
+    - Compare greenest vs worst cycle (invoke with cycle_id_a = best, cycle_id_b = worst)
+    - A/B test solver changes
+    - Before/after perturbation impact
+    - Seasonal comparison (winter vs summer cycle)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    if not cycle_id_a or not cycle_id_b:
+        raise HTTPException(
+            status_code=400,
+            detail="Both cycle_id_a and cycle_id_b are required",
+        )
+    if cycle_id_a == cycle_id_b:
+        raise HTTPException(
+            status_code=400,
+            detail="cycle_id_a and cycle_id_b must be different",
+        )
+
+    return coordinator.persistence.compare_cycles(
+        cycle_id_a=cycle_id_a,
+        cycle_id_b=cycle_id_b,
+    )
 
 
 @app.get("/api/persistence/demand-aggregates")

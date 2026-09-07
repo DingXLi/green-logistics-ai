@@ -108,6 +108,11 @@ def _snapshot_backend_coordinator(request):
     Auto fixture: snapshot web.backend.main.coordinator before each test,
     restore after. Catches stale-coordinator pollution from any test that
     mutates the singleton without restoring it.
+
+    iter #59: Only restore the saved value if it was non-None. If saved was
+    None (no prior TestClient startup), don't reset to None — that would
+    break the first test in a session where the app's startup event has
+    just run and populated coordinator.
     """
     try:
         from web.backend import main as _backend_main
@@ -117,7 +122,8 @@ def _snapshot_backend_coordinator(request):
 
     saved = getattr(_backend_main, "coordinator", None)
     yield
-    try:
-        _backend_main.coordinator = saved
-    except Exception:
-        pass
+    if saved is not None:
+        try:
+            _backend_main.coordinator = saved
+        except Exception:
+            pass

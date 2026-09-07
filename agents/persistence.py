@@ -6134,3 +6134,176 @@ class Persistence:
             "n_facilities_returned": min(limit, len(results)),
             "top_facilities": results[:max(1, min(100, limit))],
         }
+
+
+    def compare_cycles(
+        self,
+        cycle_id_a: str,
+        cycle_id_b: str,
+    ) -> Dict[str, Any]:
+        """
+        iter #59: Side-by-side comparison of two optimization cycles.
+
+        Compares the two cycles on:
+        - Cycle metadata (sim_day, sim_hour, wall_timestamp, solver_status, wall_duration_ms)
+        - Core KPIs (n_matches, total_tons, total_cost_sek, total_co2_kg,
+          total_distance_km, n_vehicles_used, n_vehicles_available,
+          fleet_utilization_pct)
+        - Derived metrics (cost_per_ton_sek, co2_per_ton_kg, cost_per_km_sek,
+          co2_per_km_kg, avg_tons_per_match)
+        - Seasonal context (seasonal_factor_avg, seasonal_month, perturbation_count)
+        - Differences (b - a for each numeric field, plus pct_change where useful)
+
+        Args:
+            cycle_id_a: first cycle_id (e.g. "OPT0001")
+            cycle_id_b: second cycle_id (e.g. "OPT0005")
+
+        Returns:
+            {
+              cycle_a: {cycle_id, ...all KPIs...},
+              cycle_b: {cycle_id, ...all KPIs...},
+              differences: {
+                absolute: {field: b - a, ...},
+                pct_change: {field: 100*(b-a)/a, ...}
+              },
+              winner: {
+                lower_is_better: {cycle_id, by},
+                higher_is_better: {cycle_id, by}
+              } | None,
+            }
+
+        Use cases:
+        - Compare greenest cycle vs worst cycle
+        - A/B test solver changes (same input, different solver config)
+        - Before/after perturbation impact analysis
+        - Compare seasonal cycles (winter vs summer)
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT cycle_id, sim_day, sim_hour, wall_timestamp,
+                          activity_factor,
+                          n_supply_offers, n_demand_requests, n_matches,
+                          total_tons, total_cost_sek, total_co2_kg,
+                          total_distance_km, n_vehicles_used, n_vehicles_available,
+                          fleet_utilization_pct, solver_status, wall_duration_ms,
+                          seasonal_factor_avg, base_seasonal_factor_avg,
+                          seasonal_month, perturbation_count,
+                          perturbation_total_multiplier
+                FROM optimization_cycles
+                WHERE cycle_id IN (?, ?)""",
+                (cycle_id_a, cycle_id_b),
+            ).fetchall()
+
+        by_id = {r["cycle_id"]: dict(r) for r in rows}
+        # If only one or zero cycles found, return partial with nulls
+        a = by_id.get(cycle_id_a)
+        b = by_id.get(cycle_id_b)
+
+        def _serialize(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if row is None:
+                return None
+            total_tons = float(row.get("total_tons") or 0)
+            total_cost = float(row.get("total_cost_sek") or 0)
+            total_co2 = float(row.get("total_co2_kg") or 0)
+            total_dist = float(row.get("total_distance_km") or 0)
+            n_matches = int(row.get("n_matches") or 0)
+            n_veh_used = int(row.get("n_vehicles_used") or 0)
+            return {
+                "cycle_id": row.get("cycle_id"),
+                "sim_day": int(row["sim_day"]) if row.get("sim_day") is not None else None,
+                "sim_hour": int(row["sim_hour"]) if row.get("sim_hour") is not None else None,
+                "wall_timestamp": row.get("wall_timestamp"),
+                "activity_factor": row.get("activity_factor"),
+                "solver_status": row.get("solver_status"),
+                "wall_duration_ms": row.get("wall_duration_ms"),
+                # Core KPIs
+                "n_supply_offers": int(row.get("n_supply_offers") or 0),
+                "n_demand_requests": int(row.get("n_demand_requests") or 0),
+                "n_matches": n_matches,
+                "total_tons": round(total_tons, 2),
+                "total_cost_sek": round(total_cost, 2),
+                "total_co2_kg": round(total_co2, 3),
+                "total_distance_km": round(total_dist, 2),
+                "n_vehicles_used": n_veh_used,
+                "n_vehicles_available": int(row.get("n_vehicles_available") or 0),
+                "fleet_utilization_pct": round(float(row.get("fleet_utilization_pct") or 0), 2),
+                # Derived
+                "cost_per_ton_sek": round(total_cost / total_tons, 2) if total_tons > 0 else None,
+                "co2_per_ton_kg": round(total_co2 / total_tons, 3) if total_tons > 0 else None,
+                "cost_per_km_sek": round(total_cost / total_dist, 3) if total_dist > 0 else None,
+                "co2_per_km_kg": round(total_co2 / total_dist, 3) if total_dist > 0 else None,
+                "avg_tons_per_match": round(total_tons / n_matches, 2) if n_matches > 0 else None,
+                # Seasonal
+                "seasonal_factor_avg": row.get("seasonal_factor_avg"),
+                "base_seasonal_factor_avg": row.get("base_seasonal_factor_avg"),
+                "seasonal_month": row.get("seasonal_month"),
+                "perturbation_count": int(row.get("perturbation_count") or 0),
+                "perturbation_total_multiplier": row.get("perturbation_total_multiplier"),
+            }
+
+        sa = _serialize(a)
+        sb = _serialize(b)
+
+        differences: Dict[str, Any] = {"absolute": {}, "pct_change": {}}
+        winner: Optional[Dict[str, Any]] = None
+        if sa is not None and sb is not None:
+            # Compute absolute differences (b - a) for numeric fields
+            numeric_fields = (
+                "n_supply_offers", "n_demand_requests", "n_matches",
+                "total_tons", "total_cost_sek", "total_co2_kg", "total_distance_km",
+                "n_vehicles_used", "n_vehicles_available", "fleet_utilization_pct",
+                "cost_per_ton_sek", "co2_per_ton_kg", "cost_per_km_sek",
+                "co2_per_km_kg", "avg_tons_per_match",
+            )
+            for f in numeric_fields:
+                va = sa.get(f)
+                vb = sb.get(f)
+                if va is None or vb is None:
+                    continue
+                abs_diff = round(vb - va, 3)
+                differences["absolute"][f] = abs_diff
+                if va != 0:
+                    pct = round(100 * (vb - va) / abs(va), 2)
+                    differences["pct_change"][f] = pct
+
+            # Determine winner on three key axes
+            winner_axes = {
+                "lowest_co2_per_ton_kg": ("co2_per_ton_kg", "lower_is_better"),
+                "lowest_cost_per_ton_sek": ("cost_per_ton_sek", "lower_is_better"),
+                "highest_fleet_utilization_pct": ("fleet_utilization_pct", "higher_is_better"),
+                "most_matches": ("n_matches", "higher_is_better"),
+                "most_tons": ("total_tons", "higher_is_better"),
+            }
+            winner = {}
+            for axis, (field, direction) in winner_axes.items():
+                va = sa.get(field)
+                vb = sb.get(field)
+                if va is None or vb is None:
+                    winner[axis] = None
+                    continue
+                if direction == "lower_is_better":
+                    win_id = cycle_id_a if va <= vb else cycle_id_b
+                else:
+                    win_id = cycle_id_a if va >= vb else cycle_id_b
+                winning_val = min(va, vb) if direction == "lower_is_better" else max(va, vb)
+                losing_val = max(va, vb) if direction == "lower_is_better" else min(va, vb)
+                by_abs = round(winning_val - losing_val, 3)
+                by_pct = (
+                    round(100 * abs(va - vb) / abs(losing_val), 2)
+                    if losing_val != 0 else None
+                )
+                winner[axis] = {
+                    "cycle_id": win_id,
+                    "direction": direction,
+                    "by_abs": by_abs,
+                    "by_pct": by_pct,
+                    "a_value": va,
+                    "b_value": vb,
+                }
+
+        return {
+            "cycle_a": sa,
+            "cycle_b": sb,
+            "differences": differences,
+            "winner": winner,
+        }
