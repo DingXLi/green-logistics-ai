@@ -161,5 +161,176 @@ class TestHealthDeepEndpoint(unittest.TestCase):
         self.assertIn(data["status"], ("ok", "degraded"))
 
 
+# ============================================
+# iter #60: deep-health extension (simulation + weather subsystems)
+# ============================================
+
+
+class TestHealthDeepSimulationSubsystem(unittest.TestCase):
+    """/api/health/deep simulation subsystem (iter #60)"""
+
+    def setUp(self):
+        from web.backend import main as backend_main
+        from agents.persistence import Persistence
+
+        self.backend_main = backend_main
+        self.tmp_path = f"/tmp/test_health_sim_{os.getpid()}.db"
+        persistence = Persistence(db_path=self.tmp_path)
+        persistence.begin_cycle(
+            cycle_id="sim-c1", sim_day=1, sim_hour=8, activity_factor=1.0,
+            n_supply_offers=2, n_demand_requests=1,
+        )
+        persistence.commit_cycle(
+            cycle_id="sim-c1",
+            kpi={"n_matches": 1, "total_tons": 5, "total_cost_sek": 50,
+                 "total_co2_kg": 25, "total_distance_km": 10,
+                 "n_vehicles_used": 1, "n_vehicles_available": 5,
+                 "fleet_utilization_pct": 20, "solver_status": "OPTIMAL"},
+            wall_duration_ms=50,
+        )
+        coord = MagicMock()
+        coord.persistence = persistence
+        coord.supply_agents = [MagicMock()] * 2
+        coord.market_agent = MagicMock()
+        coord.market_agent.demand_points = [MagicMock()] * 3
+        coord.logistics_agent = MagicMock()
+        coord.logistics_agent.vehicles = [MagicMock()] * 4
+        coord.run_optimization_cycle = MagicMock()  # callable
+        coord._last_cycle_result = {"sim_day": 1, "optimization_id": "sim-c1"}
+        coord.last_cycle_id = "sim-c1"
+        backend_main.coordinator = coord
+        self.client = TestClient(backend_main.app)
+
+    def tearDown(self):
+        try:
+            os.unlink(self.tmp_path)
+        except Exception:
+            pass
+
+    def test_simulation_subsystem_present(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("simulation", data["checks"])
+        sim = data["checks"]["simulation"]
+        self.assertIn("status", sim)
+        self.assertIn(sim["status"], ("ok", "degraded", "down"))
+
+    def test_simulation_subsystem_has_batch_tasks(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        sim = resp.json()["checks"]["simulation"]
+        self.assertIn("batch_tasks", sim)
+        bt = sim["batch_tasks"]
+        for key in ("n_pending", "n_running", "n_completed", "n_failed", "n_total"):
+            self.assertIn(key, bt)
+
+    def test_simulation_subsystem_has_last_persisted_cycle(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        sim = resp.json()["checks"]["simulation"]
+        self.assertIn("last_persisted_cycle", sim)
+        last = sim["last_persisted_cycle"]
+        if last:  # may be None if not seeded
+            self.assertIn("cycle_id", last)
+
+    def test_simulation_status_degraded_with_failed_batches(self):
+        """If batch_tasks has failures, status should be degraded."""
+        # Inject failed tasks
+        self.backend_main._BATCH_TASKS.clear()
+        self.backend_main._BATCH_TASKS["failed-1"] = {
+            "task_id": "failed-1",
+            "status": "failed",
+            "error": "test",
+        }
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        sim = resp.json()["checks"]["simulation"]
+        self.assertEqual(sim["status"], "degraded")
+        # Cleanup
+        self.backend_main._BATCH_TASKS.clear()
+
+    def test_simulation_filter_only(self):
+        """?include=simulation should return only simulation block."""
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep?include=simulation")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("simulation", data["checks"])
+        # Other subsystems should not be present
+        self.assertNotIn("database", data["checks"])
+        self.assertNotIn("weather", data["checks"])
+
+
+class TestHealthDeepWeatherSubsystem(unittest.TestCase):
+    """/api/health/deep weather subsystem (iter #60)"""
+
+    def setUp(self):
+        from web.backend import main as backend_main
+        from agents.persistence import Persistence
+
+        self.backend_main = backend_main
+        self.tmp_path = f"/tmp/test_health_weather_{os.getpid()}.db"
+        persistence = Persistence(db_path=self.tmp_path)
+        coord = MagicMock()
+        coord.persistence = persistence
+        coord.supply_agents = [MagicMock()]
+        coord.market_agent = MagicMock()
+        coord.market_agent.demand_points = [MagicMock()]
+        coord.logistics_agent = MagicMock()
+        coord.logistics_agent.vehicles = [MagicMock()]
+        coord.run_optimization_cycle = MagicMock()
+        backend_main.coordinator = coord
+        self.client = TestClient(backend_main.app)
+
+    def tearDown(self):
+        try:
+            os.unlink(self.tmp_path)
+        except Exception:
+            pass
+
+    def test_weather_subsystem_present(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("weather", data["checks"])
+        w = data["checks"]["weather"]
+        self.assertIn("status", w)
+        self.assertIn(w["status"], ("ok", "degraded"))
+
+    def test_weather_block_structure(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        w = resp.json()["checks"]["weather"]
+        # Should have cache block (may be empty if no cache yet)
+        self.assertTrue(
+            "cache" in w or "cache_error" in w or "reasons" in w,
+            f"unexpected weather structure: {w}",
+        )
+
+    def test_weather_filter_only(self):
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep?include=weather")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("weather", data["checks"])
+        self.assertNotIn("simulation", data["checks"])
+        self.assertNotIn("database", data["checks"])
+
+    def test_subsystem_count(self):
+        """All 9 subsystems should be present in the default response."""
+        with TestClient(self.backend_main.app) as client:
+            resp = client.get("/api/health/deep")
+        data = resp.json()
+        self.assertEqual(data["n_subsystems"], 9)
+        expected = {
+            "database", "websocket", "osm", "scheduler",
+            "llm", "agents", "signals", "simulation", "weather",
+        }
+        self.assertEqual(set(data["checks"].keys()), expected)
+
+
 if __name__ == "__main__":
     unittest.main()

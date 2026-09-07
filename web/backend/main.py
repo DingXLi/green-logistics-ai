@@ -1167,179 +1167,373 @@ async def health_check():
     }
 
 
-@app.get("/api/health/deep")
-async def health_check_deep():
+# ============================================
+# iter #60: deep-health extension with simulation + weather subsystems
+# ============================================
+
+async def _check_simulation_subsystem() -> Dict[str, Any]:
     """
-    Deep health check (iter #14) — 检查所有依赖子系统的状态。
+    iter #60: Check the simulation subsystem health.
 
-    返回每个子系统的 status (ok / degraded / down) + 详情:
-    - database: SQLite 可读 + cycle 数
-    - websocket: broadcaster client 数 + 状态
-    - osrm: OSM 可用性 (尝试小范围 query, timeout 3s)
-    - scheduler: enabled / running / cycle_count / dry_run
-    - llm: GOOGLE_API_KEY 是否设置 + 最近一次调用是否成功
-    - agents: supply/demand/vehicle 计数
-    - signals (iter #54): Eurostat 3 indicators (construction / industrial /
-      business confidence) availability + source
+    Reports:
+    - coordinator is initialized
+    - coordinator.run_optimization_cycle is callable
+    - last known cycle: cycle_id / sim_day / wall_timestamp
+    - batch tasks: count by status (pending/running/completed/failed)
+    - scheduler state (if enabled)
+    """
+    info: Dict[str, Any] = {
+        "status": "ok",
+    }
+    if coordinator is None:
+        info["status"] = "down"
+        info["reason"] = "Coordinator not initialized"
+        return info
+    # Coordinator is initialized
+    if not hasattr(coordinator, "run_optimization_cycle"):
+        info["status"] = "degraded"
+        info["reason"] = "run_optimization_cycle not callable on coordinator"
+        return info
 
-    Status 总体:
-    - all_ok = 所有子系统都 ok
-    - degraded = 某些子系统 degraded 但仍可服务
-    - down = 关键子系统 (database) 不可用
+    # Last known cycle from in-memory cache
+    last_result = getattr(coordinator, "_last_cycle_result", None) or {}
+    last_cycle_id = getattr(coordinator, "last_cycle_id", None) or last_result.get("optimization_id")
+    last_sim_day = last_result.get("sim_day")
+    last_timestamp = last_result.get("wall_timestamp") or last_result.get("completed_at")
 
-    用途: 诊断页面 / monitoring / 部署后验证
+    # Last DB-persisted cycle (truth source)
+    last_db_cycle = None
+    try:
+        recent = coordinator.persistence.get_recent_cycles(limit=1)
+        if recent:
+            last_db_cycle = recent[0]
+    except Exception:
+        pass
+
+    # Batch tasks summary
+    try:
+        n_pending = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "pending")
+        n_running = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "running")
+        n_completed = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "completed")
+        n_failed = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "failed")
+        batch_summary = {
+            "n_pending": n_pending,
+            "n_running": n_running,
+            "n_completed": n_completed,
+            "n_failed": n_failed,
+            "n_total": len(_BATCH_TASKS),
+        }
+    except Exception:
+        batch_summary = {"error": "could not read _BATCH_TASKS"}
+
+    # Scheduler state (already reported in scheduler block, but include brief here)
+    sched = globals().get("scheduler")
+    scheduler_active = bool(sched and getattr(sched, "scheduler_active", False))
+
+    info["coordinator_initialized"] = True
+    info["last_in_memory_cycle"] = {
+        "cycle_id": last_cycle_id,
+        "sim_day": last_sim_day,
+        "wall_timestamp": last_timestamp,
+    }
+    if last_db_cycle:
+        info["last_persisted_cycle"] = {
+            "cycle_id": last_db_cycle.get("cycle_id"),
+            "sim_day": last_db_cycle.get("sim_day"),
+            "wall_timestamp": last_db_cycle.get("wall_timestamp"),
+            "n_matches": last_db_cycle.get("n_matches"),
+            "solver_status": last_db_cycle.get("solver_status"),
+        }
+    info["batch_tasks"] = batch_summary
+    info["scheduler_active"] = scheduler_active
+
+    # Status logic
+    if batch_summary.get("n_failed", 0) > 0 and batch_summary.get("n_running", 0) == 0:
+        # Only failed tasks in the recent history — degraded
+        info["status"] = "degraded"
+        info["reason"] = f"{batch_summary['n_failed']} batch task(s) failed"
+
+    return info
+
+
+async def _check_weather_subsystem() -> Dict[str, Any]:
+    """
+    iter #60: Check the SMHI weather subsystem health.
+
+    Reports:
+    - weather module importable
+    - last cached fetch: timestamp / lat / lon / source
+    - SMHI API reachability: only if use_cache=False (we use cached by default
+      to avoid rate limits; reachability tested with timeout 3s)
+    """
+    info: Dict[str, Any] = {
+        "status": "ok",
+    }
+    try:
+        from data.weather_smhi import get_forecast, _cache_key  # type: ignore
+    except Exception as e:
+        info["status"] = "degraded"
+        info["reason"] = f"weather_smhi import failed: {e}"
+        return info
+
+    # Check cache file (Borås default coords: 57.7089, 14.1618)
+    try:
+        cache_path = _cache_key(57.7089, 14.1618)
+        cache_exists = cache_path.exists() if cache_path else False
+        if cache_exists:
+            import json as _json
+            import time as _time
+            try:
+                cache_data = _json.loads(cache_path.read_text())
+                fetched_at = cache_data.get("fetched_at") or cache_data.get("timestamp")
+                if fetched_at:
+                    # parsed_time may be ISO string; rough staleness check
+                    from datetime import datetime as _dt
+                    try:
+                        ft = _dt.fromisoformat(fetched_at.replace("Z", "+00:00"))
+                        age_s = (_dt.now(ft.tzinfo) - ft).total_seconds() if ft.tzinfo else None
+                    except Exception:
+                        age_s = None
+                else:
+                    age_s = None
+                info["cache"] = {
+                    "path": str(cache_path),
+                    "fetched_at": fetched_at,
+                    "age_seconds": age_s,
+                    "source": cache_data.get("source"),
+                    "summary": cache_data.get("summary"),
+                }
+                # Stale if older than 30 min
+                if age_s is not None and age_s > 1800:
+                    info["cache"]["stale"] = True
+                    info["status"] = "degraded"
+                    info.setdefault("reasons", []).append(
+                        f"cache is {int(age_s)}s old (>30min)"
+                    )
+                else:
+                    info["cache"]["stale"] = False
+            except Exception as e:
+                info["cache_error"] = f"could not parse cache: {e}"
+        else:
+            info["cache"] = {"exists": False, "path": str(cache_path)}
+            # No cache yet — will fall back to defaults on first request
+            info["status"] = "degraded"
+            info.setdefault("reasons", []).append("no cache yet (first call will populate)")
+    except Exception as e:
+        info["cache_error"] = f"could not read cache: {e}"
+
+    # Active SMHI call (we DO call but with short timeout via the underlying SMHI)
+    # Since SMHI israte-limited, only probe on-demand via ?probe=true in future.
+    # For now, return cache status only.
+
+    return info
+
+
+@app.get("/api/health/deep")
+async def health_check_deep(include: Optional[str] = None):
+    """
+    Deep health check (iter #14 + iter #60) — checks all dependency subsystems.
+
+    Query:
+    - include: optional comma-separated list of subsystems to include. If omitted,
+      all subsystems are checked. Useful for fast probes.
+      Available: database, websocket, osm, scheduler, llm, agents, signals,
+      simulation, weather
+
+    Returns overall status + per-subsystem details:
+    - database: SQLite readable + cycle count
+    - websocket: broadcaster client count + broadcasts_sent
+    - osm: osmnx available?
+    - scheduler: enabled / active / cycle_count / error_count
+    - llm: GOOGLE_API_KEY set + model config
+    - agents: supply / demand / vehicle counts
+    - signals: Eurostat indicators (construction / industrial / business_confidence)
+    - simulation (iter #60): coordinator callable + last cycle + batch tasks
+    - weather (iter #60): SMHI cache + staleness
+
+    Overall status:
+    - 'ok': all subsystems ok
+    - 'degraded': some subsystems degraded but core (database) ok
+    - 'down': critical subsystem (database / coordinator) down
     """
     checks: Dict[str, Any] = {}
     overall_status = "ok"
+    wanted = set(include.split(",")) if include else None
+
+    def _want(name: str) -> bool:
+        return wanted is None or name in wanted
 
     # 1. Database
-    try:
-        if coordinator is not None and coordinator.persistence is not None:
-            summary = coordinator.persistence.get_summary() or {}
-            checks["database"] = {
-                "status": "ok",
-                "n_cycles": summary.get("n_cycles", 0),
-                "db_path": getattr(coordinator.persistence, "db_path", None),
-            }
-        else:
-            checks["database"] = {
-                "status": "degraded",
-                "reason": "Persistence not initialized",
-            }
-            overall_status = "degraded"
-    except Exception as e:
-        checks["database"] = {"status": "down", "error": str(e)[:200]}
-        overall_status = "down"
+    if _want("database"):
+        try:
+            if coordinator is not None and coordinator.persistence is not None:
+                summary = coordinator.persistence.get_summary() or {}
+                checks["database"] = {
+                    "status": "ok",
+                    "n_cycles": summary.get("n_cycles", 0),
+                    "db_path": getattr(coordinator.persistence, "db_path", None),
+                }
+            else:
+                checks["database"] = {
+                    "status": "degraded",
+                    "reason": "Persistence not initialized",
+                }
+                overall_status = "degraded"
+        except Exception as e:
+            checks["database"] = {"status": "down", "error": str(e)[:200]}
+            overall_status = "down"
 
     # 2. WebSocket
-    try:
-        stats = ws_broadcaster.stats()
-        checks["websocket"] = {
-            "status": "ok" if stats.get("total_clients", 0) >= 0 else "down",
-            "total_clients": stats.get("total_clients", 0),
-            "broadcasts_sent": stats.get("broadcasts_sent", 0),
-        }
-    except Exception as e:
-        checks["websocket"] = {"status": "down", "error": str(e)[:200]}
-        overall_status = "degraded"
-
-    # 3. OSRM / OSM availability (heuristic: try import osmnx, check cache)
-    try:
-        from optimization.real_distance import _osmnx_available  # type: ignore
-        osmnx_ok = _osmnx_available()
-        checks["osm"] = {
-            "status": "ok" if osmnx_ok else "degraded",
-            "osmnx_available": osmnx_ok,
-            "reason": "OSM available" if osmnx_ok else "osmnx not installed or import failed",
-        }
-        if not osmnx_ok:
-            overall_status = "degraded"
-    except Exception as e:
-        checks["osm"] = {"status": "degraded", "reason": str(e)[:200]}
-        overall_status = "degraded"
-
-    # 4. Scheduler
-    sched = globals().get("scheduler")
-    if sched is not None:
+    if _want("websocket"):
         try:
-            sched_status = sched.status()
-            checks["scheduler"] = {
-                "status": "ok" if sched.scheduler_active else "idle",
-                "active": sched.scheduler_active,
-                "cycle_count": sched.cycle_count,
-                "dry_run": sched.dry_run,
-                "error_count": sched.error_count,
-                "last_cycle_at": sched.last_cycle_at,
+            stats = ws_broadcaster.stats()
+            checks["websocket"] = {
+                "status": "ok" if stats.get("total_clients", 0) >= 0 else "down",
+                "total_clients": stats.get("total_clients", 0),
+                "broadcasts_sent": stats.get("broadcasts_sent", 0),
             }
         except Exception as e:
-            checks["scheduler"] = {"status": "degraded", "error": str(e)[:200]}
-    else:
-        checks["scheduler"] = {
-            "status": "idle",
-            "reason": "GL_SCHEDULER_ENABLED is not set to true",
-        }
+            checks["websocket"] = {"status": "down", "error": str(e)[:200]}
+            overall_status = "degraded"
 
-    # 5. LLM (Gemini)
-    try:
-        api_key_set = bool(os.environ.get("GOOGLE_API_KEY"))
-        if api_key_set:
-            from agents.llm_config import get_llm_config
-            cfg = get_llm_config()
-            checks["llm"] = {
-                "status": "ok",
-                "api_key_set": True,
-                "model": cfg.get("model"),
-                "max_retries": cfg.get("max_retries"),
+    # 3. OSRM / OSM availability
+    if _want("osm"):
+        try:
+            from optimization.real_distance import _osmnx_available  # type: ignore
+            osmnx_ok = _osmnx_available()
+            checks["osm"] = {
+                "status": "ok" if osmnx_ok else "degraded",
+                "osmnx_available": osmnx_ok,
+                "reason": "OSM available" if osmnx_ok else "osmnx not installed or import failed",
             }
-        else:
-            checks["llm"] = {
-                "status": "degraded",
-                "api_key_set": False,
-                "reason": "GOOGLE_API_KEY not set (LLM predictions will use deterministic fallback)",
-            }
-            if overall_status == "ok":
+            if not osmnx_ok:
                 overall_status = "degraded"
-    except Exception as e:
-        checks["llm"] = {"status": "degraded", "error": str(e)[:200]}
+        except Exception as e:
+            checks["osm"] = {"status": "degraded", "reason": str(e)[:200]}
+            overall_status = "degraded"
+
+    # 4. Scheduler
+    if _want("scheduler"):
+        sched = globals().get("scheduler")
+        if sched is not None:
+            try:
+                sched_status = sched.status()
+                checks["scheduler"] = {
+                    "status": "ok" if sched.scheduler_active else "idle",
+                    "active": sched.scheduler_active,
+                    "cycle_count": sched.cycle_count,
+                    "dry_run": sched.dry_run,
+                    "error_count": sched.error_count,
+                    "last_cycle_at": sched.last_cycle_at,
+                }
+            except Exception as e:
+                checks["scheduler"] = {"status": "degraded", "error": str(e)[:200]}
+        else:
+            checks["scheduler"] = {
+                "status": "idle",
+                "reason": "GL_SCHEDULER_ENABLED is not set to true",
+            }
+
+    # 5. LLM
+    if _want("llm"):
+        try:
+            api_key_set = bool(os.environ.get("GOOGLE_API_KEY"))
+            if api_key_set:
+                from agents.llm_config import get_llm_config
+                cfg = get_llm_config()
+                checks["llm"] = {
+                    "status": "ok",
+                    "api_key_set": True,
+                    "model": cfg.get("model"),
+                    "max_retries": cfg.get("max_retries"),
+                }
+            else:
+                checks["llm"] = {
+                    "status": "degraded",
+                    "api_key_set": False,
+                    "reason": "GOOGLE_API_KEY not set (LLM predictions will use deterministic fallback)",
+                }
+                if overall_status == "ok":
+                    overall_status = "degraded"
+        except Exception as e:
+            checks["llm"] = {"status": "degraded", "error": str(e)[:200]}
 
     # 6. Agents
-    try:
-        if coordinator is not None:
-            checks["agents"] = {
-                "status": "ok",
-                "n_supply": len(coordinator.supply_agents),
-                "n_demand": len(coordinator.market_agent.demand_points)
-                if hasattr(coordinator, "market_agent") else 0,
-                "n_vehicles": len(coordinator.logistics_agent.vehicles)
-                if hasattr(coordinator, "logistics_agent") else 0,
-            }
-        else:
-            checks["agents"] = {
-                "status": "down",
-                "reason": "Coordinator not initialized",
-            }
-            overall_status = "down"
-    except Exception as e:
-        checks["agents"] = {"status": "degraded", "error": str(e)[:200]}
-        overall_status = "degraded"
-
-    # 7. External signals (iter #54) — check if Eurostat fetch works
-    try:
-        from data.external_signals import (
-            get_construction_index,
-            get_industrial_index,
-            get_business_confidence,
-        )
-        construction = get_construction_index(country="SE", use_cache=True)
-        industrial = get_industrial_index(country="SE", use_cache=True)
-        confidence = get_business_confidence(country="SE", use_cache=True)
-        # All three should return valid latest_value
-        ok_count = sum(
-            1 for ind in (construction, industrial, confidence)
-            if ind.get("latest_value") is not None
-        )
-        all_source_ok = all(
-            ind.get("source") in ("eurostat", "cache") for ind in (construction, industrial, confidence)
-        )
-        signals_status = "ok" if (ok_count == 3 and all_source_ok) else "degraded"
-        checks["signals"] = {
-            "status": signals_status,
-            "construction_source": construction.get("source"),
-            "industrial_source": industrial.get("source"),
-            "business_confidence_source": confidence.get("source"),
-            "n_indicators_ok": ok_count,
-            "n_indicators_total": 3,
-        }
-        if signals_status == "degraded" and overall_status == "ok":
+    if _want("agents"):
+        try:
+            if coordinator is not None:
+                checks["agents"] = {
+                    "status": "ok",
+                    "n_supply": len(coordinator.supply_agents),
+                    "n_demand": len(coordinator.market_agent.demand_points)
+                    if hasattr(coordinator, "market_agent") else 0,
+                    "n_vehicles": len(coordinator.logistics_agent.vehicles)
+                    if hasattr(coordinator, "logistics_agent") else 0,
+                }
+            else:
+                checks["agents"] = {
+                    "status": "down",
+                    "reason": "Coordinator not initialized",
+                }
+                overall_status = "down"
+        except Exception as e:
+            checks["agents"] = {"status": "degraded", "error": str(e)[:200]}
             overall_status = "degraded"
-    except Exception as e:
-        checks["signals"] = {"status": "degraded", "error": str(e)[:200]}
-        if overall_status == "ok":
+
+    # 7. External signals
+    if _want("signals"):
+        try:
+            from data.external_signals import (
+                get_construction_index,
+                get_industrial_index,
+                get_business_confidence,
+            )
+            construction = get_construction_index(country="SE", use_cache=True)
+            industrial = get_industrial_index(country="SE", use_cache=True)
+            confidence = get_business_confidence(country="SE", use_cache=True)
+            ok_count = sum(
+                1 for ind in (construction, industrial, confidence)
+                if ind.get("latest_value") is not None
+            )
+            all_source_ok = all(
+                ind.get("source") in ("eurostat", "cache") for ind in (construction, industrial, confidence)
+            )
+            signals_status = "ok" if (ok_count == 3 and all_source_ok) else "degraded"
+            checks["signals"] = {
+                "status": signals_status,
+                "construction_source": construction.get("source"),
+                "industrial_source": industrial.get("source"),
+                "business_confidence_source": confidence.get("source"),
+                "n_indicators_ok": ok_count,
+                "n_indicators_total": 3,
+            }
+            if signals_status == "degraded" and overall_status == "ok":
+                overall_status = "degraded"
+        except Exception as e:
+            checks["signals"] = {"status": "degraded", "error": str(e)[:200]}
+            if overall_status == "ok":
+                overall_status = "degraded"
+
+    # 8. Simulation (iter #60)
+    if _want("simulation"):
+        sim_check = await _check_simulation_subsystem()
+        checks["simulation"] = sim_check
+        if sim_check.get("status") == "down":
+            overall_status = "down"
+        elif sim_check.get("status") == "degraded" and overall_status == "ok":
+            overall_status = "degraded"
+
+    # 9. Weather (iter #60)
+    if _want("weather"):
+        weather_check = await _check_weather_subsystem()
+        checks["weather"] = weather_check
+        if weather_check.get("status") == "degraded" and overall_status == "ok":
             overall_status = "degraded"
 
     return {
         "status": overall_status,
         "timestamp": datetime.now().isoformat(),
+        "n_subsystems": len(checks),
         "checks": checks,
     }
 

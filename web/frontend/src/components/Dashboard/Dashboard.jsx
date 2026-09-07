@@ -116,6 +116,8 @@ const PredictionAccuracyPanel = lazy(() => import('./PredictionAccuracyPanel').t
 const TopFacilitiesPanel = lazy(() => import('./TopFacilitiesPanel').then(m => ({ default: m.TopFacilitiesPanel })))
 // iter #59: cycle comparison panel (side-by-side compare two cycles)
 const CycleComparisonPanel = lazy(() => import('./CycleComparisonPanel').then(m => ({ default: m.CycleComparisonPanel })))
+// iter #60: health dashboard panel (visualize /api/health/deep)
+const HealthDashboardPanel = lazy(() => import('./HealthDashboardPanel').then(m => ({ default: m.HealthDashboardPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -775,6 +777,11 @@ export default function Dashboard() {
           {/* iter #59: Cycle comparison (side-by-side compare two cycles) */}
           <Suspense fallback={<LoadingSpinner label="Loading cycle comparison…" />}>
             <CycleComparisonPanel />
+          </Suspense>
+
+          {/* iter #60: Health dashboard (visualize /api/health/deep) */}
+          <Suspense fallback={<LoadingSpinner label="Loading health dashboard…" />}>
+            <HealthDashboardPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
