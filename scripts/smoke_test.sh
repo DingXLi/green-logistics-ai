@@ -392,6 +392,15 @@ check_json_field "/api/persistence/compare-cycles has winner" GET "/api/persiste
 check_json_field "/api/persistence/compare-cycles has absolute diffs" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.absolute | type" "object"
 check_json_field "/api/persistence/compare-cycles has pct_change" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.pct_change | type" "object"
 check_json_field "/api/persistence/compare-cycles winner has 5 axes" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".winner | keys | length" "5"
+# iter #60: deep-health extension (simulation + weather subsystems)
+check_endpoint "/api/health/deep (iter #60, 9 subsystems)" 200 GET "/api/health/deep"
+check_json_field "/api/health/deep has n_subsystems=9" GET "/api/health/deep" ".n_subsystems" "9"
+check_json_field "/api/health/deep has simulation block" GET "/api/health/deep" ".checks.simulation | type" "object"
+check_json_field "/api/health/deep has weather block" GET "/api/health/deep" ".checks.weather | type" "object"
+check_json_field "/api/health/deep simulation has batch_tasks" GET "/api/health/deep" ".checks.simulation.batch_tasks | type" "object"
+check_endpoint "/api/health/deep?include=simulation" 200 GET "/api/health/deep?include=simulation"
+check_endpoint "/api/health/deep?include=weather" 200 GET "/api/health/deep?include=weather"
+check_json_field "/api/health/deep include filter excludes others" GET "/api/health/deep?include=simulation" ".checks.database // null" "null"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

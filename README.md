@@ -249,7 +249,7 @@ green-logistics-ai/
 | GET    | `/api/admin/db-maintenance/log?limit=N` | Recent VACUUM audit log (admin, iter #42) |
 | GET    | `/api/facilities/distance-matrix` | N×N facility distance matrix (iter #15) |
 | POST   | `/api/optimize/batch` | Parallel multi-scenario optimization (iter #13) |
-| GET    | `/api/health/deep` | Multi-subsystem health check (iter #14) |
+| GET    | `/api/health/deep` | Multi-subsystem health check (9 subsystems: database / websocket / osm / scheduler / llm / agents / signals / simulation / weather). Optional `?include=db,simulation,weather` to filter. (iter #14 + iter #60) |
 | GET    | `/api/scheduler/status` | Background scheduler status |
 | POST   | `/api/scheduler/control` | start / stop / restart scheduler |
 | WS     | `/ws` | WebSocket: cycle_update + fleet metrics (iter #27 origin allowlist) |
