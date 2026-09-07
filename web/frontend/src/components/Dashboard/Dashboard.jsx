@@ -114,6 +114,8 @@ const TopDemandsPanel = lazy(() => import('./TopDemandsPanel').then(m => ({ defa
 const PredictionAccuracyPanel = lazy(() => import('./PredictionAccuracyPanel').then(m => ({ default: m.PredictionAccuracyPanel })))
 // iter #59: top facilities panel (real Sweden facilities ranked by supply-distance metrics)
 const TopFacilitiesPanel = lazy(() => import('./TopFacilitiesPanel').then(m => ({ default: m.TopFacilitiesPanel })))
+// iter #59: cycle comparison panel (side-by-side compare two cycles)
+const CycleComparisonPanel = lazy(() => import('./CycleComparisonPanel').then(m => ({ default: m.CycleComparisonPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -768,6 +770,11 @@ export default function Dashboard() {
           {/* iter #59: Top facilities (real Sweden facilities ranked by supply-distance metrics) */}
           <Suspense fallback={<LoadingSpinner label="Loading top facilities…" />}>
             <TopFacilitiesPanel />
+          </Suspense>
+
+          {/* iter #59: Cycle comparison (side-by-side compare two cycles) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cycle comparison…" />}>
+            <CycleComparisonPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

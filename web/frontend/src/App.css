@@ -4831,3 +4831,150 @@ td.no-matches {
   color: var(--text-secondary);
   margin-top: 0.1rem;
 }
+
+/* iter #59: CycleComparisonPanel styles
+   Side-by-side cycle comparison with winner badges, KPI table, and metadata. */
+.cycle-comparison-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.cycle-comparison-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cycle-comparison-panel .filter-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 220px;
+}
+
+.cycle-comparison-panel .error-inline {
+  font-size: 0.8rem;
+  color: var(--warning, #d97706);
+}
+
+.cycle-comparison-panel .winner-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.cycle-comparison-panel .winner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  background: var(--bg-accent);
+}
+
+.cycle-comparison-panel .winner-badge.winner-a {
+  border-color: var(--accent, #3b82f6);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.cycle-comparison-panel .winner-badge.winner-b {
+  border-color: var(--success, #10b981);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.cycle-comparison-panel .winner-axis {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.cycle-comparison-panel .winner-magnitude {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.cycle-comparison-panel .comparison-table .cycle-a-col {
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.cycle-comparison-panel .comparison-table .cycle-b-col {
+  background: rgba(16, 185, 129, 0.05);
+  border-left: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.cycle-comparison-panel .comparison-table .diff-col {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.cycle-comparison-panel .pct-positive {
+  color: var(--success, #10b981);
+  font-weight: 600;
+}
+
+.cycle-comparison-panel .pct-negative {
+  color: var(--error, #ef4444);
+  font-weight: 600;
+}
+
+.cycle-comparison-panel .metric-unit {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 0.2rem;
+}
+
+.cycle-comparison-panel .meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.cycle-comparison-panel .meta-block {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  min-width: 120px;
+}
+
+.cycle-comparison-panel .meta-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  margin-bottom: 0.25rem;
+}
+
+.cycle-comparison-panel .meta-a {
+  color: var(--accent, #3b82f6);
+  font-weight: 500;
+}
+
+.cycle-comparison-panel .meta-b {
+  color: var(--success, #10b981);
+  font-weight: 500;
+}
+
+.cycle-comparison-panel .meta-vs {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin: 0.1rem 0;
+}

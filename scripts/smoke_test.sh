@@ -383,6 +383,15 @@ check_endpoint "/api/persistence/top-facilities?facility_type=metal_recovery" 20
 check_endpoint "/api/persistence/top-facilities?facility_ids=GBG_RENOVA_SYA,GBG_STENA" 200 GET "/api/persistence/top-facilities?facility_ids=GBG_RENOVA_SYA,GBG_STENA"
 check_endpoint "/api/persistence/top-facilities?since_sim_day=1&until_sim_day=30" 200 GET "/api/persistence/top-facilities?since_sim_day=1&until_sim_day=30"
 check_endpoint "/api/persistence/top-facilities?invalid=metric&city=Bor%C3%A5s" 200 GET "/api/persistence/top-facilities?city=Bor%C3%A5s&limit=5"
+# iter #59: compare-cycles endpoint
+check_endpoint "/api/persistence/compare-cycles (iter #59, default cycles)" 200 GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002"
+check_json_field "/api/persistence/compare-cycles has cycle_a" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".cycle_a | type" "object"
+check_json_field "/api/persistence/compare-cycles has cycle_b" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".cycle_b | type" "object"
+check_json_field "/api/persistence/compare-cycles has differences" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences | type" "object"
+check_json_field "/api/persistence/compare-cycles has winner" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".winner | type" "object"
+check_json_field "/api/persistence/compare-cycles has absolute diffs" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.absolute | type" "object"
+check_json_field "/api/persistence/compare-cycles has pct_change" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".differences.pct_change | type" "object"
+check_json_field "/api/persistence/compare-cycles winner has 5 axes" GET "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002" ".winner | keys | length" "5"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
