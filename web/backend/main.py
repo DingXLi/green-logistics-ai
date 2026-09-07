@@ -6724,6 +6724,47 @@ async def reset_perf_stats(_: None = Depends(require_admin)):
     return {"reset": True}
 
 
+# ============================================
+# iter #61: Persistence TTL cache admin endpoints
+# ============================================
+# Inspect / clear the in-memory cache that backs the 4 top-X persistence methods
+# (get_top_suppliers_by_efficiency, get_top_cycles_by_efficiency,
+# get_top_demands_by_fulfillment, get_top_facilities_by_distance).
+# Useful for diagnostics + manual invalidation when data changes outside the
+# 30s TTL (e.g. after a batch simulation completes).
+
+@app.get("/api/admin/persistence/cache")
+async def get_persistence_cache_stats(_: None = Depends(require_admin)):
+    """
+    iter #61: Get persistence cache stats.
+
+    Returns:
+      {
+        n_entries, n_active, n_expired, ttl_seconds
+      }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.cache_stats()
+
+
+@app.post("/api/admin/persistence/cache/clear")
+async def clear_persistence_cache(_: None = Depends(require_admin)):
+    """
+    iter #61: Manually clear the persistence cache.
+
+    Useful after batch sim completes (so dashboard immediately shows new data
+    instead of waiting up to 30s for TTL expiry).
+
+    Returns:
+      {cleared: int}  -- number of cache entries removed
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    n_cleared = coordinator.persistence.cache_clear()
+    return {"cleared": n_cleared}
+
+
 # ============================================================
 # LLM cost tracking (iter #22)
 # ============================================================
