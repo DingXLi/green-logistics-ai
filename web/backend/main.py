@@ -5405,6 +5405,48 @@ async def get_cycle_duration_stats(
     )
 
 
+@app.get("/api/persistence/cycle-duration-histogram")
+async def get_cycle_duration_histogram(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #64: Cycle solver-duration histogram with fixed buckets.
+
+    Same data as /api/persistence/cycle-duration-stats but bucketed for
+    visualization. 8 fixed buckets: <100ms, 100-500ms, 0.5-1s, 1-5s,
+    5-10s, 10-30s, 30-60s, 60s+. Each bucket reports count + pct_of_total.
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles, n_buckets,
+        buckets: [{label, min_ms, max_ms, count, pct}, ...],
+        stats: {mean_ms, median_ms, min_ms, max_ms, stddev_ms,
+                slow_count, fast_count, total_seconds}
+      }
+
+    Use cases:
+    - Render histogram chart in dashboard
+    - Identify bimodal solver performance (some fast, some slow)
+    - Spot outlier runs (60s+ bucket)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_cycle_duration_histogram(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/match-distance-buckets")
 async def get_match_distance_buckets(
     since_sim_day: Optional[int] = None,

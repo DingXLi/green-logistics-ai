@@ -2639,6 +2639,163 @@ class Persistence:
             "until_sim_day": until_sim_day,
         }
 
+    def get_cycle_duration_histogram(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #64: Cycle solver-duration histogram with fixed buckets.
+
+        Same data as get_cycle_duration_stats but bucketed for visualization.
+        Buckets:
+          <100ms, 100-500ms, 500ms-1s, 1-5s, 5-10s, 10-30s, 30-60s, 60s+
+
+        Each bucket reports count + pct_of_total.
+
+        Args:
+            since_sim_day, until_sim_day: optional sim_day window
+
+        Returns:
+          {
+            n_cycles, n_buckets,
+            since_sim_day, until_sim_day,
+            buckets: [
+              {label, min_ms, max_ms, count, pct},
+              ...
+            ],
+            stats: {mean_ms, median_ms, min_ms, max_ms, stddev_ms,
+                    slow_count, fast_count, total_seconds}
+          }
+
+        Use cases:
+        - Visualize solver performance distribution in histogram chart
+        - Identify bimodal distributions (some fast, some slow)
+        - Spot outlier slow runs (60s+ bucket)
+        """
+        _cache_key = self._cache_key(
+            "get_cycle_duration_histogram",
+            {"since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT wall_duration_ms, sim_day, cycle_id, solver_status
+                FROM optimization_cycles
+                WHERE {where_sql}""",
+                params,
+            ).fetchall()
+
+        # Define buckets (min_ms, max_ms, label)
+        # Last bucket has max_ms = +inf (we use >= check)
+        bucket_defs = [
+            (0,    100,   "<100ms"),
+            (100,  500,   "100-500ms"),
+            (500,  1000,  "0.5-1s"),
+            (1000, 5000,  "1-5s"),
+            (5000, 10000, "5-10s"),
+            (10000, 30000, "10-30s"),
+            (30000, 60000, "30-60s"),
+            (60000, float("inf"), "60s+"),
+        ]
+
+        if not rows:
+            empty_buckets = [
+                {
+                    "label": label,
+                    "min_ms": lo,
+                    "max_ms": hi if hi != float("inf") else None,
+                    "count": 0,
+                    "pct": 0.0,
+                }
+                for (lo, hi, label) in bucket_defs
+            ]
+            result = {
+                "n_cycles": 0,
+                "n_buckets": len(bucket_defs),
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+                "buckets": empty_buckets,
+                "stats": {
+                    "mean_ms": None, "median_ms": None,
+                    "min_ms": None, "max_ms": None, "stddev_ms": None,
+                    "slow_count": 0, "fast_count": 0,
+                    "total_seconds": 0.0,
+                },
+            }
+            self._cache_set(_cache_key, result)
+            return result
+
+        values = [float(r["wall_duration_ms"]) for r in rows]
+        n = len(values)
+
+        # Compute bucket counts
+        bucket_counts = [0] * len(bucket_defs)
+        for v in values:
+            for idx, (lo, hi, _label) in enumerate(bucket_defs):
+                if lo <= v < hi:
+                    bucket_counts[idx] += 1
+                    break
+
+        buckets_out = []
+        for idx, (lo, hi, label) in enumerate(bucket_defs):
+            count = bucket_counts[idx]
+            pct = round(100 * count / n, 2) if n > 0 else 0.0
+            buckets_out.append({
+                "label": label,
+                "min_ms": lo,
+                "max_ms": hi if hi != float("inf") else None,
+                "count": count,
+                "pct": pct,
+            })
+
+        # Compute summary stats
+        sorted_values = sorted(values)
+        mean = sum(values) / n
+        variance = sum((v - mean) ** 2 for v in values) / n
+        stddev = variance ** 0.5
+        if n == 1:
+            median = values[0]
+        else:
+            mid_idx = (n - 1) / 2
+            lo_idx = int(mid_idx)
+            hi_idx = min(lo_idx + 1, n - 1)
+            frac = mid_idx - lo_idx
+            median = sorted_values[lo_idx] * (1 - frac) + sorted_values[hi_idx] * frac
+
+        result = {
+            "n_cycles": n,
+            "n_buckets": len(bucket_defs),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "buckets": buckets_out,
+            "stats": {
+                "mean_ms": round(mean, 2),
+                "median_ms": round(median, 2),
+                "min_ms": round(min(values), 2),
+                "max_ms": round(max(values), 2),
+                "stddev_ms": round(stddev, 2),
+                "slow_count": sum(1 for v in values if v >= 5000),
+                "fast_count": sum(1 for v in values if v <= 100),
+                "total_seconds": round(sum(values) / 1000, 2),
+            },
+        }
+        self._cache_set(_cache_key, result)
+        return result
+
     def get_match_distance_buckets(self, since_sim_day: Optional[int] = None,
                                     until_sim_day: Optional[int] = None) -> Dict[str, Any]:
         """
