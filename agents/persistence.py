@@ -7746,3 +7746,191 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def cycle_trend_comparison(
+        self,
+        early_window: int = 5,
+        late_window: int = 5,
+        metric: str = "co2_per_ton",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #65: Compare early-window vs late-window cycles by metric.
+
+        Aggregates the first N cycles (oldest by sim_day) vs the last N
+        cycles (newest by sim_day) and compares their average value of the
+        chosen metric. Useful for visualizing how a system metric evolves
+        over the simulation horizon.
+
+        Args:
+            early_window: number of cycles from the start of window (default 5)
+            late_window: number of cycles from the end of window (default 5)
+            metric: which efficiency metric to compare. One of:
+                - 'co2_per_ton' (kg CO2 / matched ton, lower = better)
+                - 'cost_per_ton' (SEK / matched ton, lower = better)
+                - 'co2_per_km' (kg CO2 / km, lower = better)
+                - 'cost_per_km' (SEK / km, lower = better)
+                - 'fleet_utilization_pct' (avg util %, higher = better)
+                - 'match_rate_vs_offers' (matches / offers, higher = better)
+                - 'tons_per_cycle' (avg matched tons, higher = better)
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            window: {since_sim_day, until_sim_day},
+            early: {n_cycles, cycle_ids, mean_value, min_value, max_value,
+                    median_value, stddev_value},
+            late: {n_cycles, cycle_ids, mean_value, min_value, max_value,
+                   median_value, stddev_value},
+            delta: {absolute (late - early), pct_change},
+            trend: 'improving' / 'declining' / 'stable',
+          }
+
+        Use cases:
+        - Show that fleet is becoming greener over time (co2_per_ton drops)
+        - Show utilization is rising
+        - Identify whether optimization is paying off vs baseline
+        """
+        _cache_key = self._cache_key(
+            "cycle_trend_comparison",
+            {"early_window": early_window, "late_window": late_window,
+             "metric": metric,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        valid_metrics = {
+            "co2_per_ton": ("lower_is_better", "kg CO2 / matched ton"),
+            "cost_per_ton": ("lower_is_better", "SEK / matched ton"),
+            "co2_per_km": ("lower_is_better", "kg CO2 / km"),
+            "cost_per_km": ("lower_is_better", "SEK / km"),
+            "fleet_utilization_pct": ("higher_is_better", "avg util %"),
+            "match_rate_vs_offers": ("higher_is_better", "matches / offers"),
+            "tons_per_cycle": ("higher_is_better", "avg matched tons"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+        direction, desc = valid_metrics[metric]
+
+        where_clauses: List[str] = ["1=1"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("oc.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("oc.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        # Compute per-cycle metric value via aggregation
+        # For ton-based: needs sum of match.tons per cycle
+        # For km-based: needs sum of routes.distance_km per cycle
+        metric_sql_fragment = {
+            "co2_per_ton": "oc.total_co2_kg / NULLIF(oc.total_tons, 0)",
+            "cost_per_ton": "oc.total_cost_sek / NULLIF(oc.total_tons, 0)",
+            "co2_per_km": "oc.total_co2_kg / NULLIF(oc.total_distance_km, 0)",
+            "cost_per_km": "oc.total_cost_sek / NULLIF(oc.total_distance_km, 0)",
+            "fleet_utilization_pct": "oc.fleet_utilization_pct",
+            "match_rate_vs_offers": "oc.n_matches / NULLIF(oc.n_supply_offers, 0)",
+            "tons_per_cycle": "oc.total_tons",
+        }[metric]
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT oc.cycle_id, oc.sim_day, oc.sim_hour,
+                          oc.n_matches, oc.n_supply_offers, oc.total_tons,
+                          oc.total_cost_sek, oc.total_co2_kg, oc.total_distance_km,
+                          oc.fleet_utilization_pct,
+                          {metric_sql_fragment} as metric_value
+                FROM optimization_cycles oc
+                WHERE {where_sql}
+                  AND oc.n_matches > 0
+                ORDER BY oc.sim_day ASC, oc.sim_hour ASC, oc.cycle_id ASC""",
+                params,
+            ).fetchall()
+
+        def _stats(rows_subset):
+            n = len(rows_subset)
+            vals = [r["metric_value"] for r in rows_subset if r["metric_value"] is not None]
+            if not vals:
+                return {
+                    "n_cycles": n, "cycle_ids": [],
+                    "mean_value": None, "min_value": None,
+                    "max_value": None, "median_value": None,
+                    "stddev_value": None,
+                }
+            sorted_vals = sorted(vals)
+            mean = sum(vals) / len(vals)
+            variance = sum((v - mean) ** 2 for v in vals) / len(vals)
+            stddev = variance ** 0.5
+            if len(vals) == 1:
+                median = vals[0]
+            else:
+                mid_idx = (len(vals) - 1) / 2
+                lo_idx = int(mid_idx)
+                hi_idx = min(lo_idx + 1, len(vals) - 1)
+                frac = mid_idx - lo_idx
+                median = sorted_vals[lo_idx] * (1 - frac) + sorted_vals[hi_idx] * frac
+            return {
+                "n_cycles": len(vals),
+                "cycle_ids": [r["cycle_id"] for r in rows_subset if r["metric_value"] is not None],
+                "mean_value": round(mean, 4),
+                "min_value": round(min(vals), 4),
+                "max_value": round(max(vals), 4),
+                "median_value": round(median, 4),
+                "stddev_value": round(stddev, 4),
+            }
+
+        early_rows = rows[:early_window]
+        late_rows = rows[-late_window:] if late_window > 0 else []
+        early_stats = _stats(early_rows)
+        late_stats = _stats(late_rows)
+
+        # Compute delta + trend
+        delta_dict: Dict[str, Any] = {"absolute": None, "pct_change": None}
+        trend = "stable"
+        if (early_stats["mean_value"] is not None and
+                late_stats["mean_value"] is not None):
+            abs_diff = round(late_stats["mean_value"] - early_stats["mean_value"], 4)
+            delta_dict["absolute"] = abs_diff
+            if early_stats["mean_value"] != 0:
+                pct = round(
+                    100 * (late_stats["mean_value"] - early_stats["mean_value"])
+                    / abs(early_stats["mean_value"]), 2)
+                delta_dict["pct_change"] = pct
+                # Trend: > 5% threshold
+                if direction == "lower_is_better":
+                    if pct < -5:
+                        trend = "improving"
+                    elif pct > 5:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+                else:
+                    if pct > 5:
+                        trend = "improving"
+                    elif pct < -5:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+
+        result = {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "window": {"since_sim_day": since_sim_day,
+                       "until_sim_day": until_sim_day},
+            "early": early_stats,
+            "late": late_stats,
+            "delta": delta_dict,
+            "trend": trend,
+        }
+        self._cache_set(_cache_key, result)
+        return result

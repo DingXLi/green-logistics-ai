@@ -5340,6 +5340,59 @@ async def get_vehicle_timeseries(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/cycle-trend-comparison")
+async def get_cycle_trend_comparison(
+    early_window: int = 5,
+    late_window: int = 5,
+    metric: str = "co2_per_ton",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #65: Compare early-window vs late-window cycles by metric.
+
+    Aggregates the first N cycles vs the last N cycles in the window and
+    compares their average value of the chosen metric. Returns mean /
+    min / max / median / stddev for each window + absolute + pct delta
+    + trend classification (improving / declining / stable).
+
+    Query:
+    - early_window: cycles from start of window (default 5)
+    - late_window: cycles from end of window (default 5)
+    - metric: one of co2_per_ton / cost_per_ton / co2_per_km / cost_per_km /
+      fleet_utilization_pct / match_rate_vs_offers / tons_per_cycle
+      (default co2_per_ton)
+    - since_sim_day / until_sim_day: optional sim_day window
+
+    Returns:
+      {
+        metric, metric_description, direction,
+        window: {since_sim_day, until_sim_day},
+        early: {n_cycles, cycle_ids, mean_value, min_value, max_value,
+                median_value, stddev_value},
+        late: {n_cycles, cycle_ids, mean_value, ...},
+        delta: {absolute (late - early), pct_change},
+        trend: 'improving' / 'declining' / 'stable',
+      }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if early_window < 1 or late_window < 1:
+        raise HTTPException(status_code=400, detail="windows must be >= 1")
+    if early_window > 100 or late_window > 100:
+        raise HTTPException(status_code=400, detail="windows must be <= 100")
+    try:
+        return coordinator.persistence.cycle_trend_comparison(
+            early_window=early_window,
+            late_window=late_window,
+            metric=metric,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/perturbation-history")
 async def get_perturbation_history(
     include_inactive: bool = True,
