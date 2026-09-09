@@ -3701,6 +3701,186 @@ class Persistence:
         self._cache_set(_cache_key, result)
         return result
 
+    def get_top_routes_by_efficiency(
+        self,
+        metric: str = "co2_per_km",
+        vehicle_id: Optional[str] = None,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #63: Top routes (per cycle × per vehicle) ranked by efficiency metrics.
+
+        The routes table holds one row per cycle per vehicle (stops_json +
+        distance_km + cost_sek + co2_kg + duration_hours). This method lets
+        the user surface which individual routes were the most efficient on a
+        given day for a given vehicle.
+
+        Args:
+            metric: which efficiency metric to rank by. One of:
+                - 'co2_per_km' (kg CO2 / km, lower = better — greenest)
+                - 'co2_per_hour' (kg CO2 / hour, lower = better — cleanest per driving hour)
+                - 'cost_per_km' (SEK / km, lower = better — cheapest per km)
+                - 'cost_per_hour' (SEK / hour, lower = better — cheapest per driving hour)
+                - 'speed_km_per_hour' (km / hour, higher = better — fastest)
+                - 'distance' (km, higher = better — longest routes)
+                - 'tons_per_km' (proxy: cycle_tons / distance, higher = better — most loaded)
+            vehicle_id: optional filter (only include routes from this vehicle)
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+            limit: top N (default 10, max 100)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            filter: {vehicle_id, since_sim_day, until_sim_day},
+            n_routes_evaluated, n_routes_returned,
+            top_routes: [{route_id, cycle_id, vehicle_id, sim_day, sim_hour,
+                          duration_hours, distance_km, cost_sek, co2_kg,
+                          n_stops, cycle_tons, value}, ...]
+          }
+
+        Use cases:
+        - Identify greenest cycle × vehicle combinations (low co2_per_km)
+        - Identify cheapest routes (low cost_per_km)
+        - Identify fastest routes (high speed_km_per_hour)
+        - Identify most-loaded routes (high tons_per_km)
+        - Drill down on a specific vehicle (vehicle_id filter)
+        """
+        _cache_key = self._cache_key(
+            "get_top_routes_by_efficiency",
+            {"metric": metric, "vehicle_id": vehicle_id,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day,
+             "limit": limit},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        valid_metrics = {
+            "co2_per_km": ("lower_is_better", "kg CO2 per km"),
+            "co2_per_hour": ("lower_is_better", "kg CO2 per hour"),
+            "cost_per_km": ("lower_is_better", "SEK per km"),
+            "cost_per_hour": ("lower_is_better", "SEK per hour"),
+            "speed_km_per_hour": ("higher_is_better", "km per hour"),
+            "distance": ("higher_is_better", "route distance km"),
+            "tons_per_km": ("higher_is_better", "tons per km (proxy)"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if vehicle_id:
+            where_clauses.append("r.vehicle_id = ?")
+            params.append(vehicle_id)
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT r.id as route_id, r.cycle_id, r.vehicle_id,
+                          r.distance_km, r.duration_hours, r.cost_sek, r.co2_kg,
+                          r.stops_json,
+                          c.sim_day, c.sim_hour,
+                          (SELECT COALESCE(SUM(m.tons), 0)
+                           FROM matches m WHERE m.cycle_id = r.cycle_id) as cycle_tons
+                FROM routes r
+                JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                WHERE {where_sql} AND r.vehicle_id IS NOT NULL
+                  AND r.distance_km > 0
+                ORDER BY r.id DESC""",
+                params,
+            ).fetchall()
+
+            results = []
+            for r in rows:
+                distance = float(r["distance_km"] or 0)
+                duration = float(r["duration_hours"] or 0)
+                cost = float(r["cost_sek"] or 0)
+                co2 = float(r["co2_kg"] or 0)
+                tons = float(r["cycle_tons"] or 0)
+                # Compute metric value
+                if metric == "co2_per_km":
+                    v = co2 / distance if distance > 0 else None
+                elif metric == "co2_per_hour":
+                    v = co2 / duration if duration > 0 else None
+                elif metric == "cost_per_km":
+                    v = cost / distance if distance > 0 else None
+                elif metric == "cost_per_hour":
+                    v = cost / duration if duration > 0 else None
+                elif metric == "speed_km_per_hour":
+                    v = distance / duration if duration > 0 else None
+                elif metric == "distance":
+                    v = distance
+                elif metric == "tons_per_km":
+                    v = tons / distance if distance > 0 else None
+                else:
+                    v = None
+                if v is None:
+                    continue
+                if metric == "distance":
+                    value = round(v, 2)
+                elif metric == "speed_km_per_hour":
+                    value = round(v, 2)
+                else:
+                    value = round(v, 4)
+
+                # Count non-empty stops (stops_json is like ["SUP_A", "DEM_1", ...])
+                stops_json = r["stops_json"] or "[]"
+                try:
+                    stops_list = json.loads(stops_json) if isinstance(stops_json, str) else stops_json
+                    n_stops = sum(1 for s in stops_list if s)
+                except Exception:
+                    n_stops = 0
+
+                results.append({
+                    "route_id": r["route_id"],
+                    "cycle_id": r["cycle_id"],
+                    "vehicle_id": r["vehicle_id"],
+                    "sim_day": r["sim_day"],
+                    "sim_hour": r["sim_hour"],
+                    "distance_km": round(distance, 2),
+                    "duration_hours": round(duration, 3),
+                    "cost_sek": round(cost, 2),
+                    "co2_kg": round(co2, 2),
+                    "n_stops": n_stops,
+                    "cycle_tons": round(tons, 2),
+                    "value": value,
+                })
+
+        # Sort by metric direction
+        if direction == "lower_is_better":
+            results.sort(key=lambda x: x["value"])
+        else:
+            results.sort(key=lambda x: x["value"], reverse=True)
+
+        result = {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "filter": {
+                "vehicle_id": vehicle_id,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+            "n_routes_evaluated": len(results),
+            "n_routes_returned": min(limit, len(results)),
+            "top_routes": results[:max(1, min(100, limit))],
+        }
+        self._cache_set(_cache_key, result)
+        return result
+
     def get_material_supply_demand_balance(
         self,
         since_sim_day: Optional[int] = None,

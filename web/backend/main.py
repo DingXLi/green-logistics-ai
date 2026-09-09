@@ -1686,6 +1686,21 @@ async def get_dashboard_top_summary(
     except Exception as e:
         result["cache"] = {"error": str(e)}
 
+    # 7. iter #63: top routes (per cycle × per vehicle)
+    try:
+        full = _safe("get_top_routes_by_efficiency",
+                     metric="co2_per_km", limit=limit_per_panel)
+        result["top_routes"] = {
+            "metric": "co2_per_km",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_routes_evaluated", 0),
+            "top": full.get("top_routes", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_routes"] = full
+    except Exception as e:
+        result["top_routes"] = {"error": str(e)}
+
     return result
 
 
@@ -5856,6 +5871,44 @@ async def get_top_facilities(
             city=city,
             facility_type=facility_type,
             material_type=material_type,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/persistence/top-routes")
+async def get_top_routes(
+    metric: str = "co2_per_km",
+    vehicle_id: Optional[str] = None,
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 10,
+):
+    """
+    iter #63: Top routes (per cycle × per vehicle) ranked by efficiency metrics.
+
+    Each row in the routes table is a single vehicle's haul in a single cycle.
+    This endpoint ranks those route rows by efficiency metrics so users can
+    identify the greenest, cheapest, fastest, or most-loaded routes.
+
+    Query:
+    - metric (default co2_per_km): one of
+        co2_per_km | co2_per_hour | cost_per_km | cost_per_hour |
+        speed_km_per_hour | distance | tons_per_km
+    - vehicle_id: optional filter (e.g. 'TRUCK_001')
+    - since_sim_day / until_sim_day: optional sim_day window
+    - limit (default 10, max 100): number of routes to return
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(100, limit))
+    try:
+        return coordinator.persistence.get_top_routes_by_efficiency(
+            metric=metric,
+            vehicle_id=vehicle_id,
             since_sim_day=since_sim_day,
             until_sim_day=until_sim_day,
             limit=limit,
