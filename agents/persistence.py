@@ -3881,6 +3881,317 @@ class Persistence:
         self._cache_set(_cache_key, result)
         return result
 
+    def get_top_materials_by_volume(
+        self,
+        metric: str = "total_matched_tons",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        iter #63: Top materials ranked by volume / efficiency metrics.
+
+        Aggregates per material_type from supply_offers, demand_requests,
+        matches and routes. Useful for: which materials dominate the system,
+        which have the best match rate, which are cleanest per ton, etc.
+
+        Args:
+            metric: which volume/efficiency metric to rank by. One of:
+                - 'total_matched_tons' (matched tons, higher = better)
+                - 'total_supply_tons' (sum of available_tons, higher = better)
+                - 'total_demand_tons' (sum of required_tons, higher = better)
+                - 'n_matches' (number of matches, higher = better)
+                - 'n_supply_offers' (number of offers, higher = better)
+                - 'n_demand_requests' (number of demands, higher = better)
+                - 'match_rate' (matches / offers, higher = better)
+                - 'avg_tons_per_match' (avg matched tons, higher = better)
+                - 'co2_per_ton' (kg CO2 / matched ton, lower = better)
+                - 'cost_per_ton' (SEK / matched ton, lower = better)
+                - 'avg_distance_km' (avg km per match, lower = better)
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+            limit: top N (default 10, max 50 — material list is small)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            filter: {since_sim_day, until_sim_day},
+            n_materials_evaluated, n_materials_returned,
+            top_materials: [{
+              material_type,
+              value,
+              total_matched_tons, total_supply_tons, total_demand_tons,
+              total_co2_kg, total_cost_sek,
+              n_matches, n_supply_offers, n_demand_requests,
+              match_rate, avg_tons_per_match,
+              avg_distance_km,
+              demand_fulfillment_pct,
+            }, ...]
+          }
+
+        Use cases:
+        - Identify dominant materials (high total_matched_tons)
+        - Identify bottleneck materials (low match_rate)
+        - Identify cleanest materials (low co2_per_ton)
+        - Identify most-requested materials (high total_demand_tons)
+        """
+        _cache_key = self._cache_key(
+            "get_top_materials_by_volume",
+            {"metric": metric,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day,
+             "limit": limit},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        valid_metrics = {
+            "total_matched_tons": ("higher_is_better", "total matched tons"),
+            "total_supply_tons": ("higher_is_better", "total available tons"),
+            "total_demand_tons": ("higher_is_better", "total requested tons"),
+            "n_matches": ("higher_is_better", "number of matches"),
+            "n_supply_offers": ("higher_is_better", "number of offers"),
+            "n_demand_requests": ("higher_is_better", "number of demands"),
+            "match_rate": ("higher_is_better", "matches per offer"),
+            "avg_tons_per_match": ("higher_is_better", "avg tons per match"),
+            "co2_per_ton": ("lower_is_better", "kg CO2 per matched ton"),
+            "cost_per_ton": ("lower_is_better", "SEK per matched ton"),
+            "avg_distance_km": ("lower_is_better", "avg km per match"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["1=1"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            # Per-material aggregates from supply_offers (matched = sum of available)
+            supply_rows = conn.execute(
+                f"""SELECT s.material_type,
+                          COUNT(DISTINCT s.supply_id) as n_offers,
+                          SUM(s.available_tons) as total_supply,
+                          COUNT(DISTINCT s.cycle_id) as cycles_with_supply
+                FROM supply_offers s
+                JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                WHERE {where_sql}
+                GROUP BY s.material_type""",
+                params,
+            ).fetchall()
+
+            demand_rows = conn.execute(
+                f"""SELECT d.material_type,
+                          COUNT(DISTINCT d.demand_id) as n_demands,
+                          SUM(d.required_tons) as total_demand,
+                          COUNT(DISTINCT d.cycle_id) as cycles_with_demand
+                FROM demand_requests d
+                JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                WHERE {where_sql}
+                GROUP BY d.material_type""",
+                params,
+            ).fetchall()
+
+            match_rows = conn.execute(
+                f"""SELECT m.material_type,
+                          COUNT(*) as n_matches,
+                          SUM(m.tons) as total_matched,
+                          AVG(m.tons) as avg_tons,
+                          AVG(m.distance_km) as avg_distance,
+                          SUM(m.distance_km) as total_distance,
+                          SUM(m.estimated_profit_sek) as total_profit
+                FROM matches m
+                JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                WHERE {where_sql}
+                GROUP BY m.material_type""",
+                params,
+            ).fetchall()
+
+            route_rows = conn.execute(
+                f"""SELECT r.cycle_id,
+                          SUM(r.co2_kg) as cycle_co2,
+                          SUM(r.cost_sek) as cycle_cost
+                FROM routes r
+                JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                WHERE {where_sql}
+                GROUP BY r.cycle_id""",
+                params,
+            ).fetchall()
+
+            # Sum route co2/cost per cycle — but we need per-material.
+            # Without a direct material → route link, we approximate by
+            # allocating cycle totals in proportion to match.tons.
+            # Build {cycle_id: {co2, cost}} for allocation
+            route_by_cycle = {r["cycle_id"]: (float(r["cycle_co2"] or 0),
+                                              float(r["cycle_cost"] or 0))
+                              for r in route_rows}
+            # Build per-material dict
+        mat_data: Dict[str, Dict[str, Any]] = {}
+        for r in supply_rows:
+            mat = r["material_type"]
+            if mat is None:
+                continue
+            mat_data.setdefault(mat, {})
+            mat_data[mat]["n_supply_offers"] = int(r["n_offers"] or 0)
+            mat_data[mat]["total_supply_tons"] = float(r["total_supply"] or 0)
+        for r in demand_rows:
+            mat = r["material_type"]
+            if mat is None:
+                continue
+            mat_data.setdefault(mat, {})
+            mat_data[mat]["n_demand_requests"] = int(r["n_demands"] or 0)
+            mat_data[mat]["total_demand_tons"] = float(r["total_demand"] or 0)
+        for r in match_rows:
+            mat = r["material_type"]
+            if mat is None:
+                continue
+            mat_data.setdefault(mat, {})
+            mat_data[mat]["n_matches"] = int(r["n_matches"] or 0)
+            mat_data[mat]["total_matched_tons"] = float(r["total_matched"] or 0)
+            mat_data[mat]["avg_tons_per_match"] = float(r["avg_tons"] or 0)
+            mat_data[mat]["avg_distance_km"] = float(r["avg_distance"] or 0)
+            mat_data[mat]["total_profit_sek"] = float(r["total_profit"] or 0)
+            mat_data[mat]["total_distance_km"] = float(r["total_distance"] or 0)
+            mat_data[mat]["total_co2_kg"] = 0.0
+            mat_data[mat]["total_cost_sek"] = 0.0
+            mat_data[mat]["_matched_cycles"] = []
+
+        # We need to allocate per-cycle route co2/cost per material.
+        # Re-query matches per cycle for allocation.
+        with self._conn() as conn:
+            matched_cycles_rows = conn.execute(
+                f"""SELECT m.cycle_id, m.material_type, SUM(m.tons) as cycle_mat_tons
+                FROM matches m
+                JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                WHERE {where_sql}
+                GROUP BY m.cycle_id, m.material_type""",
+                params,
+            ).fetchall()
+            cycle_totals_rows = conn.execute(
+                f"""SELECT m.cycle_id, SUM(m.tons) as cycle_total_tons
+                FROM matches m
+                JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                WHERE {where_sql}
+                GROUP BY m.cycle_id""",
+                params,
+            ).fetchall()
+        cycle_total_dict = {r["cycle_id"]: float(r["cycle_total_tons"] or 0)
+                            for r in cycle_totals_rows}
+        for r in matched_cycles_rows:
+            cid = r["cycle_id"]
+            mat = r["material_type"]
+            ct = float(r["cycle_mat_tons"] or 0)
+            tot = cycle_total_dict.get(cid, 0)
+            if mat in mat_data and tot > 0:
+                frac = ct / tot
+                co2_total, cost_total = route_by_cycle.get(cid, (0.0, 0.0))
+                mat_data[mat]["total_co2_kg"] += co2_total * frac
+                mat_data[mat]["total_cost_sek"] += cost_total * frac
+
+        results = []
+        for mat, d in mat_data.items():
+            matched = d.get("total_matched_tons", 0.0)
+            offers = d.get("n_supply_offers", 0)
+            demands = d.get("n_demand_requests", 0)
+            matches = d.get("n_matches", 0)
+            supply = d.get("total_supply_tons", 0.0)
+            demand = d.get("total_demand_tons", 0.0)
+            co2 = d.get("total_co2_kg", 0.0)
+            cost = d.get("total_cost_sek", 0.0)
+            avg_dist = d.get("avg_distance_km", 0.0)
+            avg_tons = d.get("avg_tons_per_match", 0.0)
+            demand_fulfill = matched / demand if demand > 0 else 0.0
+            # Skip materials with no matches AND no offers (effectively
+            # unused in this window). Avoids cluttering results with phantom
+            # materials that only appear in demand_requests.
+            if matches == 0 and offers == 0:
+                continue
+
+            if metric == "total_matched_tons":
+                v = matched
+            elif metric == "total_supply_tons":
+                v = supply
+            elif metric == "total_demand_tons":
+                v = demand
+            elif metric == "n_matches":
+                v = matches
+            elif metric == "n_supply_offers":
+                v = offers
+            elif metric == "n_demand_requests":
+                v = demands
+            elif metric == "match_rate":
+                v = matches / offers if offers > 0 else None
+            elif metric == "avg_tons_per_match":
+                v = avg_tons if matches > 0 else None
+            elif metric == "co2_per_ton":
+                v = co2 / matched if matched > 0 else None
+            elif metric == "cost_per_ton":
+                v = cost / matched if matched > 0 else None
+            elif metric == "avg_distance_km":
+                v = avg_dist if matches > 0 else None
+            else:
+                v = None
+            if v is None:
+                continue
+            # Round appropriately
+            if metric in ("n_matches", "n_supply_offers", "n_demand_requests"):
+                value = int(v)
+            elif metric in ("match_rate",):
+                value = round(v, 4)
+            elif metric in ("total_matched_tons", "total_supply_tons",
+                             "total_demand_tons", "avg_tons_per_match",
+                             "avg_distance_km"):
+                value = round(v, 3)
+            else:  # co2_per_ton, cost_per_ton
+                value = round(v, 4)
+
+            results.append({
+                "material_type": mat,
+                "value": value,
+                "total_matched_tons": round(matched, 2),
+                "total_supply_tons": round(supply, 2),
+                "total_demand_tons": round(demand, 2),
+                "total_co2_kg": round(co2, 2),
+                "total_cost_sek": round(cost, 2),
+                "n_matches": int(matches),
+                "n_supply_offers": int(offers),
+                "n_demand_requests": int(demands),
+                "match_rate": round(matches / offers, 3) if offers > 0 else None,
+                "avg_tons_per_match": round(avg_tons, 3),
+                "avg_distance_km": round(avg_dist, 2),
+                "demand_fulfillment_pct": round(100 * demand_fulfill, 2),
+            })
+
+        # Sort by metric direction
+        if direction == "lower_is_better":
+            results.sort(key=lambda x: x["value"])
+        else:
+            results.sort(key=lambda x: x["value"], reverse=True)
+
+        result = {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "filter": {
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+            "n_materials_evaluated": len(results),
+            "n_materials_returned": min(limit, len(results)),
+            "top_materials": results[:max(1, min(50, limit))],
+        }
+        self._cache_set(_cache_key, result)
+        return result
+
     def get_material_supply_demand_balance(
         self,
         since_sim_day: Optional[int] = None,

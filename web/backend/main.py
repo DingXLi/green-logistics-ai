@@ -1701,6 +1701,21 @@ async def get_dashboard_top_summary(
     except Exception as e:
         result["top_routes"] = {"error": str(e)}
 
+    # 8. iter #63: top materials by volume / efficiency
+    try:
+        full = _safe("get_top_materials_by_volume",
+                     metric="total_matched_tons", limit=limit_per_panel)
+        result["top_materials"] = {
+            "metric": "total_matched_tons",
+            "metric_description": full.get("metric_description"),
+            "n_evaluated": full.get("n_materials_evaluated", 0),
+            "top": full.get("top_materials", [])[:limit_per_panel],
+        }
+        if "error" in full:
+            result["top_materials"] = full
+    except Exception as e:
+        result["top_materials"] = {"error": str(e)}
+
     return result
 
 
@@ -5909,6 +5924,43 @@ async def get_top_routes(
         return coordinator.persistence.get_top_routes_by_efficiency(
             metric=metric,
             vehicle_id=vehicle_id,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/persistence/top-materials")
+async def get_top_materials(
+    metric: str = "total_matched_tons",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 10,
+):
+    """
+    iter #63: Top materials ranked by volume / efficiency metrics.
+
+    Aggregates per material_type across supply_offers, demand_requests,
+    matches and routes. Useful for identifying dominant materials, bottlenecks
+    (low match_rate), and the cleanest / most cost-efficient materials.
+
+    Query:
+    - metric (default total_matched_tons): one of
+        total_matched_tons | total_supply_tons | total_demand_tons |
+        n_matches | n_supply_offers | n_demand_requests |
+        match_rate | avg_tons_per_match |
+        co2_per_ton | cost_per_ton | avg_distance_km
+    - since_sim_day / until_sim_day: optional sim_day window
+    - limit (default 10, max 50): number of materials to return
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(50, limit))
+    try:
+        return coordinator.persistence.get_top_materials_by_volume(
+            metric=metric,
             since_sim_day=since_sim_day,
             until_sim_day=until_sim_day,
             limit=limit,
