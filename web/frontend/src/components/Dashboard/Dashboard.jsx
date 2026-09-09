@@ -122,6 +122,8 @@ const HealthDashboardPanel = lazy(() => import('./HealthDashboardPanel').then(m 
 const TopRoutesPanel = lazy(() => import('./TopRoutesPanel').then(m => ({ default: m.TopRoutesPanel })))
 // iter #63: top materials panel (volume + efficiency ranking)
 const TopMaterialsPanel = lazy(() => import('./TopMaterialsPanel').then(m => ({ default: m.TopMaterialsPanel })))
+// iter #64: compare-materials side-by-side panel
+const CompareMaterialsPanel = lazy(() => import('./CompareMaterialsPanel').then(m => ({ default: m.CompareMaterialsPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -796,6 +798,11 @@ export default function Dashboard() {
           {/* iter #63: Top materials (volume + efficiency ranking) */}
           <Suspense fallback={<LoadingSpinner label="Loading top materials…" />}>
             <TopMaterialsPanel />
+          </Suspense>
+
+          {/* iter #64: Compare materials (side-by-side compare 2 materials) */}
+          <Suspense fallback={<LoadingSpinner label="Loading material comparison…" />}>
+            <CompareMaterialsPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

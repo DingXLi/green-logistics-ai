@@ -4619,6 +4619,154 @@ td.no-matches {
 }
 
 /* ============================================
+   iter #64: CompareMaterialsPanel styles
+   ============================================ */
+.compare-materials-panel {
+  /* extends .card */
+}
+
+.compare-materials-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+
+.compare-materials-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.compare-materials-panel .filter-input {
+  min-width: 180px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.compare-materials-panel .filter-input-narrow {
+  min-width: 60px;
+  width: 80px;
+}
+
+.compare-materials-panel .quick-picks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+.compare-materials-panel .chip-pick {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compare-materials-panel .chip-pick:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.compare-materials-panel .chip-pick.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.compare-materials-panel .winner-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.compare-materials-panel .winner-badge {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.compare-materials-panel .winner-badge.badge-a {
+  background: rgba(59, 130, 246, 0.15);
+  color: rgb(59, 130, 246);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.compare-materials-panel .winner-badge.badge-b {
+  background: rgba(34, 197, 94, 0.15);
+  color: rgb(34, 197, 94);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.compare-materials-panel .metric-group {
+  margin-top: 1rem;
+}
+
+.compare-materials-panel .metric-group h4 {
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.compare-materials-panel .compare-m-table {
+  font-size: 0.85rem;
+}
+
+.compare-materials-panel .compare-m-table th.header-a {
+  background: rgba(59, 130, 246, 0.1);
+  color: rgb(59, 130, 246);
+}
+
+.compare-materials-panel .compare-m-table th.header-b {
+  background: rgba(34, 197, 94, 0.1);
+  color: rgb(34, 197, 94);
+}
+
+.compare-materials-panel .compare-m-table .cell-a {
+  font-weight: 600;
+  color: rgb(59, 130, 246);
+}
+
+.compare-materials-panel .compare-m-table .cell-b {
+  font-weight: 600;
+  color: rgb(34, 197, 94);
+}
+
+.compare-materials-panel .compare-m-table .metric-name {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-transform: lowercase;
+}
+
+.compare-materials-panel .compare-m-table .diff-cell {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.compare-materials-panel .compare-m-table .pct-cell {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ============================================
    iter #63: TopMaterialsPanel styles
    ============================================ */
 .top-materials-panel {

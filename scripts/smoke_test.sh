@@ -435,6 +435,12 @@ check_json_field "/api/persistence/top-materials has top_materials array" GET "/
 check_endpoint "/api/persistence/top-materials?metric=co2_per_ton" 200 GET "/api/persistence/top-materials?metric=co2_per_ton"
 check_endpoint "/api/persistence/top-materials?metric=match_rate" 200 GET "/api/persistence/top-materials?metric=match_rate"
 check_json_field "/api/dashboard-top-summary has top_materials (iter #63)" GET "/api/dashboard-top-summary" ".top_materials | type" "object"
+# iter #64: compare-materials endpoint
+check_endpoint "/api/persistence/compare-materials (iter #64)" 200 GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap"
+check_json_field "/api/persistence/compare-materials has material_a" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".material_a | type" "object"
+check_json_field "/api/persistence/compare-materials has material_b" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".material_b | type" "object"
+check_json_field "/api/persistence/compare-materials has differences" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".differences | type" "object"
+check_json_field "/api/persistence/compare-materials has winner" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".winner | type" "object"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
