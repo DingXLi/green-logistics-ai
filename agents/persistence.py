@@ -4574,6 +4574,240 @@ class Persistence:
         self._cache_set(_cache_key, result)
         return result
 
+    def get_material_timeseries(
+        self,
+        material_type: Optional[str] = None,
+        metric: str = "matched_tons",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 200,
+    ) -> Dict[str, Any]:
+        """
+        iter #65: Per-material time-series of volume / efficiency metrics.
+
+        Returns one row per cycle × per material with the chosen metric,
+        plus a per-material summary (mean/min/max/latest + trend). Useful
+        for plotting how each material's per-cycle volume or efficiency
+        evolves over time.
+
+        Args:
+            material_type: optional filter (e.g. 'concrete')
+            metric: which metric to rank by. One of:
+                - 'matched_tons' (matched tons per cycle, higher = better)
+                - 'n_matches' (number of matches, higher = better)
+                - 'avg_match_tons' (avg tons per match, higher = better)
+                - 'co2_per_ton' (kg CO2 / matched ton, lower = better)
+                - 'cost_per_ton' (SEK / matched ton, lower = better)
+                - 'match_rate' (matches / offers, higher = better)
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+            limit: max rows to return (default 200)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            filter: {material_type, since_sim_day, until_sim_day},
+            n_rows_evaluated, n_rows_returned,
+            timeseries: [{cycle_id, sim_day, material_type, metric_value,
+                          n_matches, matched_tons, n_offers, n_demands}, ...],
+            per_material_summary: {
+              material_type: {n_cycles, mean_value, min_value, max_value,
+                              latest_value, trend},
+              ...
+            },
+          }
+
+        Use cases:
+        - Plot each material's matched_tons per cycle
+        - Identify materials trending greener (co2_per_ton dropping)
+        - Spot materials losing/gaining demand share over time
+        """
+        _cache_key = self._cache_key(
+            "get_material_timeseries",
+            {"material_type": material_type, "metric": metric,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day,
+             "limit": limit},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        valid_metrics = {
+            "matched_tons": ("higher_is_better", "matched tons / cycle"),
+            "n_matches": ("higher_is_better", "matches / cycle"),
+            "avg_match_tons": ("higher_is_better", "avg tons per match"),
+            "co2_per_ton": ("lower_is_better", "kg CO2 per matched ton"),
+            "cost_per_ton": ("lower_is_better", "SEK per matched ton"),
+            "match_rate": ("higher_is_better", "matches per offer"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["m.material_type IS NOT NULL"]
+        params: List[Any] = []
+        if material_type:
+            where_clauses.append("m.material_type = ?")
+            params.append(material_type)
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        # Per-cycle × per-material aggregate from matches + supply + demand
+        # Route co2/cost allocated by match.tons proportion
+        with self._conn() as conn:
+            base_rows = conn.execute(
+                f"""SELECT m.cycle_id, m.material_type, c.sim_day, c.sim_hour,
+                          COUNT(*) as n_matches,
+                          SUM(m.tons) as matched_tons,
+                          AVG(m.tons) as avg_match_tons,
+                          (SELECT COUNT(*) FROM supply_offers s
+                           WHERE s.cycle_id = m.cycle_id AND s.material_type = m.material_type) as n_offers,
+                          (SELECT COUNT(*) FROM demand_requests d
+                           WHERE d.cycle_id = m.cycle_id AND d.material_type = m.material_type) as n_demands,
+                          oc.total_co2_kg as cycle_co2,
+                          oc.total_cost_sek as cycle_cost,
+                          (SELECT COALESCE(SUM(m2.tons), 0)
+                           FROM matches m2 WHERE m2.cycle_id = m.cycle_id) as cycle_total_tons
+                FROM matches m
+                JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                LEFT JOIN optimization_cycles oc ON oc.cycle_id = m.cycle_id
+                WHERE {where_sql}
+                GROUP BY m.cycle_id, m.material_type
+                ORDER BY c.sim_day ASC, c.sim_hour ASC, m.cycle_id ASC""",
+                params,
+            ).fetchall()
+
+        results = []
+        for r in base_rows:
+            n_matches = int(r["n_matches"] or 0)
+            matched_tons = float(r["matched_tons"] or 0)
+            avg_match_tons = float(r["avg_match_tons"] or 0)
+            n_offers = int(r["n_offers"] or 0)
+            n_demands = int(r["n_demands"] or 0)
+            cycle_co2 = float(r["cycle_co2"] or 0)
+            cycle_cost = float(r["cycle_cost"] or 0)
+            cycle_total_tons = float(r["cycle_total_tons"] or 0)
+
+            # Allocate route co2/cost by match.tons proportion
+            if cycle_total_tons > 0 and matched_tons > 0:
+                mat_co2 = cycle_co2 * matched_tons / cycle_total_tons
+                mat_cost = cycle_cost * matched_tons / cycle_total_tons
+            else:
+                mat_co2 = 0.0
+                mat_cost = 0.0
+
+            if metric == "matched_tons":
+                v = matched_tons
+            elif metric == "n_matches":
+                v = n_matches
+            elif metric == "avg_match_tons":
+                v = avg_match_tons if n_matches > 0 else 0.0
+            elif metric == "co2_per_ton":
+                v = mat_co2 / matched_tons if matched_tons > 0 else 0.0
+            elif metric == "cost_per_ton":
+                v = mat_cost / matched_tons if matched_tons > 0 else 0.0
+            elif metric == "match_rate":
+                v = n_matches / n_offers if n_offers > 0 else 0.0
+            else:
+                v = None
+            if v is None:
+                continue
+            if metric == "n_matches":
+                value = int(v)
+            elif metric == "match_rate":
+                value = round(v, 4)
+            elif metric == "co2_per_ton" or metric == "cost_per_ton":
+                value = round(v, 4)
+            else:
+                value = round(v, 2)
+
+            results.append({
+                "cycle_id": r["cycle_id"],
+                "sim_day": r["sim_day"],
+                "sim_hour": r["sim_hour"],
+                "material_type": r["material_type"],
+                "metric_value": value,
+                "n_matches": n_matches,
+                "matched_tons": round(matched_tons, 2),
+                "n_offers": n_offers,
+                "n_demands": n_demands,
+                "n_stops": n_matches,
+            })
+
+        # Build per-material summary
+        per_material: Dict[str, List[Dict[str, Any]]] = {}
+        for row in results:
+            per_material.setdefault(row["material_type"], []).append(row)
+
+        per_material_summary: Dict[str, Dict[str, Any]] = {}
+        for mat, hist in per_material.items():
+            values_hist = [r["metric_value"] for r in hist
+                           if r["metric_value"] is not None]
+            if not values_hist:
+                continue
+            mean_v = sum(values_hist) / len(values_hist)
+            min_v = min(values_hist)
+            max_v = max(values_hist)
+            latest_v = values_hist[-1]
+            half = len(values_hist) // 2
+            if half >= 1 and len(values_hist) >= 2:
+                first_half_mean = sum(values_hist[:half]) / half
+                second_half_mean = sum(values_hist[half:]) / (len(values_hist) - half)
+                delta = second_half_mean - first_half_mean
+                base = abs(first_half_mean) if first_half_mean != 0 else 1
+                pct = 100 * delta / base
+                if direction == "lower_is_better":
+                    if pct < -10:
+                        trend = "improving"
+                    elif pct > 10:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+                else:
+                    if pct > 10:
+                        trend = "improving"
+                    elif pct < -10:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+            else:
+                trend = "stable"
+
+            per_material_summary[mat] = {
+                "n_cycles": len(values_hist),
+                "mean_value": round(mean_v, 4),
+                "min_value": round(min_v, 4),
+                "max_value": round(max_v, 4),
+                "latest_value": round(latest_v, 4),
+                "trend": trend,
+                "first_sim_day": hist[0]["sim_day"],
+                "last_sim_day": hist[-1]["sim_day"],
+            }
+
+        result = {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "filter": {
+                "material_type": material_type,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+            "n_rows_evaluated": len(results),
+            "n_rows_returned": min(limit, len(results)),
+            "timeseries": results[:max(1, min(500, limit))],
+            "per_material_summary": per_material_summary,
+        }
+        self._cache_set(_cache_key, result)
+        return result
+
     def get_material_supply_demand_balance(
         self,
         since_sim_day: Optional[int] = None,

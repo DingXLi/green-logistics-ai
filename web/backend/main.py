@@ -5393,6 +5393,44 @@ async def get_cycle_trend_comparison(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/persistence/material-timeseries")
+async def get_material_timeseries(
+    material_type: Optional[str] = None,
+    metric: str = "matched_tons",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 200,
+):
+    """
+    iter #65: Per-material time-series of volume / efficiency metrics.
+
+    Returns one row per cycle × per material with the chosen metric
+    (matched_tons / n_matches / avg_match_tons / co2_per_ton / cost_per_ton /
+    match_rate). Includes `per_material_summary` dict with mean/min/max/
+    latest + trend classification (improving / declining / stable, 10%
+    threshold).
+
+    Query:
+    - material_type: optional filter (e.g. 'concrete')
+    - metric: one of the 6 listed above (default matched_tons)
+    - since_sim_day / until_sim_day: optional sim_day window
+    - limit: max rows to return (default 200, max 500)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    try:
+        return coordinator.persistence.get_material_timeseries(
+            material_type=material_type,
+            metric=metric,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/perturbation-history")
 async def get_perturbation_history(
     include_inactive: bool = True,
