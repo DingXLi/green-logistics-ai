@@ -124,6 +124,8 @@ const TopRoutesPanel = lazy(() => import('./TopRoutesPanel').then(m => ({ defaul
 const TopMaterialsPanel = lazy(() => import('./TopMaterialsPanel').then(m => ({ default: m.TopMaterialsPanel })))
 // iter #64: compare-materials side-by-side panel
 const CompareMaterialsPanel = lazy(() => import('./CompareMaterialsPanel').then(m => ({ default: m.CompareMaterialsPanel })))
+// iter #64: compare-routes side-by-side panel
+const CompareRoutesPanel = lazy(() => import('./CompareRoutesPanel').then(m => ({ default: m.CompareRoutesPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -803,6 +805,11 @@ export default function Dashboard() {
           {/* iter #64: Compare materials (side-by-side compare 2 materials) */}
           <Suspense fallback={<LoadingSpinner label="Loading material comparison…" />}>
             <CompareMaterialsPanel />
+          </Suspense>
+
+          {/* iter #64: Compare routes (side-by-side compare 2 route rows) */}
+          <Suspense fallback={<LoadingSpinner label="Loading route comparison…" />}>
+            <CompareRoutesPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

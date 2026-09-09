@@ -441,6 +441,12 @@ check_json_field "/api/persistence/compare-materials has material_a" GET "/api/p
 check_json_field "/api/persistence/compare-materials has material_b" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".material_b | type" "object"
 check_json_field "/api/persistence/compare-materials has differences" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".differences | type" "object"
 check_json_field "/api/persistence/compare-materials has winner" GET "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap" ".winner | type" "object"
+# iter #64: compare-routes endpoint
+check_endpoint "/api/persistence/compare-routes (iter #64)" 200 GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2"
+check_json_field "/api/persistence/compare-routes has route_a" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".route_a | type" "object"
+check_json_field "/api/persistence/compare-routes has route_b" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".route_b | type" "object"
+check_json_field "/api/persistence/compare-routes has differences" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".differences | type" "object"
+check_json_field "/api/persistence/compare-routes has winner" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".winner | type" "object"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
