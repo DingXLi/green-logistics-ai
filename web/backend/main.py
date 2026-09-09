@@ -6033,6 +6033,47 @@ async def get_compare_cycles(
     )
 
 
+@app.get("/api/persistence/compare-materials")
+async def get_compare_materials(
+    material_a: str = Query(..., description="First material_type (e.g. 'concrete')"),
+    material_b: str = Query(..., description="Second material_type (e.g. 'metal_scrap')"),
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #64: Side-by-side comparison of two materials.
+
+    Compares two material_types on volume / activity / efficiency / sustainability
+    metrics. Returns each material's full KPIs + absolute + pct differences
+    + 5-axis winner (lowest CO₂/ton, lowest cost/ton, most matches,
+    highest match rate, highest demand fulfillment).
+
+    Query:
+    - material_a (required): first material_type
+    - material_b (required): second material_type (must differ from a)
+    - since_sim_day / until_sim_day: optional sim_day window
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if not material_a or not material_b:
+        raise HTTPException(
+            status_code=400,
+            detail="Both material_a and material_b are required",
+        )
+    if material_a == material_b:
+        raise HTTPException(
+            status_code=400,
+            detail="material_a and material_b must be different",
+        )
+
+    return coordinator.persistence.compare_materials(
+        material_a=material_a,
+        material_b=material_b,
+        since_sim_day=since_sim_day,
+        until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/demand-aggregates")
 async def get_demand_aggregates(
     demand_id: Optional[str] = None,

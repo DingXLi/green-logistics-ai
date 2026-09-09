@@ -6914,3 +6914,293 @@ class Persistence:
             "differences": differences,
             "winner": winner,
         }
+
+    def compare_materials(
+        self,
+        material_a: str,
+        material_b: str,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #64: Side-by-side comparison of two materials (iter #63 top-metrics).
+
+        Compares the two materials on:
+        - Volume metrics (total_matched_tons / total_supply_tons / total_demand_tons)
+        - Activity metrics (n_matches / n_supply_offers / n_demand_requests / match_rate)
+        - Efficiency metrics (avg_tons_per_match / avg_distance_km)
+        - Sustainability metrics (total_co2_kg / co2_per_ton / total_cost_sek / cost_per_ton)
+        - Demand context (demand_fulfillment_pct)
+        - Differences (absolute + pct_change)
+        - Winner on 5 axes (cleanest per ton, cheapest per ton, most matches,
+          highest match rate, highest demand fulfillment)
+
+        Args:
+            material_a: first material_type (e.g. "concrete")
+            material_b: second material_type (e.g. "metal_scrap")
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+
+        Returns:
+          {
+            material_a: {material_type, ...all KPIs...} | None,
+            material_b: {material_type, ...all KPIs...} | None,
+            differences: {
+              absolute: {field: b - a, ...},
+              pct_change: {field: 100*(b-a)/abs(a), ...}
+            },
+            winner: {
+              axis: {material, direction, by_abs, by_pct, a_value, b_value}
+            } | None,
+          }
+
+        Use cases:
+        - Compare dominant material (concrete) vs rare material (metal)
+        - A/B greenness comparison (lowest co2_per_ton)
+        - Demand-side comparison (best fulfillment)
+        - Identify bottleneck materials (low match_rate)
+        """
+        # iter #64: TTL cache check
+        _cache_key = self._cache_key(
+            "compare_materials",
+            {"material_a": material_a, "material_b": material_b,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        def _material_data(mat: str) -> Optional[Dict[str, Any]]:
+            """Compute per-material aggregate dict (same shape as
+            get_top_materials_by_volume row)."""
+            with self._conn() as conn:
+                where_clauses = ["m.material_type = ?"]
+                params: List[Any] = [mat]
+                if since_sim_day is not None:
+                    where_clauses.append("c.sim_day >= ?")
+                    params.append(int(since_sim_day))
+                if until_sim_day is not None:
+                    where_clauses.append("c.sim_day <= ?")
+                    params.append(int(until_sim_day))
+                where_sql = " AND ".join(where_clauses)
+
+                # Match-based: n_matches, total_matched, avg_tons, avg_distance, total_profit
+                m_row = conn.execute(
+                    f"""SELECT COUNT(*) as n_matches,
+                              COALESCE(SUM(m.tons), 0) as total_matched,
+                              COALESCE(AVG(m.tons), 0) as avg_tons,
+                              COALESCE(AVG(m.distance_km), 0) as avg_distance,
+                              COALESCE(SUM(m.distance_km), 0) as total_distance,
+                              COALESCE(SUM(m.estimated_profit_sek), 0) as total_profit
+                    FROM matches m
+                    JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                    WHERE {where_sql}""",
+                    params,
+                ).fetchone()
+
+                # Supply-based
+                s_row = conn.execute(
+                    f"""SELECT COUNT(DISTINCT s.supply_id) as n_offers,
+                              COALESCE(SUM(s.available_tons), 0) as total_supply,
+                              COUNT(DISTINCT s.cycle_id) as cycles_with_supply
+                    FROM supply_offers s
+                    JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                    WHERE s.material_type = ?
+                      {"AND c.sim_day >= ?" if since_sim_day is not None else ""}
+                      {"AND c.sim_day <= ?" if until_sim_day is not None else ""}
+                    """,
+                    tuple([mat]
+                          + ([int(since_sim_day)] if since_sim_day is not None else [])
+                          + ([int(until_sim_day)] if until_sim_day is not None else [])),
+                ).fetchone()
+
+                # Demand-based
+                d_row = conn.execute(
+                    f"""SELECT COUNT(DISTINCT d.demand_id) as n_demands,
+                              COALESCE(SUM(d.required_tons), 0) as total_demand,
+                              COUNT(DISTINCT d.cycle_id) as cycles_with_demand
+                    FROM demand_requests d
+                    JOIN optimization_cycles c ON c.cycle_id = d.cycle_id
+                    WHERE d.material_type = ?
+                      {"AND c.sim_day >= ?" if since_sim_day is not None else ""}
+                      {"AND c.sim_day <= ?" if until_sim_day is not None else ""}
+                    """,
+                    tuple([mat]
+                          + ([int(since_sim_day)] if since_sim_day is not None else [])
+                          + ([int(until_sim_day)] if until_sim_day is not None else [])),
+                ).fetchone()
+
+                # Route-based co2/cost allocation per material
+                cycle_totals = conn.execute(
+                    f"""SELECT m.cycle_id, SUM(m.tons) as cycle_mat_tons
+                    FROM matches m
+                    JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                    WHERE {where_sql}
+                    GROUP BY m.cycle_id""",
+                    params,
+                ).fetchall()
+                cycle_total_dict = {
+                    r["cycle_id"]: float(r["cycle_mat_tons"] or 0)
+                    for r in cycle_totals
+                }
+                # Build a window-only where clause for global cycle totals + routes
+                win_where_clauses: List[str] = ["1=1"]
+                win_params: List[Any] = []
+                if since_sim_day is not None:
+                    win_where_clauses.append("c.sim_day >= ?")
+                    win_params.append(int(since_sim_day))
+                if until_sim_day is not None:
+                    win_where_clauses.append("c.sim_day <= ?")
+                    win_params.append(int(until_sim_day))
+                win_where_sql = " AND ".join(win_where_clauses)
+                # Get global per-cycle total for proportional allocation
+                cycle_global_totals = conn.execute(
+                    f"""SELECT m.cycle_id, SUM(m.tons) as cycle_total
+                    FROM matches m
+                    JOIN optimization_cycles c ON c.cycle_id = m.cycle_id
+                    WHERE {win_where_sql}
+                    GROUP BY m.cycle_id""",
+                    win_params,
+                ).fetchall()
+                cycle_global_dict = {
+                    r["cycle_id"]: float(r["cycle_total"] or 0)
+                    for r in cycle_global_totals
+                }
+                # Sum route co2/cost per cycle in this window
+                cycle_route_rows = conn.execute(
+                    f"""SELECT r.cycle_id,
+                              COALESCE(SUM(r.co2_kg), 0) as total_co2,
+                              COALESCE(SUM(r.cost_sek), 0) as total_cost
+                    FROM routes r
+                    JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                    WHERE {win_where_sql}
+                    GROUP BY r.cycle_id""",
+                    win_params,
+                ).fetchall()
+                cycle_route_dict = {
+                    r["cycle_id"]: (float(r["total_co2"]), float(r["total_cost"]))
+                    for r in cycle_route_rows
+                }
+
+            if m_row is None and s_row is None and d_row is None:
+                return None
+
+            n_matches = int(m_row["n_matches"] if m_row else 0)
+            total_matched = float(m_row["total_matched"] if m_row else 0)
+            avg_tons = float(m_row["avg_tons"] if m_row else 0)
+            avg_distance = float(m_row["avg_distance"] if m_row else 0)
+            total_profit = float(m_row["total_profit"] if m_row else 0)
+            n_offers = int(s_row["n_offers"] if s_row else 0)
+            total_supply = float(s_row["total_supply"] if s_row else 0)
+            n_demands = int(d_row["n_demands"] if d_row else 0)
+            total_demand = float(d_row["total_demand"] if d_row else 0)
+
+            # Allocate route co2/cost by match.tons proportion
+            mat_co2 = 0.0
+            mat_cost = 0.0
+            for cid, mat_tons in cycle_total_dict.items():
+                cycle_total = cycle_global_dict.get(cid, 0)
+                if cycle_total > 0 and mat_tons > 0:
+                    frac = mat_tons / cycle_total
+                    rco2, rcost = cycle_route_dict.get(cid, (0.0, 0.0))
+                    mat_co2 += rco2 * frac
+                    mat_cost += rcost * frac
+
+            match_rate = round(n_matches / n_offers, 4) if n_offers > 0 else None
+            co2_per_ton = round(mat_co2 / total_matched, 4) if total_matched > 0 else None
+            cost_per_ton = round(mat_cost / total_matched, 4) if total_matched > 0 else None
+            demand_fulfill = round(100 * total_matched / total_demand, 2) if total_demand > 0 else None
+
+            return {
+                "material_type": mat,
+                "n_matches": n_matches,
+                "n_supply_offers": n_offers,
+                "n_demand_requests": n_demands,
+                "match_rate": match_rate,
+                "total_matched_tons": round(total_matched, 2),
+                "total_supply_tons": round(total_supply, 2),
+                "total_demand_tons": round(total_demand, 2),
+                "avg_tons_per_match": round(avg_tons, 3),
+                "avg_distance_km": round(avg_distance, 2),
+                "total_co2_kg": round(mat_co2, 2),
+                "total_cost_sek": round(mat_cost, 2),
+                "co2_per_ton": co2_per_ton,
+                "cost_per_ton": cost_per_ton,
+                "total_profit_sek": round(total_profit, 2),
+                "demand_fulfillment_pct": demand_fulfill,
+            }
+
+        sa = _material_data(material_a)
+        sb = _material_data(material_b)
+
+        differences: Dict[str, Any] = {"absolute": {}, "pct_change": {}}
+        winner: Optional[Dict[str, Any]] = None
+        if sa is not None and sb is not None:
+            numeric_fields = (
+                "n_matches", "n_supply_offers", "n_demand_requests",
+                "match_rate",
+                "total_matched_tons", "total_supply_tons", "total_demand_tons",
+                "avg_tons_per_match", "avg_distance_km",
+                "total_co2_kg", "total_cost_sek",
+                "co2_per_ton", "cost_per_ton",
+                "total_profit_sek", "demand_fulfillment_pct",
+            )
+            for f in numeric_fields:
+                va = sa.get(f)
+                vb = sb.get(f)
+                if va is None or vb is None:
+                    continue
+                abs_diff = round(vb - va, 3)
+                differences["absolute"][f] = abs_diff
+                if va != 0:
+                    pct = round(100 * (vb - va) / abs(va), 2)
+                    differences["pct_change"][f] = pct
+
+            winner_axes = {
+                "lowest_co2_per_ton": ("co2_per_ton", "lower_is_better"),
+                "lowest_cost_per_ton": ("cost_per_ton", "lower_is_better"),
+                "most_matches": ("n_matches", "higher_is_better"),
+                "highest_match_rate": ("match_rate", "higher_is_better"),
+                "highest_demand_fulfillment": ("demand_fulfillment_pct", "higher_is_better"),
+            }
+            winner = {}
+            for axis, (field, direction) in winner_axes.items():
+                va = sa.get(field)
+                vb = sb.get(field)
+                if va is None or vb is None:
+                    winner[axis] = None
+                    continue
+                if direction == "lower_is_better":
+                    win_mat = material_a if va <= vb else material_b
+                    winning_val = min(va, vb)
+                    losing_val = max(va, vb)
+                else:
+                    win_mat = material_a if va >= vb else material_b
+                    winning_val = max(va, vb)
+                    losing_val = min(va, vb)
+                by_abs = round(winning_val - losing_val, 3)
+                by_pct = (
+                    round(100 * abs(va - vb) / abs(losing_val), 2)
+                    if losing_val != 0 else None
+                )
+                winner[axis] = {
+                    "material": win_mat,
+                    "direction": direction,
+                    "by_abs": by_abs,
+                    "by_pct": by_pct,
+                    "a_value": va,
+                    "b_value": vb,
+                }
+
+        result = {
+            "material_a": sa,
+            "material_b": sb,
+            "differences": differences,
+            "winner": winner,
+            "filter": {
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+        }
+        self._cache_set(_cache_key, result)
+        return result
