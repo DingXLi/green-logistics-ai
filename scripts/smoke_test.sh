@@ -428,6 +428,13 @@ check_json_field "/api/persistence/top-routes has top_routes array" GET "/api/pe
 check_endpoint "/api/persistence/top-routes?metric=distance" 200 GET "/api/persistence/top-routes?metric=distance"
 check_endpoint "/api/persistence/top-routes?metric=speed_km_per_hour" 200 GET "/api/persistence/top-routes?metric=speed_km_per_hour"
 check_json_field "/api/dashboard-top-summary has top_routes (iter #63)" GET "/api/dashboard-top-summary" ".top_routes | type" "object"
+# iter #63: top-materials-by-volume endpoint
+check_endpoint "/api/persistence/top-materials (iter #63)" 200 GET "/api/persistence/top-materials"
+check_json_field "/api/persistence/top-materials has metric" GET "/api/persistence/top-materials" ".metric | type" "string"
+check_json_field "/api/persistence/top-materials has top_materials array" GET "/api/persistence/top-materials" ".top_materials | type" "array"
+check_endpoint "/api/persistence/top-materials?metric=co2_per_ton" 200 GET "/api/persistence/top-materials?metric=co2_per_ton"
+check_endpoint "/api/persistence/top-materials?metric=match_rate" 200 GET "/api/persistence/top-materials?metric=match_rate"
+check_json_field "/api/dashboard-top-summary has top_materials (iter #63)" GET "/api/dashboard-top-summary" ".top_materials | type" "object"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
