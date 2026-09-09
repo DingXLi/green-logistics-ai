@@ -7204,3 +7204,163 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def compare_routes(
+        self,
+        route_id_a: int,
+        route_id_b: int,
+    ) -> Dict[str, Any]:
+        """
+        iter #64: Side-by-side comparison of two specific route rows.
+
+        Each route row is identified by its primary key route_id (the same
+        id surfaced in /api/persistence/top-routes). Compares the two on:
+        - Route identity (cycle_id, vehicle_id, sim_day, sim_hour, n_stops)
+        - Volume metrics (distance_km, duration_hours, cycle_tons)
+        - Cost metrics (cost_sek, cost_per_km, cost_per_hour)
+        - Sustainability metrics (co2_kg, co2_per_km, co2_per_hour)
+        - Speed proxy (speed_km_per_hour = distance_km / duration_hours)
+        - Differences (absolute + pct_change)
+        - Winner on 5 axes (lowest CO₂/km, lowest CO₂/hour, lowest cost/km,
+          highest speed, lowest duration)
+
+        Args:
+            route_id_a: first route's primary key (route.id from top-routes)
+            route_id_b: second route's primary key
+
+        Returns:
+          {
+            route_a: {route_id, ...all KPIs...} | None,
+            route_b: {route_id, ...all KPIs...} | None,
+            differences: {absolute, pct_change},
+            winner: {axis: {route, direction, by_abs, by_pct, a_value, b_value}},
+          }
+
+        Use cases:
+        - Compare greenest route vs dirtiest (co2_per_km leaderboard)
+        - Compare most-loaded route (cycle_tons) vs least-loaded
+        - Compare same-vehicle across 2 cycles
+        """
+        _cache_key = self._cache_key(
+            "compare_routes",
+            {"route_id_a": route_id_a, "route_id_b": route_id_b},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        def _route_data(rid: int) -> Optional[Dict[str, Any]]:
+            with self._conn() as conn:
+                row = conn.execute(
+                    """SELECT r.id as route_id, r.cycle_id, r.vehicle_id,
+                              r.distance_km, r.duration_hours, r.cost_sek,
+                              r.co2_kg, r.stops_json,
+                              c.sim_day, c.sim_hour,
+                              (SELECT COALESCE(SUM(m.tons), 0)
+                               FROM matches m WHERE m.cycle_id = r.cycle_id) as cycle_tons
+                    FROM routes r
+                    JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                    WHERE r.id = ?""",
+                    (rid,),
+                ).fetchone()
+            if row is None:
+                return None
+            distance = float(row["distance_km"] or 0)
+            duration = float(row["duration_hours"] or 0)
+            cost = float(row["cost_sek"] or 0)
+            co2 = float(row["co2_kg"] or 0)
+            cycle_tons = float(row["cycle_tons"] or 0)
+
+            stops_json = row["stops_json"] or "[]"
+            try:
+                stops_list = json.loads(stops_json) if isinstance(stops_json, str) else stops_json
+                n_stops = sum(1 for s in stops_list if s)
+            except Exception:
+                n_stops = 0
+
+            return {
+                "route_id": int(row["route_id"]),
+                "cycle_id": row["cycle_id"],
+                "vehicle_id": row["vehicle_id"],
+                "sim_day": row["sim_day"],
+                "sim_hour": row["sim_hour"],
+                "n_stops": n_stops,
+                "distance_km": round(distance, 2),
+                "duration_hours": round(duration, 3),
+                "cost_sek": round(cost, 2),
+                "co2_kg": round(co2, 2),
+                "cycle_tons": round(cycle_tons, 2),
+                "co2_per_km": round(co2 / distance, 4) if distance > 0 else None,
+                "co2_per_hour": round(co2 / duration, 4) if duration > 0 else None,
+                "cost_per_km": round(cost / distance, 4) if distance > 0 else None,
+                "cost_per_hour": round(cost / duration, 4) if duration > 0 else None,
+                "speed_km_per_hour": round(distance / duration, 2) if duration > 0 else None,
+            }
+
+        sa = _route_data(route_id_a)
+        sb = _route_data(route_id_b)
+
+        differences: Dict[str, Any] = {"absolute": {}, "pct_change": {}}
+        winner: Optional[Dict[str, Any]] = None
+        if sa is not None and sb is not None:
+            numeric_fields = (
+                "n_stops", "distance_km", "duration_hours",
+                "cost_sek", "co2_kg", "cycle_tons",
+                "co2_per_km", "co2_per_hour", "cost_per_km", "cost_per_hour",
+                "speed_km_per_hour",
+            )
+            for f in numeric_fields:
+                va = sa.get(f)
+                vb = sb.get(f)
+                if va is None or vb is None:
+                    continue
+                abs_diff = round(vb - va, 3)
+                differences["absolute"][f] = abs_diff
+                if va != 0:
+                    pct = round(100 * (vb - va) / abs(va), 2)
+                    differences["pct_change"][f] = pct
+
+            winner_axes = {
+                "lowest_co2_per_km": ("co2_per_km", "lower_is_better"),
+                "lowest_co2_per_hour": ("co2_per_hour", "lower_is_better"),
+                "lowest_cost_per_km": ("cost_per_km", "lower_is_better"),
+                "highest_speed": ("speed_km_per_hour", "higher_is_better"),
+                "lowest_duration": ("duration_hours", "lower_is_better"),
+            }
+            winner = {}
+            for axis, (field, direction) in winner_axes.items():
+                va = sa.get(field)
+                vb = sb.get(field)
+                if va is None or vb is None:
+                    winner[axis] = None
+                    continue
+                if direction == "lower_is_better":
+                    win_rid = route_id_a if va <= vb else route_id_b
+                    winning_val = min(va, vb)
+                    losing_val = max(va, vb)
+                else:
+                    win_rid = route_id_a if va >= vb else route_id_b
+                    winning_val = max(va, vb)
+                    losing_val = min(va, vb)
+                by_abs = round(winning_val - losing_val, 3)
+                by_pct = (
+                    round(100 * abs(va - vb) / abs(losing_val), 2)
+                    if losing_val != 0 else None
+                )
+                winner[axis] = {
+                    "route_id": win_rid,
+                    "direction": direction,
+                    "by_abs": by_abs,
+                    "by_pct": by_pct,
+                    "a_value": va,
+                    "b_value": vb,
+                }
+
+        result = {
+            "route_a": sa,
+            "route_b": sb,
+            "differences": differences,
+            "winner": winner,
+        }
+        self._cache_set(_cache_key, result)
+        return result

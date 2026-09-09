@@ -6074,6 +6074,37 @@ async def get_compare_materials(
     )
 
 
+@app.get("/api/persistence/compare-routes")
+async def get_compare_routes(
+    route_id_a: int = Query(..., description="First route_id (e.g. 9)"),
+    route_id_b: int = Query(..., description="Second route_id (e.g. 45)"),
+):
+    """
+    iter #64: Side-by-side comparison of two specific route rows.
+
+    Compares two routes on distance / duration / cost / co2 / cycle_tons /
+    derived metrics (co2_per_km, co2_per_hour, cost_per_km, cost_per_hour,
+    speed_km_per_hour) + absolute + pct differences + 5-axis winner
+    (lowest CO₂/km, lowest CO₂/hour, lowest cost/km, highest speed,
+    lowest duration).
+
+    Query:
+    - route_id_a (required): first route's primary key
+    - route_id_b (required): second route's primary key (must differ from a)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if route_id_a == route_id_b:
+        raise HTTPException(
+            status_code=400,
+            detail="route_id_a and route_id_b must be different",
+        )
+    return coordinator.persistence.compare_routes(
+        route_id_a=route_id_a,
+        route_id_b=route_id_b,
+    )
+
+
 @app.get("/api/persistence/demand-aggregates")
 async def get_demand_aggregates(
     demand_id: Optional[str] = None,
