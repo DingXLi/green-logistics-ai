@@ -4619,6 +4619,80 @@ td.no-matches {
 }
 
 /* ============================================
+   iter #63: TopRoutesPanel styles
+   ============================================ */
+.top-routes-panel {
+  /* extends .card */
+}
+
+.top-routes-panel .rank-cell {
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  width: 32px;
+}
+
+.top-routes-panel .metric-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.top-routes-panel .metric-unit {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.top-routes-panel .filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.top-routes-panel .filter-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.top-routes-panel .filter-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.top-routes-panel .filter-input-narrow {
+  min-width: 60px;
+  width: 90px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.top-routes-panel .card-badge {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* ============================================
    iter #57: TopDemandsPanel styles
    ============================================ */
 .top-demands-panel {

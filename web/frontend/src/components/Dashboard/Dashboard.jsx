@@ -118,6 +118,8 @@ const TopFacilitiesPanel = lazy(() => import('./TopFacilitiesPanel').then(m => (
 const CycleComparisonPanel = lazy(() => import('./CycleComparisonPanel').then(m => ({ default: m.CycleComparisonPanel })))
 // iter #60: health dashboard panel (visualize /api/health/deep)
 const HealthDashboardPanel = lazy(() => import('./HealthDashboardPanel').then(m => ({ default: m.HealthDashboardPanel })))
+// iter #63: top routes panel (per cycle × per vehicle ranked by efficiency)
+const TopRoutesPanel = lazy(() => import('./TopRoutesPanel').then(m => ({ default: m.TopRoutesPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -782,6 +784,11 @@ export default function Dashboard() {
           {/* iter #60: Health dashboard (visualize /api/health/deep) */}
           <Suspense fallback={<LoadingSpinner label="Loading health dashboard…" />}>
             <HealthDashboardPanel />
+          </Suspense>
+
+          {/* iter #63: Top routes (per cycle × per vehicle ranked by efficiency) */}
+          <Suspense fallback={<LoadingSpinner label="Loading top routes…" />}>
+            <TopRoutesPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

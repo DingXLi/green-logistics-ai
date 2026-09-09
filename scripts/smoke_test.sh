@@ -421,6 +421,13 @@ check_json_field "/api/dashboard-top-summary has top_facilities" GET "/api/dashb
 check_json_field "/api/dashboard-top-summary has compare_preview" GET "/api/dashboard-top-summary" ".compare_preview | type" "object"
 check_json_field "/api/dashboard-top-summary has cache block" GET "/api/dashboard-top-summary" ".cache | type" "object"
 check_json_field "/api/dashboard-top-summary source is aggregate" GET "/api/dashboard-top-summary" ".source" "aggregate"
+# iter #63: top-routes-by-efficiency endpoint
+check_endpoint "/api/persistence/top-routes (iter #63)" 200 GET "/api/persistence/top-routes"
+check_json_field "/api/persistence/top-routes has metric" GET "/api/persistence/top-routes" ".metric | type" "string"
+check_json_field "/api/persistence/top-routes has top_routes array" GET "/api/persistence/top-routes" ".top_routes | type" "array"
+check_endpoint "/api/persistence/top-routes?metric=distance" 200 GET "/api/persistence/top-routes?metric=distance"
+check_endpoint "/api/persistence/top-routes?metric=speed_km_per_hour" 200 GET "/api/persistence/top-routes?metric=speed_km_per_hour"
+check_json_field "/api/dashboard-top-summary has top_routes (iter #63)" GET "/api/dashboard-top-summary" ".top_routes | type" "object"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
