@@ -5282,6 +5282,64 @@ async def get_vehicle_stats(
     }
 
 
+@app.get("/api/persistence/vehicle-timeseries")
+async def get_vehicle_timeseries(
+    vehicle_id: Optional[str] = None,
+    metric: str = "co2_per_km",
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+    limit: int = 100,
+):
+    """
+    iter #65: Per-vehicle time-series of efficiency metrics.
+
+    Returns one row per cycle × per vehicle with the chosen efficiency
+    metric, plus a per-vehicle summary (mean/min/max/latest + trend:
+    improving / declining / stable based on first-half vs second-half
+    delta).
+
+    Query:
+    - vehicle_id: optional filter (e.g. 'VEH_001')
+    - metric: one of co2_per_km / co2_per_hour / cost_per_km / cost_per_hour /
+      speed_km_per_hour / distance_km / n_stops (default co2_per_km)
+    - since_sim_day / until_sim_day: optional sim_day window
+    - limit: max rows to return (default 100, max 500)
+
+    Returns:
+      {
+        metric, metric_description, direction,
+        filter: {vehicle_id, since_sim_day, until_sim_day},
+        n_routes_evaluated, n_routes_returned,
+        timeseries: [{route_id, cycle_id, vehicle_id, sim_day, sim_hour,
+                      distance_km, duration_hours, cost_sek, co2_kg,
+                      n_stops, value}, ...],  # chronological order
+        per_vehicle_summary: {
+          vehicle_id: {n_routes, mean_value, min_value, max_value,
+                       latest_value, trend, first_sim_day, last_sim_day},
+          ...
+        },
+      }
+
+    Use cases:
+    - Plot each vehicle's co2_per_km over time
+    - Identify vehicles trending toward greener routes
+    - Spot anomalous per-cycle efficiency drops
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    limit = max(1, min(500, limit))
+    try:
+        return coordinator.persistence.get_vehicle_timeseries(
+            vehicle_id=vehicle_id,
+            metric=metric,
+            since_sim_day=since_sim_day,
+            until_sim_day=until_sim_day,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/persistence/perturbation-history")
 async def get_perturbation_history(
     include_inactive: bool = True,

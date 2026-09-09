@@ -3189,6 +3189,231 @@ class Persistence:
             })
         return results
 
+    def get_vehicle_timeseries(
+        self,
+        vehicle_id: Optional[str] = None,
+        metric: str = "co2_per_km",
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        iter #65: Per-vehicle time-series of efficiency metrics.
+
+        Returns one row per cycle × per vehicle, with derived efficiency
+        metrics computed from the routes table. Useful for plotting how each
+        vehicle's per-cycle efficiency evolves over time.
+
+        Args:
+            vehicle_id: optional filter (only include this vehicle)
+            metric: which efficiency metric to rank by. One of:
+                - 'co2_per_km' (kg CO2 / km, lower = better)
+                - 'co2_per_hour' (kg CO2 / hour, lower = better)
+                - 'cost_per_km' (SEK / km, lower = better)
+                - 'cost_per_hour' (SEK / hour, lower = better)
+                - 'speed_km_per_hour' (km / hour, higher = better)
+                - 'distance_km' (km per route, higher = better)
+                - 'n_stops' (higher = better)
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+            limit: max rows to return (default 100)
+
+        Returns:
+          {
+            metric, metric_description, direction,
+            filter: {vehicle_id, since_sim_day, until_sim_day},
+            n_routes_evaluated, n_routes_returned,
+            timeseries: [
+              {route_id, cycle_id, vehicle_id, sim_day, sim_hour,
+               distance_km, duration_hours, cost_sek, co2_kg,
+               n_stops, value}, ...
+            ],
+            per_vehicle_summary: {
+              vehicle_id: {
+                n_routes, mean_value, min_value, max_value, latest_value,
+                trend ('improving' / 'declining' / 'stable'),
+              }, ...
+            },
+          }
+
+        Use cases:
+        - Plot each vehicle's co2_per_km over time
+        - Identify vehicles trending toward greener routes
+        - Spot anomalous per-cycle efficiency drops
+        """
+        _cache_key = self._cache_key(
+            "get_vehicle_timeseries",
+            {"vehicle_id": vehicle_id, "metric": metric,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day,
+             "limit": limit},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        valid_metrics = {
+            "co2_per_km": ("lower_is_better", "kg CO2 per km"),
+            "co2_per_hour": ("lower_is_better", "kg CO2 per hour"),
+            "cost_per_km": ("lower_is_better", "SEK per km"),
+            "cost_per_hour": ("lower_is_better", "SEK per hour"),
+            "speed_km_per_hour": ("higher_is_better", "km per hour"),
+            "distance_km": ("higher_is_better", "route distance km"),
+            "n_stops": ("higher_is_better", "stops per route"),
+        }
+        if metric not in valid_metrics:
+            raise ValueError(
+                f"Unknown metric {metric!r}. Valid: {list(valid_metrics)}"
+            )
+
+        direction, desc = valid_metrics[metric]
+
+        where_clauses = ["r.vehicle_id IS NOT NULL", "r.distance_km > 0"]
+        params: List[Any] = []
+        if vehicle_id:
+            where_clauses.append("r.vehicle_id = ?")
+            params.append(vehicle_id)
+        if since_sim_day is not None:
+            where_clauses.append("c.sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("c.sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT r.id as route_id, r.cycle_id, r.vehicle_id,
+                          r.distance_km, r.duration_hours, r.cost_sek, r.co2_kg,
+                          r.stops_json,
+                          c.sim_day, c.sim_hour
+                FROM routes r
+                JOIN optimization_cycles c ON c.cycle_id = r.cycle_id
+                WHERE {where_sql}
+                ORDER BY c.sim_day DESC, c.sim_hour DESC, r.id DESC
+                LIMIT ?""",
+                (*params, limit),
+            ).fetchall()
+
+        results = []
+        for r in rows:
+            distance = float(r["distance_km"] or 0)
+            duration = float(r["duration_hours"] or 0)
+            cost = float(r["cost_sek"] or 0)
+            co2 = float(r["co2_kg"] or 0)
+            stops_json = r["stops_json"] or "[]"
+            try:
+                stops_list = json.loads(stops_json) if isinstance(stops_json, str) else stops_json
+                n_stops = sum(1 for s in stops_list if s)
+            except Exception:
+                n_stops = 0
+
+            if metric == "co2_per_km":
+                v = co2 / distance if distance > 0 else None
+                value = round(v, 4) if v is not None else None
+            elif metric == "co2_per_hour":
+                v = co2 / duration if duration > 0 else None
+                value = round(v, 4) if v is not None else None
+            elif metric == "cost_per_km":
+                v = cost / distance if distance > 0 else None
+                value = round(v, 4) if v is not None else None
+            elif metric == "cost_per_hour":
+                v = cost / duration if duration > 0 else None
+                value = round(v, 4) if v is not None else None
+            elif metric == "speed_km_per_hour":
+                v = distance / duration if duration > 0 else None
+                value = round(v, 2) if v is not None else None
+            elif metric == "distance_km":
+                value = round(distance, 2)
+            elif metric == "n_stops":
+                value = n_stops
+            else:
+                value = None
+
+            results.append({
+                "route_id": int(r["route_id"]),
+                "cycle_id": r["cycle_id"],
+                "vehicle_id": r["vehicle_id"],
+                "sim_day": r["sim_day"],
+                "sim_hour": r["sim_hour"],
+                "distance_km": round(distance, 2),
+                "duration_hours": round(duration, 3),
+                "cost_sek": round(cost, 2),
+                "co2_kg": round(co2, 2),
+                "n_stops": n_stops,
+                "value": value,
+            })
+
+        # Build per-vehicle summary (mean/min/max/latest + trend)
+        per_vehicle: Dict[str, List[Dict[str, Any]]] = {}
+        # results is ordered by sim_day DESC — append to vehicle lists in reverse
+        # so they end up in chronological order
+        for row in reversed(results):
+            per_vehicle.setdefault(row["vehicle_id"], []).append(row)
+
+        per_vehicle_summary: Dict[str, Dict[str, Any]] = {}
+        for vid, hist in per_vehicle.items():
+            values_hist = [r["value"] for r in hist if r["value"] is not None]
+            if not values_hist:
+                continue
+            mean_v = sum(values_hist) / len(values_hist)
+            min_v = min(values_hist)
+            max_v = max(values_hist)
+            latest_v = values_hist[-1]
+            # Trend: compare first half vs second half (chronological)
+            half = len(values_hist) // 2
+            if half >= 1 and len(values_hist) >= 2:
+                first_half_mean = sum(values_hist[:half]) / half
+                second_half_mean = sum(values_hist[half:]) / (len(values_hist) - half)
+                delta = second_half_mean - first_half_mean
+                # For lower_is_better, decreasing = improving
+                if direction == "lower_is_better":
+                    if delta < -abs(first_half_mean) * 0.1:
+                        trend = "improving"
+                    elif delta > abs(first_half_mean) * 0.1:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+                else:
+                    if delta > abs(first_half_mean) * 0.1:
+                        trend = "improving"
+                    elif delta < -abs(first_half_mean) * 0.1:
+                        trend = "declining"
+                    else:
+                        trend = "stable"
+            else:
+                trend = "stable"
+
+            per_vehicle_summary[vid] = {
+                "n_routes": len(values_hist),
+                "mean_value": round(mean_v, 4),
+                "min_value": round(min_v, 4),
+                "max_value": round(max_v, 4),
+                "latest_value": round(latest_v, 4),
+                "trend": trend,
+                "first_sim_day": hist[0]["sim_day"],
+                "last_sim_day": hist[-1]["sim_day"],
+            }
+
+        # results is ordered DESC; reverse to chronological for chart friendliness
+        results.reverse()
+
+        result = {
+            "metric": metric,
+            "metric_description": desc,
+            "direction": direction,
+            "filter": {
+                "vehicle_id": vehicle_id,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+            },
+            "n_routes_evaluated": len(results),
+            "n_routes_returned": min(limit, len(results)),
+            "timeseries": results[:max(1, min(500, limit))],
+            "per_vehicle_summary": per_vehicle_summary,
+        }
+        self._cache_set(_cache_key, result)
+        return result
+
     def get_top_suppliers_by_efficiency(
         self,
         metric: str = "co2_per_ton",
