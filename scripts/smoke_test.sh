@@ -447,6 +447,12 @@ check_json_field "/api/persistence/compare-routes has route_a" GET "/api/persist
 check_json_field "/api/persistence/compare-routes has route_b" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".route_b | type" "object"
 check_json_field "/api/persistence/compare-routes has differences" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".differences | type" "object"
 check_json_field "/api/persistence/compare-routes has winner" GET "/api/persistence/compare-routes?route_id_a=1&route_id_b=2" ".winner | type" "object"
+# iter #64: cycle-duration-histogram endpoint
+check_endpoint "/api/persistence/cycle-duration-histogram (iter #64)" 200 GET "/api/persistence/cycle-duration-histogram"
+check_json_field "/api/persistence/cycle-duration-histogram has buckets array" GET "/api/persistence/cycle-duration-histogram" ".buckets | type" "array"
+check_json_field "/api/persistence/cycle-duration-histogram has n_buckets=8" GET "/api/persistence/cycle-duration-histogram" ".n_buckets" "8"
+check_json_field "/api/persistence/cycle-duration-histogram has stats" GET "/api/persistence/cycle-duration-histogram" ".stats | type" "object"
+check_endpoint "/api/persistence/cycle-duration-histogram with window" 200 GET "/api/persistence/cycle-duration-histogram?since_sim_day=1&until_sim_day=10"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"

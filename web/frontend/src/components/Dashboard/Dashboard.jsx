@@ -126,6 +126,8 @@ const TopMaterialsPanel = lazy(() => import('./TopMaterialsPanel').then(m => ({ 
 const CompareMaterialsPanel = lazy(() => import('./CompareMaterialsPanel').then(m => ({ default: m.CompareMaterialsPanel })))
 // iter #64: compare-routes side-by-side panel
 const CompareRoutesPanel = lazy(() => import('./CompareRoutesPanel').then(m => ({ default: m.CompareRoutesPanel })))
+// iter #64: cycle-duration histogram bar chart
+const CycleDurationHistogram = lazy(() => import('./CycleDurationHistogram').then(m => ({ default: m.CycleDurationHistogram })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -810,6 +812,11 @@ export default function Dashboard() {
           {/* iter #64: Compare routes (side-by-side compare 2 route rows) */}
           <Suspense fallback={<LoadingSpinner label="Loading route comparison…" />}>
             <CompareRoutesPanel />
+          </Suspense>
+
+          {/* iter #64: Cycle duration histogram (bar chart of solver times) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cycle duration histogram…" />}>
+            <CycleDurationHistogram />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}
