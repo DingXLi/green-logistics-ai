@@ -466,6 +466,12 @@ check_json_field "/api/persistence/cycle-trend-comparison has late" GET "/api/pe
 check_json_field "/api/persistence/cycle-trend-comparison has delta" GET "/api/persistence/cycle-trend-comparison" ".delta | type" "object"
 check_json_field "/api/persistence/cycle-trend-comparison has trend" GET "/api/persistence/cycle-trend-comparison" ".trend | type" "string"
 check_endpoint "/api/persistence/cycle-trend-comparison?metric=fleet_utilization_pct" 200 GET "/api/persistence/cycle-trend-comparison?metric=fleet_utilization_pct"
+# iter #65: material-timeseries endpoint
+check_endpoint "/api/persistence/material-timeseries (iter #65)" 200 GET "/api/persistence/material-timeseries"
+check_json_field "/api/persistence/material-timeseries has metric" GET "/api/persistence/material-timeseries" ".metric | type" "string"
+check_json_field "/api/persistence/material-timeseries has timeseries" GET "/api/persistence/material-timeseries" ".timeseries | type" "array"
+check_json_field "/api/persistence/material-timeseries has per_material_summary" GET "/api/persistence/material-timeseries" ".per_material_summary | type" "object"
+check_endpoint "/api/persistence/material-timeseries?metric=n_matches" 200 GET "/api/persistence/material-timeseries?metric=n_matches"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
