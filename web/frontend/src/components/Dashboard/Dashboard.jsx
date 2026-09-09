@@ -128,6 +128,10 @@ const CompareMaterialsPanel = lazy(() => import('./CompareMaterialsPanel').then(
 const CompareRoutesPanel = lazy(() => import('./CompareRoutesPanel').then(m => ({ default: m.CompareRoutesPanel })))
 // iter #64: cycle-duration histogram bar chart
 const CycleDurationHistogram = lazy(() => import('./CycleDurationHistogram').then(m => ({ default: m.CycleDurationHistogram })))
+// iter #65: vehicle efficiency time-series
+const VehicleTimeseriesPanel = lazy(() => import('./VehicleTimeseriesPanel').then(m => ({ default: m.VehicleTimeseriesPanel })))
+// iter #65: cycle trend comparison (early vs late window)
+const CycleTrendComparisonPanel = lazy(() => import('./CycleTrendComparisonPanel').then(m => ({ default: m.CycleTrendComparisonPanel })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -817,6 +821,16 @@ export default function Dashboard() {
           {/* iter #64: Cycle duration histogram (bar chart of solver times) */}
           <Suspense fallback={<LoadingSpinner label="Loading cycle duration histogram…" />}>
             <CycleDurationHistogram />
+          </Suspense>
+
+          {/* iter #65: Vehicle timeseries (per-vehicle efficiency evolution) */}
+          <Suspense fallback={<LoadingSpinner label="Loading vehicle timeseries…" />}>
+            <VehicleTimeseriesPanel />
+          </Suspense>
+
+          {/* iter #65: Cycle trend comparison (early vs late window) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cycle trend…" />}>
+            <CycleTrendComparisonPanel />
           </Suspense>
 
           {/* iter #20: Cohort retention by period (trend) */}

@@ -453,6 +453,19 @@ check_json_field "/api/persistence/cycle-duration-histogram has buckets array" G
 check_json_field "/api/persistence/cycle-duration-histogram has n_buckets=8" GET "/api/persistence/cycle-duration-histogram" ".n_buckets" "8"
 check_json_field "/api/persistence/cycle-duration-histogram has stats" GET "/api/persistence/cycle-duration-histogram" ".stats | type" "object"
 check_endpoint "/api/persistence/cycle-duration-histogram with window" 200 GET "/api/persistence/cycle-duration-histogram?since_sim_day=1&until_sim_day=10"
+# iter #65: vehicle-timeseries endpoint
+check_endpoint "/api/persistence/vehicle-timeseries (iter #65)" 200 GET "/api/persistence/vehicle-timeseries"
+check_json_field "/api/persistence/vehicle-timeseries has metric" GET "/api/persistence/vehicle-timeseries" ".metric | type" "string"
+check_json_field "/api/persistence/vehicle-timeseries has timeseries" GET "/api/persistence/vehicle-timeseries" ".timeseries | type" "array"
+check_json_field "/api/persistence/vehicle-timeseries has per_vehicle_summary" GET "/api/persistence/vehicle-timeseries" ".per_vehicle_summary | type" "object"
+check_endpoint "/api/persistence/vehicle-timeseries?metric=cost_per_km" 200 GET "/api/persistence/vehicle-timeseries?metric=cost_per_km"
+# iter #65: cycle-trend-comparison endpoint
+check_endpoint "/api/persistence/cycle-trend-comparison (iter #65)" 200 GET "/api/persistence/cycle-trend-comparison"
+check_json_field "/api/persistence/cycle-trend-comparison has early" GET "/api/persistence/cycle-trend-comparison" ".early | type" "object"
+check_json_field "/api/persistence/cycle-trend-comparison has late" GET "/api/persistence/cycle-trend-comparison" ".late | type" "object"
+check_json_field "/api/persistence/cycle-trend-comparison has delta" GET "/api/persistence/cycle-trend-comparison" ".delta | type" "object"
+check_json_field "/api/persistence/cycle-trend-comparison has trend" GET "/api/persistence/cycle-trend-comparison" ".trend | type" "string"
+check_endpoint "/api/persistence/cycle-trend-comparison?metric=fleet_utilization_pct" 200 GET "/api/persistence/cycle-trend-comparison?metric=fleet_utilization_pct"
 # iter #49: perturbation history
 check_endpoint "/api/persistence/perturbation-history (iter #49)" 200 GET "/api/persistence/perturbation-history"
 check_json_field "/api/persistence/perturbation-history has perturbations" GET "/api/persistence/perturbation-history" ".perturbations | type" "array"
