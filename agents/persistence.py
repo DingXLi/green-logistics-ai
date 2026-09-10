@@ -8168,3 +8168,127 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    # ------------------------------------------------------------------
+    # iter #66: anomaly aggregation / summary
+    # ------------------------------------------------------------------
+
+    def get_anomaly_summary(
+        self,
+        z_threshold: float = 2.0,
+        min_history: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        iter #66: Aggregate anomaly statistics across all cycles.
+
+        Wraps ``detect_anomalous_cycles`` and adds per-metric counts,
+        severity distribution, and multi-anomaly cycle detection. Useful
+        for ops to answer questions like:
+        - Which metric is the most unstable? (e.g. cost_sek spikes weekly)
+        - Are anomalies clustered in time? (multi-anomaly cycles = systemic)
+        - Is the anomaly rate increasing or stable?
+
+        Args:
+            z_threshold: forwarded to ``detect_anomalous_cycles``
+            min_history: forwarded to ``detect_anomalous_cycles``
+
+        Returns:
+            {
+              n_anomalous_cycles: int,
+              n_total_cycles: int,
+              anomaly_rate_pct: float,
+              z_threshold: float,
+              min_history: int,
+              total_anomaly_events: int,           # total per-metric anomalies
+              per_metric_counts: {metric: count, ...},    # raw counts
+              per_metric_pct: {metric: pct, ...},          # % of cycles with this metric flagged
+              per_severity_counts: {high: int, medium: int, low: int},
+              top_anomalous_metrics: [{metric, count, pct_of_cycles}, ...]  # sorted desc
+              cycles_with_multiple_anomalies: int,         # cycles with >= 2 metric anomalies
+              multi_anomaly_rate_pct: float,               # cycles_with_multiple / n_anomalous
+              most_common_metric: str | None,
+              most_common_severity: str | None,
+              insufficient_history: bool,                  # True if history < min_history
+            }
+        """
+        cache_kwargs = {"z_threshold": float(z_threshold), "min_history": int(min_history)}
+        _cache_key = self._cache_key("get_anomaly_summary", cache_kwargs)
+        cached = self._cache_get(_cache_key)
+        if cached is not None:
+            return cached
+
+        anomalies = self.detect_anomalous_cycles(
+            z_threshold=z_threshold, min_history=min_history,
+        )
+        try:
+            n_total = self.get_summary().get("n_cycles", 0)
+        except Exception:
+            n_total = 0
+
+        insufficient_history = n_total < min_history
+
+        # Initialize per-metric counter for all known metrics (so frontend
+        # always gets consistent keys)
+        all_metrics = [
+            "total_cost_sek", "total_co2_kg", "fleet_utilization_pct",
+            "total_distance_km", "total_tons",
+        ]
+        per_metric_counts: Dict[str, int] = {m: 0 for m in all_metrics}
+        per_severity_counts: Dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+        cycles_with_multiple_anomalies = 0
+        total_anomaly_events = 0
+
+        for cyc in anomalies:
+            cycle_anoms = cyc.get("anomalies", [])
+            n_cycle = len(cycle_anoms)
+            total_anomaly_events += n_cycle
+            if n_cycle >= 2:
+                cycles_with_multiple_anomalies += 1
+            for a in cycle_anoms:
+                metric = a.get("metric")
+                severity = a.get("severity")
+                if metric in per_metric_counts:
+                    per_metric_counts[metric] += 1
+                if severity in per_severity_counts:
+                    per_severity_counts[severity] += 1
+
+        # Per-metric percentage: % of total cycles where this metric was flagged
+        per_metric_pct: Dict[str, float] = {}
+        for m, c in per_metric_counts.items():
+            per_metric_pct[m] = round(100 * c / n_total, 2) if n_total > 0 else 0.0
+
+        # Top metrics (sorted desc by count, drop zero-count to keep list compact)
+        top_metrics = [
+            {"metric": m, "count": c, "pct_of_cycles": per_metric_pct[m]}
+            for m, c in sorted(per_metric_counts.items(), key=lambda kv: kv[1], reverse=True)
+            if c > 0
+        ]
+
+        n_anomalous = len(anomalies)
+        most_common_metric = top_metrics[0]["metric"] if top_metrics else None
+        most_common_severity = max(
+            per_severity_counts.items(), key=lambda kv: kv[1]
+        )[0] if any(per_severity_counts.values()) else None
+
+        result = {
+            "n_anomalous_cycles": n_anomalous,
+            "n_total_cycles": n_total,
+            "anomaly_rate_pct": round(100 * n_anomalous / n_total, 2) if n_total > 0 else 0.0,
+            "z_threshold": float(z_threshold),
+            "min_history": int(min_history),
+            "total_anomaly_events": total_anomaly_events,
+            "per_metric_counts": per_metric_counts,
+            "per_metric_pct": per_metric_pct,
+            "per_severity_counts": per_severity_counts,
+            "top_anomalous_metrics": top_metrics,
+            "cycles_with_multiple_anomalies": cycles_with_multiple_anomalies,
+            "multi_anomaly_rate_pct": (
+                round(100 * cycles_with_multiple_anomalies / n_anomalous, 2)
+                if n_anomalous > 0 else 0.0
+            ),
+            "most_common_metric": most_common_metric,
+            "most_common_severity": most_common_severity,
+            "insufficient_history": insufficient_history,
+        }
+        self._cache_set(_cache_key, result)
+        return result

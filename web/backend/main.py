@@ -6695,6 +6695,51 @@ async def get_anomalous_cycles(
     }
 
 
+@app.get("/api/persistence/anomaly-summary")
+async def get_anomaly_summary(
+    z_threshold: float = 2.0,
+    min_history: int = 5,
+):
+    """
+    iter #66: Aggregated anomaly statistics across all cycles.
+
+    Wraps ``detect_anomalous_cycles`` and adds:
+    - per-metric anomaly counts and percentages
+    - severity distribution (high/medium/low)
+    - top anomalous metrics (sorted desc)
+    - multi-anomaly cycle detection (cycles with >= 2 metric anomalies)
+    - insufficient_history flag (when n_cycles < min_history)
+
+    Query:
+    - z_threshold: how many stddevs to flag (default 2.0)
+    - min_history: minimum cycles needed (default 5)
+
+    Returns:
+        {
+          n_anomalous_cycles: int,
+          n_total_cycles: int,
+          anomaly_rate_pct: float,
+          z_threshold: float,
+          min_history: int,
+          total_anomaly_events: int,
+          per_metric_counts: {metric: count, ...},
+          per_metric_pct: {metric: pct, ...},
+          per_severity_counts: {high: int, medium: int, low: int},
+          top_anomalous_metrics: [{metric, count, pct_of_cycles}, ...],
+          cycles_with_multiple_anomalies: int,
+          multi_anomaly_rate_pct: float,
+          most_common_metric: str | None,
+          most_common_severity: str | None,
+          insufficient_history: bool,
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    return coordinator.persistence.get_anomaly_summary(
+        z_threshold=z_threshold, min_history=min_history,
+    )
+
+
 @app.post("/api/admin/db-maintenance")
 async def post_db_maintenance(_: None = Depends(require_admin)):
     """
