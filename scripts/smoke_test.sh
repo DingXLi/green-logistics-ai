@@ -283,6 +283,15 @@ check_endpoint "/api/persistence/anomalous-cycles (iter #47)" 200 GET "/api/pers
 check_json_field "/api/persistence/anomalous-cycles has anomalies array" GET "/api/persistence/anomalous-cycles" ".anomalies | type" "array"
 check_json_field "/api/persistence/anomalous-cycles has z_threshold" GET "/api/persistence/anomalous-cycles" ".z_threshold | type" "number"
 check_endpoint "/api/persistence/anomalous-cycles?z_threshold=3.5" 200 GET "/api/persistence/anomalous-cycles?z_threshold=3.5"
+
+# ---- iter #66: anomaly aggregation / summary ----
+check_endpoint "/api/persistence/anomaly-summary (iter #66)" 200 GET "/api/persistence/anomaly-summary"
+check_json_field "/api/persistence/anomaly-summary has n_anomalous_cycles" GET "/api/persistence/anomaly-summary" ".n_anomalous_cycles | type" "number"
+check_json_field "/api/persistence/anomaly-summary has per_metric_counts" GET "/api/persistence/anomaly-summary" ".per_metric_counts | type" "object"
+check_json_field "/api/persistence/anomaly-summary has per_severity_counts" GET "/api/persistence/anomaly-summary" ".per_severity_counts | type" "object"
+check_json_field "/api/persistence/anomaly-summary has top_anomalous_metrics" GET "/api/persistence/anomaly-summary" ".top_anomalous_metrics | type" "array"
+check_json_field "/api/persistence/anomaly-summary has insufficient_history flag" GET "/api/persistence/anomaly-summary" ".insufficient_history | type" "boolean"
+check_endpoint "/api/persistence/anomaly-summary?z_threshold=2.5&min_history=3 (iter #66)" 200 GET "/api/persistence/anomaly-summary?z_threshold=2.5&min_history=3"
 check_endpoint "/api/persistence/cycle-kpi-summary?last_n=7" 200 GET "/api/persistence/cycle-kpi-summary?last_n=7"
 # iter #27: parquet exports (consistency with /admin/db-export)
 check_endpoint "/api/persistence/export/cycles.parquet" 200 GET "/api/persistence/export/cycles.parquet?limit=10"

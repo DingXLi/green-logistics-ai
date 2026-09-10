@@ -243,6 +243,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/llm-decision-targets` | Per-target LLM call stats (most-called DEM/SUP targets) (iter #48) |
 | GET    | `/api/persistence/material-supply-demand-balance` | Supply vs demand balance per material (oversupply / shortage) (iter #49) |
 | GET    | `/api/persistence/anomalous-cycles?z_threshold=2.0` | Statistical z-score outlier detection across KPIs (iter #47) |
+| GET    | `/api/persistence/anomaly-summary?z_threshold=2.0&min_history=5` | Aggregated anomaly statistics: per-metric counts (cost/co2/util/distance/tons), severity distribution (high/medium/low), multi-anomaly cycle detection, top anomalous metrics sorted desc. Returns consistent shape regardless of anomaly presence. (iter #66) |
 | GET    | `/api/regions` | Swedish region profiles (Borås/Göteborg/Stockholm) with SCB population data (iter #47) |
 | GET    | `/api/weather?lat=X&lon=Y` | SMHI weather forecast (current + 24h avg) for the depot location (iter #50) |
 | GET    | `/api/signals/external?country=SE` | Eurostat aggregated external signals (construction index + industrial index + business confidence + composite demand/supply multipliers) (iter #51) |

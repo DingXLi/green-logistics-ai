@@ -84,6 +84,8 @@ const SeasonalMaterialCrossTab = lazy(() => import('./SeasonalMaterialCrossTab')
 const PerturbationImpactByMaterial = lazy(() => import('./PerturbationImpactByMaterial').then(m => ({ default: m.PerturbationImpactByMaterial })))
 // iter #47: statistical anomaly detection (z-score)
 const AnomalousCycles = lazy(() => import('./AnomalousCycles').then(m => ({ default: m.AnomalousCycles })))
+// iter #66: aggregated anomaly statistics (per-metric counts, severity distribution)
+const AnomalySummaryPanel = lazy(() => import('./AnomalySummaryPanel').then(m => ({ default: m.AnomalySummaryPanel })))
 // iter #47: Swedish region profiles (SCB)
 const RegionProfiles = lazy(() => import('./RegionProfiles').then(m => ({ default: m.RegionProfiles })))
 // iter #48: LLM cost breakdown by decision type
@@ -855,6 +857,8 @@ export default function Dashboard() {
             <PerturbationImpactByMaterial />
             {/* iter #47: statistical anomaly detection */}
             <AnomalousCycles />
+            {/* iter #66: aggregated anomaly statistics */}
+            <AnomalySummaryPanel />
             {/* iter #47: SCB region profiles */}
             <RegionProfiles />
             {/* iter #51: Eurostat external economic signals (construction/industrial/confidence) */}
