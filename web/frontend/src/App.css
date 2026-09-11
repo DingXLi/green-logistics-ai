@@ -5793,3 +5793,128 @@ td.no-matches {
   overflow-y: auto;
   margin: 0;
 }
+
+/* iter #67: CycleDurationByProblemSize panel */
+.cycle-duration-by-problem-size-panel .problem-size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.cycle-duration-by-problem-size-panel .problem-size-bucket {
+  background: var(--surface-alt, rgba(255, 255, 255, 0.04));
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  text-transform: capitalize;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-tons {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #94a3b8);
+  font-family: var(--font-mono, monospace);
+  margin-left: 0.25rem;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-count {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.cycle-duration-by-problem-size-panel .bucket-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.75rem;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.78rem;
+}
+
+.cycle-duration-by-problem-size-panel .bs-label {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cycle-duration-by-problem-size-panel .bs-value {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+}
+
+.cycle-duration-by-problem-size-panel .bs-value.small {
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.cycle-duration-by-problem-size-panel .bucket-solver-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.cycle-duration-by-problem-size-panel .status-chip {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+
+.cycle-duration-by-problem-size-panel .status-optimal {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+}
+
+.cycle-duration-by-problem-size-panel .status-feasible {
+  background: rgba(250, 204, 21, 0.18);
+  color: #facc15;
+}
+
+.cycle-duration-by-problem-size-panel .status-infeasible {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}
+
+.cycle-duration-by-problem-size-panel .status-unknown {
+  background: rgba(148, 163, 184, 0.18);
+  color: #94a3b8;
+}
+
+@media (max-width: 600px) {
+  .cycle-duration-by-problem-size-panel .problem-size-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -462,6 +462,13 @@ check_json_field "/api/persistence/cycle-duration-histogram has buckets array" G
 check_json_field "/api/persistence/cycle-duration-histogram has n_buckets=8" GET "/api/persistence/cycle-duration-histogram" ".n_buckets" "8"
 check_json_field "/api/persistence/cycle-duration-histogram has stats" GET "/api/persistence/cycle-duration-histogram" ".stats | type" "object"
 check_endpoint "/api/persistence/cycle-duration-histogram with window" 200 GET "/api/persistence/cycle-duration-histogram?since_sim_day=1&until_sim_day=10"
+# iter #67: cycle-duration-by-problem-size endpoint
+check_endpoint "/api/persistence/cycle-duration-by-problem-size (iter #67)" 200 GET "/api/persistence/cycle-duration-by-problem-size"
+check_json_field "/api/persistence/cycle-duration-by-problem-size has buckets array" GET "/api/persistence/cycle-duration-by-problem-size" ".buckets | type" "array"
+check_json_field "/api/persistence/cycle-duration-by-problem-size has n_buckets=4" GET "/api/persistence/cycle-duration-by-problem-size" ".n_buckets" "4"
+check_json_field "/api/persistence/cycle-duration-by-problem-size has bucket_bounds" GET "/api/persistence/cycle-duration-by-problem-size" ".bucket_bounds | type" "array"
+check_json_field "/api/persistence/cycle-duration-by-problem-size has scaling_signal" GET "/api/persistence/cycle-duration-by-problem-size" ".scaling_signal | type" "string"
+check_endpoint "/api/persistence/cycle-duration-by-problem-size with window" 200 GET "/api/persistence/cycle-duration-by-problem-size?since_sim_day=1&until_sim_day=10"
 # iter #65: vehicle-timeseries endpoint
 check_endpoint "/api/persistence/vehicle-timeseries (iter #65)" 200 GET "/api/persistence/vehicle-timeseries"
 check_json_field "/api/persistence/vehicle-timeseries has metric" GET "/api/persistence/vehicle-timeseries" ".metric | type" "string"
