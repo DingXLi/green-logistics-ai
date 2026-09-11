@@ -8292,3 +8292,269 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    # ------------------------------------------------------------------
+    # iter #67: cycle duration breakdown by problem size (total_tons bucket)
+    # ------------------------------------------------------------------
+
+    def get_cycle_duration_by_problem_size(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #67: Solver wall-time + efficiency breakdown by problem size.
+
+        Bucket definition (based on ``optimization_cycles.total_tons``):
+        - "small"  :  total_tons < 10
+        - "medium" :  10 <= total_tons < 50
+        - "large"  :  50 <= total_tons < 200
+        - "xlarge" :  total_tons >= 200
+
+        For each bucket we report:
+        - count, pct_of_total
+        - wall_duration_ms stats: mean / median / min / max / stddev
+        - cost stats: mean total_cost_sek, mean cost_per_ton_sek
+        - distance stats: mean total_distance_km
+        - mean n_matches (problem complexity proxy)
+        - solver_status breakdown (optimal / feasible / infeasible / unknown)
+        - dominant_material (most common material_type in bucket)
+
+        Args:
+            since_sim_day, until_sim_day: optional time window
+
+        Returns:
+            {
+              n_cycles, n_buckets, since_sim_day, until_sim_day,
+              bucket_bounds: [
+                {label, min_tons, max_tons, ...}, ...
+              ],
+              buckets: [
+                {label, min_tons, max_tons, count, pct_of_total,
+                 duration_ms: {mean, median, min, max, stddev},
+                 cost_sek: {mean, median},
+                 cost_per_ton_sek: {mean, median},
+                 distance_km: {mean, median},
+                 n_matches: {mean, median},
+                 solver_status_counts: {optimal, feasible, infeasible, unknown},
+                 dominant_material: str | None},
+                ...
+              ],
+              scaling_signal: "linear" | "superlinear" | "sublinear" | "unknown"
+                # compares large vs small bucket p50 duration ratio to tonnage ratio
+            }
+        """
+        cache_kwargs = {
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+        }
+        _cache_key = self._cache_key("get_cycle_duration_by_problem_size", cache_kwargs)
+        cached = self._cache_get(_cache_key)
+        if cached is not None:
+            return cached
+
+        # Bucket definitions — kept in sync with the docstring above
+        BUCKETS = [
+            {"label": "small",  "min_tons": 0,   "max_tons": 10},
+            {"label": "medium", "min_tons": 10,  "max_tons": 50},
+            {"label": "large",  "min_tons": 50,  "max_tons": 200},
+            {"label": "xlarge", "min_tons": 200, "max_tons": None},  # no upper bound
+        ]
+
+        where_clauses: List[str] = [
+            "wall_duration_ms IS NOT NULL",
+            "total_tons IS NOT NULL",
+        ]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(since_sim_day)
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(until_sim_day)
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT cycle_id, sim_day, total_tons, wall_duration_ms,
+                          total_cost_sek, total_co2_kg, total_distance_km,
+                          n_matches, solver_status, seasonal_factor_avg
+                    FROM optimization_cycles
+                    WHERE {where_sql}""",
+                params,
+            ).fetchall()
+            # material_type lives on the matched_supply table; fetch via
+            # a separate aggregate to avoid JOINing every cycle row.
+            mat_rows = conn.execute(
+                f"""SELECT s.cycle_id, s.material_type
+                    FROM supply_offers s
+                    JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                    WHERE {where_sql}""",
+                params,
+            ).fetchall()
+
+        # Bucket each cycle row by total_tons
+        def _bucket_for(tons: float) -> Optional[str]:
+            for b in BUCKETS:
+                if b["max_tons"] is None:
+                    if tons >= b["min_tons"]:
+                        return b["label"]
+                else:
+                    if b["min_tons"] <= tons < b["max_tons"]:
+                        return b["label"]
+            return None
+
+        bucket_cycles: Dict[str, List[Dict[str, Any]]] = {b["label"]: [] for b in BUCKETS}
+        # material_type lookup per cycle (first material wins for "dominant")
+        cycle_materials: Dict[str, str] = {}
+        for r in mat_rows:
+            cid = r["cycle_id"]
+            mat = r["material_type"]
+            if cid not in cycle_materials and mat:
+                cycle_materials[cid] = mat
+
+        for r in rows:
+            label = _bucket_for(float(r["total_tons"]))
+            if label is None:
+                continue
+            bucket_cycles[label].append({
+                "cycle_id": r["cycle_id"],
+                "sim_day": r["sim_day"],
+                "total_tons": float(r["total_tons"]),
+                "wall_duration_ms": float(r["wall_duration_ms"]),
+                "total_cost_sek": float(r["total_cost_sek"] or 0),
+                "total_co2_kg": float(r["total_co2_kg"] or 0),
+                "total_distance_km": float(r["total_distance_km"] or 0),
+                "n_matches": int(r["n_matches"] or 0),
+                "solver_status": r["solver_status"] or "UNKNOWN",
+                "material_type": cycle_materials.get(r["cycle_id"]),
+            })
+
+        def _stats(values: List[float]) -> Dict[str, Any]:
+            if not values:
+                return {
+                    "mean": None, "median": None, "min": None,
+                    "max": None, "stddev": None,
+                }
+            n = len(values)
+            sorted_v = sorted(values)
+            mean = sum(values) / n
+            variance = sum((v - mean) ** 2 for v in values) / n
+            stddev = variance ** 0.5
+            if n == 1:
+                median = sorted_v[0]
+            else:
+                idx = (n - 1) * 0.5
+                lo = int(idx)
+                hi = min(lo + 1, n - 1)
+                frac = idx - lo
+                median = sorted_v[lo] * (1 - frac) + sorted_v[hi] * frac
+            return {
+                "mean": round(mean, 2),
+                "median": round(median, 2),
+                "min": round(min(values), 2),
+                "max": round(max(values), 2),
+                "stddev": round(stddev, 2),
+            }
+
+        def _status_counts(statuses: List[str]) -> Dict[str, int]:
+            counts = {"OPTIMAL": 0, "FEASIBLE": 0, "INFEASIBLE": 0, "UNKNOWN": 0}
+            for s in statuses:
+                key = s.upper() if s else "UNKNOWN"
+                if key not in counts:
+                    key = "UNKNOWN"
+                counts[key] += 1
+            return counts
+
+        def _dominant_material(materials: List[Optional[str]]) -> Optional[str]:
+            counts: Dict[str, int] = {}
+            for m in materials:
+                if m:
+                    counts[m] = counts.get(m, 0) + 1
+            if not counts:
+                return None
+            return max(counts.items(), key=lambda kv: kv[1])[0]
+
+        n_cycles = sum(len(v) for v in bucket_cycles.values())
+
+        buckets_out: List[Dict[str, Any]] = []
+        for b in BUCKETS:
+            cycles = bucket_cycles[b["label"]]
+            count = len(cycles)
+            durations = [c["wall_duration_ms"] for c in cycles]
+            costs = [c["total_cost_sek"] for c in cycles]
+            cost_per_ton = [
+                c["total_cost_sek"] / c["total_tons"]
+                for c in cycles
+                if c["total_tons"] > 0
+            ]
+            distances = [c["total_distance_km"] for c in cycles]
+            n_matches = [c["n_matches"] for c in cycles]
+            statuses = [c["solver_status"] for c in cycles]
+            materials = [c["material_type"] for c in cycles]
+            buckets_out.append({
+                "label": b["label"],
+                "min_tons": b["min_tons"],
+                "max_tons": b["max_tons"],
+                "count": count,
+                "pct_of_total": round(100 * count / n_cycles, 2) if n_cycles > 0 else 0.0,
+                "duration_ms": _stats(durations),
+                "cost_sek": _stats(costs),
+                "cost_per_ton_sek": _stats(cost_per_ton),
+                "distance_km": _stats(distances),
+                "n_matches": _stats([float(v) for v in n_matches]),
+                "solver_status_counts": _status_counts(statuses),
+                "dominant_material": _dominant_material(materials),
+            })
+
+        # Scaling signal: ratio of (large median duration) to (small median duration)
+        # vs ratio of (large median tons) to (small median tons).
+        # If duration ratio ≈ tonnage ratio → linear, much larger → superlinear, smaller → sublinear.
+        scaling_signal = "unknown"
+        try:
+            small = next(b for b in buckets_out if b["label"] == "small")
+            large = next(b for b in buckets_out if b["label"] == "large")
+            if (
+                small["duration_ms"]["median"] is not None
+                and large["duration_ms"]["median"] is not None
+                and small["count"] > 0
+                and large["count"] > 0
+            ):
+                # Approximate bucket midpoint for ratio
+                small_mid = 5.0   # midpoint of [0, 10)
+                large_mid = 125.0 # midpoint of [50, 200)
+                tonnage_ratio = large_mid / small_mid  # 25x
+                duration_ratio = (
+                    large["duration_ms"]["median"] / small["duration_ms"]["median"]
+                )
+                if duration_ratio <= tonnage_ratio * 1.2:
+                    scaling_signal = "linear"
+                elif duration_ratio <= tonnage_ratio * 2.5:
+                    scaling_signal = "superlinear"
+                else:
+                    scaling_signal = "superlinear"  # extreme — still superlinear
+                # If duration barely changes despite large tonnage difference → sublinear
+                if duration_ratio < max(1.0, tonnage_ratio * 0.3):
+                    scaling_signal = "sublinear"
+        except (StopIteration, KeyError, TypeError, ZeroDivisionError):
+            scaling_signal = "unknown"
+
+        result = {
+            "n_cycles": n_cycles,
+            "n_buckets": len(BUCKETS),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "bucket_bounds": [
+                {
+                    "label": b["label"],
+                    "min_tons": b["min_tons"],
+                    "max_tons": b["max_tons"] if b["max_tons"] is not None else None,
+                    "open_upper_bound": b["max_tons"] is None,
+                }
+                for b in BUCKETS
+            ],
+            "buckets": buckets_out,
+            "scaling_signal": scaling_signal,
+        }
+        self._cache_set(_cache_key, result)
+        return result

@@ -5596,6 +5596,58 @@ async def get_cycle_duration_histogram(
     )
 
 
+@app.get("/api/persistence/cycle-duration-by-problem-size")
+async def get_cycle_duration_by_problem_size(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #67: Solver duration + efficiency breakdown by problem size.
+
+    Buckets cycles by ``total_tons`` into small (<10), medium (10-50),
+    large (50-200), xlarge (>=200). For each bucket we report wall-time
+    stats (mean / median / min / max / stddev), cost stats, cost-per-ton
+    stats, distance, n_matches, solver status breakdown, and the
+    dominant material_type.
+
+    Also computes a ``scaling_signal``:
+    - linear     duration grows proportionally to tonnage
+    - superlinear duration grows faster than tonnage (red flag)
+    - sublinear  duration barely grows (good — solver scales well)
+    - unknown    not enough data to compare buckets
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles, n_buckets, since_sim_day, until_sim_day,
+        bucket_bounds: [{label, min_tons, max_tons, open_upper_bound}, ...],
+        buckets: [{label, min_tons, max_tons, count, pct_of_total,
+                   duration_ms, cost_sek, cost_per_ton_sek, distance_km,
+                   n_matches, solver_status_counts, dominant_material}, ...],
+        scaling_signal: "linear" | "superlinear" | "sublinear" | "unknown"
+      }
+
+    Use cases:
+    - Spot solver scaling bottlenecks (large buckets disproportionately slow)
+    - Compare cost/ton efficiency across problem sizes
+    - Identify which buckets have infeasible solver runs
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_cycle_duration_by_problem_size(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/match-distance-buckets")
 async def get_match_distance_buckets(
     since_sim_day: Optional[int] = None,
