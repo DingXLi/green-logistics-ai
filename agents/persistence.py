@@ -8558,3 +8558,185 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def get_solver_duration_trend(
+        self,
+        window_size: int = 5,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #68: Solver duration p50/p95 trend over time windows.
+
+        Complements get_cycle_duration_stats (aggregate) and
+        get_cycle_duration_histogram (distribution) by showing how
+        solver wall-time evolves across cycles.
+
+        Each row represents a **chronological window of N cycles** (default 5),
+        with p50 / p95 / mean / min / max wall_duration_ms for that window.
+        Also computes an overall trend across windows (improving / declining /
+        stable / unknown) by comparing first-half vs second-half p50.
+
+        Args:
+            window_size: number of cycles per window (clamped to [2, 30])
+            since_sim_day, until_sim_day: optional sim_day filter
+
+        Returns:
+          {
+            n_windows, window_size, n_cycles_evaluated,
+            since_sim_day, until_sim_day,
+            trend: 'improving' | 'declining' | 'stable' | 'unknown',
+            trend_delta_pct, trend_confidence (0-1, based on n windows),
+            windows: [
+              {window_index, start_cycle_id, end_cycle_id, start_sim_day,
+               end_sim_day, n_cycles, p50_ms, p95_ms, mean_ms,
+               min_ms, max_ms, stddev_ms}, ...
+            ],
+            first_window_p50_ms, last_window_p50_ms,
+          }
+
+        Use cases:
+        - Plot solver wall_duration_ms trend over time
+        - Detect performance regression after model changes
+        - Identify when solver started being slower
+        """
+        _cache_key = self._cache_key(
+            "get_solver_duration_trend",
+            {"window_size": window_size,
+             "since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        window_size = max(2, min(30, int(window_size)))
+
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT cycle_id, sim_day, sim_hour, wall_duration_ms,
+                           total_tons, total_cost_sek, total_co2_kg,
+                           n_matches, solver_status
+                FROM optimization_cycles
+                WHERE {where_sql}
+                ORDER BY id ASC""",
+                params,
+            ).fetchall()
+
+        n_cycles = len(rows)
+        if n_cycles == 0:
+            empty_result: Dict[str, Any] = {
+                "n_windows": 0,
+                "window_size": window_size,
+                "n_cycles_evaluated": 0,
+                "since_sim_day": since_sim_day,
+                "until_sim_day": until_sim_day,
+                "trend": "unknown",
+                "trend_delta_pct": None,
+                "trend_confidence": 0.0,
+                "windows": [],
+                "first_window_p50_ms": None,
+                "last_window_p50_ms": None,
+            }
+            self._cache_set(_cache_key, empty_result)
+            return empty_result
+
+        def _percentile(values: List[float], pct: float) -> float:
+            if not values:
+                return 0.0
+            sorted_v = sorted(values)
+            n = len(sorted_v)
+            if n == 1:
+                return sorted_v[0]
+            idx = (pct / 100.0) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return sorted_v[lo] * (1 - frac) + sorted_v[hi] * frac
+
+        # Split into windows of `window_size` consecutive cycles (by id order).
+        # If last window is partial (fewer than window_size cycles), keep it.
+        windows_out: List[Dict[str, Any]] = []
+        for w_idx in range(0, n_cycles, window_size):
+            chunk = rows[w_idx:w_idx + window_size]
+            durations = [float(r["wall_duration_ms"]) for r in chunk]
+            p50 = _percentile(durations, 50)
+            p95 = _percentile(durations, 95) if len(durations) >= 2 else durations[0]
+            mean = sum(durations) / len(durations)
+            variance = sum((d - mean) ** 2 for d in durations) / len(durations)
+            stddev = variance ** 0.5
+            windows_out.append({
+                "window_index": len(windows_out),
+                "start_cycle_id": chunk[0]["cycle_id"],
+                "end_cycle_id": chunk[-1]["cycle_id"],
+                "start_sim_day": int(chunk[0]["sim_day"]),
+                "end_sim_day": int(chunk[-1]["sim_day"]),
+                "n_cycles": len(chunk),
+                "p50_ms": round(p50, 2),
+                "p95_ms": round(p95, 2),
+                "mean_ms": round(mean, 2),
+                "min_ms": round(min(durations), 2),
+                "max_ms": round(max(durations), 2),
+                "stddev_ms": round(stddev, 2),
+            })
+
+        n_windows = len(windows_out)
+
+        # Trend: first-half vs second-half median p50.
+        # Lower wall_duration_ms = better (solver faster), so:
+        #   first > last → improving (got faster)
+        #   first < last → declining (got slower)
+        if n_windows < 2:
+            trend = "unknown"
+            trend_delta_pct: Optional[float] = None
+            trend_confidence = 0.0
+        else:
+            half = n_windows // 2
+            first_half_p50s = [w["p50_ms"] for w in windows_out[:half]]
+            second_half_p50s = [w["p50_ms"] for w in windows_out[half:]]
+            first_avg = sum(first_half_p50s) / len(first_half_p50s)
+            second_avg = sum(second_half_p50s) / len(second_half_p50s)
+            if first_avg > 0:
+                trend_delta_pct = round(
+                    (second_avg - first_avg) / first_avg * 100, 2
+                )
+            else:
+                trend_delta_pct = None
+            # 10% threshold to avoid noisy classification
+            if trend_delta_pct is not None:
+                if trend_delta_pct < -10.0:
+                    trend = "improving"
+                elif trend_delta_pct > 10.0:
+                    trend = "declining"
+                else:
+                    trend = "stable"
+            else:
+                trend = "unknown"
+            # Confidence: ratio of second_half windows that agree with overall
+            # trend direction (n_windows capped at 1.0)
+            trend_confidence = min(1.0, n_windows / 5.0)
+
+        result: Dict[str, Any] = {
+            "n_windows": n_windows,
+            "window_size": window_size,
+            "n_cycles_evaluated": n_cycles,
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "trend": trend,
+            "trend_delta_pct": trend_delta_pct,
+            "trend_confidence": round(trend_confidence, 2),
+            "windows": windows_out,
+            "first_window_p50_ms": windows_out[0]["p50_ms"] if windows_out else None,
+            "last_window_p50_ms": windows_out[-1]["p50_ms"] if windows_out else None,
+        }
+        self._cache_set(_cache_key, result)
+        return result

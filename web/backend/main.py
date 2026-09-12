@@ -5596,6 +5596,63 @@ async def get_cycle_duration_histogram(
     )
 
 
+@app.get("/api/persistence/solver-duration-trend")
+async def get_solver_duration_trend(
+    window_size: int = 5,
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #68: Solver duration p50/p95 trend over time windows.
+
+    Complements /api/persistence/cycle-duration-stats (aggregate) and
+    /api/persistence/cycle-duration-histogram (distribution) by showing
+    how solver wall-time evolves across cycles.
+
+    Each window contains N cycles (default 5, clamped [2, 30]). For each
+    window we report p50 / p95 / mean / min / max / stddev wall_duration_ms.
+    The overall trend (improving / declining / stable / unknown) compares
+    first-half vs second-half median p50, with a 10% threshold to avoid
+    noisy classification.
+
+    Query:
+    - window_size: cycles per window (default 5, [2, 30])
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_windows, window_size, n_cycles_evaluated,
+        since_sim_day, until_sim_day,
+        trend: 'improving' | 'declining' | 'stable' | 'unknown',
+        trend_delta_pct, trend_confidence (0-1),
+        first_window_p50_ms, last_window_p50_ms,
+        windows: [
+          {window_index, start_cycle_id, end_cycle_id, start_sim_day,
+           end_sim_day, n_cycles, p50_ms, p95_ms, mean_ms,
+           min_ms, max_ms, stddev_ms}, ...
+        ],
+      }
+
+    Use cases:
+    - Detect solver performance regression after model changes
+    - Visualize wall_duration_ms trend in time-series chart
+    - Identify when solver started being slower
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_solver_duration_trend(
+        window_size=window_size,
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/cycle-duration-by-problem-size")
 async def get_cycle_duration_by_problem_size(
     since_sim_day: Optional[int] = None,
