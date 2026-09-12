@@ -5918,3 +5918,192 @@ td.no-matches {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+ * iter #68: Solver Duration Trend panel
+ * ============================================================ */
+
+.solver-duration-trend-panel {
+  /* extends .card */
+}
+
+.solver-duration-trend-panel .trend-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  margin-left: 0.5rem;
+}
+
+.solver-duration-trend-panel .trend-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.5rem;
+  background: var(--bg-elevated, rgba(0, 0, 0, 0.02));
+  border-radius: 0.5rem;
+}
+
+.solver-duration-trend-panel .trend-kpi {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.solver-duration-trend-panel .trend-kpi-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.solver-duration-trend-panel .trend-kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.solver-duration-trend-panel .confidence-pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.solver-duration-trend-panel .trend-chart {
+  margin: 1rem 0;
+}
+
+.solver-duration-trend-panel .trend-chart-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.solver-duration-trend-panel .trend-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 0.5rem;
+  height: 180px;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.solver-duration-trend-panel .trend-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 50px;
+  position: relative;
+}
+
+.solver-duration-trend-panel .trend-bar {
+  width: 100%;
+  max-width: 80px;
+  min-height: 4px;
+  border-radius: 0.25rem 0.25rem 0 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.25rem;
+}
+
+.solver-duration-trend-panel .trend-bar:hover {
+  opacity: 0.8;
+}
+
+.solver-duration-trend-panel .trend-bar-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.solver-duration-trend-panel .trend-bar-label {
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.solver-duration-trend-panel .bar-label-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.solver-duration-trend-panel .bar-label-meta {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.solver-duration-trend-panel .trend-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.solver-duration-trend-panel .trend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.solver-duration-trend-panel .trend-table th {
+  text-align: left;
+  padding: 0.5rem;
+  background: var(--bg-elevated, rgba(0, 0, 0, 0.02));
+  color: var(--text-secondary, #64748b);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+}
+
+.solver-duration-trend-panel .trend-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1e293b);
+}
+
+.solver-duration-trend-panel .trend-table .small {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.solver-duration-trend-panel .window-index-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.solver-duration-trend-panel .duration-cell {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .solver-duration-trend-panel .trend-bars {
+    height: 120px;
+  }
+  .solver-duration-trend-panel .trend-kpi-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

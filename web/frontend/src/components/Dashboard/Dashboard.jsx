@@ -139,6 +139,9 @@ const MaterialTimeseriesPanel = lazy(() => import('./MaterialTimeseriesPanel').t
 // iter #67: cycle duration breakdown by problem size
 const CycleDurationByProblemSize = lazy(() => import('./CycleDurationByProblemSize').then(m => ({ default: m.CycleDurationByProblemSize })))
 
+// iter #68: solver duration p50/p95 trend over time windows
+const SolverDurationTrend = lazy(() => import('./SolverDurationTrend').then(m => ({ default: m.SolverDurationTrend })))
+
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
 import { WSStatusIndicator } from '../common/WSStatusIndicator'
@@ -832,6 +835,11 @@ export default function Dashboard() {
           {/* iter #67: Cycle duration by problem size (scaling signal + cost/ton per bucket) */}
           <Suspense fallback={<LoadingSpinner label="Loading problem size breakdown…" />}>
             <CycleDurationByProblemSize />
+          </Suspense>
+
+          {/* iter #68: Solver duration p50/p95 trend over time windows */}
+          <Suspense fallback={<LoadingSpinner label="Loading solver duration trend…" />}>
+            <SolverDurationTrend />
           </Suspense>
 
           {/* iter #65: Vehicle timeseries (per-vehicle efficiency evolution) */}

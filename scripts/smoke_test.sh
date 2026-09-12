@@ -469,6 +469,13 @@ check_json_field "/api/persistence/cycle-duration-by-problem-size has n_buckets=
 check_json_field "/api/persistence/cycle-duration-by-problem-size has bucket_bounds" GET "/api/persistence/cycle-duration-by-problem-size" ".bucket_bounds | type" "array"
 check_json_field "/api/persistence/cycle-duration-by-problem-size has scaling_signal" GET "/api/persistence/cycle-duration-by-problem-size" ".scaling_signal | type" "string"
 check_endpoint "/api/persistence/cycle-duration-by-problem-size with window" 200 GET "/api/persistence/cycle-duration-by-problem-size?since_sim_day=1&until_sim_day=10"
+# iter #68: solver-duration-trend endpoint
+check_endpoint "/api/persistence/solver-duration-trend (iter #68)" 200 GET "/api/persistence/solver-duration-trend"
+check_json_field "/api/persistence/solver-duration-trend has windows array" GET "/api/persistence/solver-duration-trend" ".windows | type" "array"
+check_json_field "/api/persistence/solver-duration-trend has trend" GET "/api/persistence/solver-duration-trend" ".trend | type" "string"
+check_json_field "/api/persistence/solver-duration-trend has window_size" GET "/api/persistence/solver-duration-trend" ".window_size | type" "number"
+check_json_field "/api/persistence/solver-duration-trend has n_cycles_evaluated" GET "/api/persistence/solver-duration-trend" ".n_cycles_evaluated | type" "number"
+check_endpoint "/api/persistence/solver-duration-trend?window_size=3" 200 GET "/api/persistence/solver-duration-trend?window_size=3"
 # iter #65: vehicle-timeseries endpoint
 check_endpoint "/api/persistence/vehicle-timeseries (iter #65)" 200 GET "/api/persistence/vehicle-timeseries"
 check_json_field "/api/persistence/vehicle-timeseries has metric" GET "/api/persistence/vehicle-timeseries" ".metric | type" "string"
