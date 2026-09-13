@@ -5653,6 +5653,64 @@ async def get_solver_duration_trend(
     )
 
 
+@app.get("/api/persistence/solver-duration-by-season")
+async def get_solver_duration_by_season(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #69: Solver duration breakdown by season (winter/spring/summer/fall).
+
+    Complements /api/persistence/solver-duration-trend (iter #68, time-based)
+    by slicing cycles into 4 seasons based on seasonal_month:
+
+    - winter: Dec (12), Jan (1), Feb (2)
+    - spring: Mar (3), Apr (4), May (5)
+    - summer: Jun (6), Jul (7), Aug (8)
+    - fall:   Sep (9), Oct (10), Nov (11)
+
+    For each season we report wall_duration_ms p50/p95/mean/min/max/stddev
+    + solver_status counts (OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN), plus
+    global stats across all seasons and slowest/fastest season by p50.
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles_evaluated, n_seasons_with_data,
+        since_sim_day, until_sim_day,
+        seasons: [
+          {season, months, n_cycles, p50_ms, p95_ms, mean_ms,
+           min_ms, max_ms, stddev_ms,
+           solver_status_counts: {OPTIMAL, FEASIBLE, INFEASIBLE, UNKNOWN}},
+          ...
+        ],
+        global_stats: {n_cycles, p50_ms, p95_ms, mean_ms,
+                       min_ms, max_ms, stddev_ms},
+        slowest_season, fastest_season,
+        slowest_p50_ms, fastest_p50_ms, slowest_vs_fastest_pct,
+      }
+
+    Use cases:
+    - Detect seasonal solver-performance drag (winter road conditions)
+    - Compare solver wall-time across Sweden's 4 seasons
+    - Spot if INFEASIBLE counts spike in any season (harder instances)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_solver_duration_by_season(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/cycle-duration-by-problem-size")
 async def get_cycle_duration_by_problem_size(
     since_sim_day: Optional[int] = None,

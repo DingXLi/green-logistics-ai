@@ -8740,3 +8740,223 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def get_solver_duration_by_season(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #69: Solver duration breakdown by season (winter/spring/summer/fall).
+
+        Complements get_solver_duration_trend (iter #68, time-based) by
+        slicing cycles into 4 seasons based on ``seasonal_month``:
+
+        - winter:  Dec (12), Jan (1), Feb (2)
+        - spring:  Mar (3), Apr (4), May (5)
+        - summer:  Jun (6), Jul (7), Aug (8)
+        - fall:    Sep (9), Oct (10), Nov (11)
+
+        For each season we report wall_duration_ms p50/p95/mean/min/max/
+        stddev, plus solver_status counts (OPTIMAL / FEASIBLE / INFEASIBLE
+        / UNKNOWN). Also reports overall n_cycles + slowest/fastest season
+        + global stats for comparison.
+
+        Args:
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+
+        Returns:
+          {
+            n_cycles_evaluated, n_seasons_with_data,
+            since_sim_day, until_sim_day,
+            seasons: [
+              {season, months: [int], n_cycles,
+               p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms,
+               solver_status_counts: {OPTIMAL, FEASIBLE, INFEASIBLE, UNKNOWN}},
+              ...
+            ],
+            global_stats: {
+              n_cycles, p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms
+            },
+            slowest_season: "winter" | "spring" | "summer" | "fall" | null,
+            fastest_season: "winter" | "spring" | "summer" | "fall" | null,
+            slowest_p50_ms, fastest_p50_ms,
+            slowest_vs_fastest_pct: float | null,
+          }
+
+        Use cases:
+        - Identify seasonal solver-performance drag (winter road conditions)
+        - Compare solver wall-time across Sweden's 4 seasons
+        - Spot if INFEASIBLE counts spike in any season (harder problem instances)
+        """
+        _cache_key = self._cache_key(
+            "get_solver_duration_by_season",
+            {"since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        season_defs: List[Dict[str, Any]] = [
+            {"season": "winter", "months": [12, 1, 2]},
+            {"season": "spring", "months": [3, 4, 5]},
+            {"season": "summer", "months": [6, 7, 8]},
+            {"season": "fall",   "months": [9, 10, 11]},
+        ]
+
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT seasonal_month, wall_duration_ms, solver_status
+                    FROM optimization_cycles
+                    WHERE {where_sql}
+                      AND seasonal_month BETWEEN 1 AND 12""",
+                params,
+            ).fetchall()
+
+        # Bucket rows by season (using month as the join key)
+        season_buckets: Dict[str, List[Dict[str, Any]]] = {
+            sd["season"]: [] for sd in season_defs
+        }
+        for r in rows:
+            m = r["seasonal_month"]
+            for sd in season_defs:
+                if m in sd["months"]:
+                    season_buckets[sd["season"]].append(
+                        {"duration": float(r["wall_duration_ms"]),
+                         "status": r["solver_status"]}
+                    )
+                    break
+
+        def _status_counts(statuses: List[Optional[str]]) -> Dict[str, int]:
+            counts = {"OPTIMAL": 0, "FEASIBLE": 0, "INFEASIBLE": 0, "UNKNOWN": 0}
+            for s in statuses:
+                key = (s.upper() if s else "UNKNOWN")
+                if key not in counts:
+                    key = "UNKNOWN"
+                counts[key] += 1
+            return counts
+
+        def _percentile(values: List[float], pct: float) -> float:
+            if not values:
+                return 0.0
+            sorted_v = sorted(values)
+            n = len(sorted_v)
+            if n == 1:
+                return sorted_v[0]
+            idx = (pct / 100.0) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return sorted_v[lo] * (1 - frac) + sorted_v[hi] * frac
+
+        seasons_out: List[Dict[str, Any]] = []
+        for sd in season_defs:
+            season = sd["season"]
+            bucket = season_buckets[season]
+            durations = [b["duration"] for b in bucket]
+            statuses = [b["status"] for b in bucket]
+            n = len(durations)
+            if n == 0:
+                seasons_out.append({
+                    "season": season,
+                    "months": sd["months"],
+                    "n_cycles": 0,
+                    "p50_ms": None,
+                    "p95_ms": None,
+                    "mean_ms": None,
+                    "min_ms": None,
+                    "max_ms": None,
+                    "stddev_ms": None,
+                    "solver_status_counts": {
+                        "OPTIMAL": 0, "FEASIBLE": 0,
+                        "INFEASIBLE": 0, "UNKNOWN": 0,
+                    },
+                })
+                continue
+            mean = sum(durations) / n
+            variance = sum((d - mean) ** 2 for d in durations) / n
+            stddev = variance ** 0.5
+            seasons_out.append({
+                "season": season,
+                "months": sd["months"],
+                "n_cycles": n,
+                "p50_ms": round(_percentile(durations, 50), 2),
+                "p95_ms": round(_percentile(durations, 95), 2),
+                "mean_ms": round(mean, 2),
+                "min_ms": round(min(durations), 2),
+                "max_ms": round(max(durations), 2),
+                "stddev_ms": round(stddev, 2),
+                "solver_status_counts": _status_counts(statuses),
+            })
+
+        # Global stats across all cycles in window
+        all_durations = [float(r["wall_duration_ms"]) for r in rows]
+        n_total = len(all_durations)
+        if n_total > 0:
+            mean_g = sum(all_durations) / n_total
+            variance_g = sum((d - mean_g) ** 2 for d in all_durations) / n_total
+            stddev_g = variance_g ** 0.5
+            global_stats = {
+                "n_cycles": n_total,
+                "p50_ms": round(_percentile(all_durations, 50), 2),
+                "p95_ms": round(_percentile(all_durations, 95), 2),
+                "mean_ms": round(mean_g, 2),
+                "min_ms": round(min(all_durations), 2),
+                "max_ms": round(max(all_durations), 2),
+                "stddev_ms": round(stddev_g, 2),
+            }
+        else:
+            global_stats = {
+                "n_cycles": 0, "p50_ms": None, "p95_ms": None,
+                "mean_ms": None, "min_ms": None, "max_ms": None,
+                "stddev_ms": None,
+            }
+
+        # Slowest / fastest by p50 (only consider seasons with data)
+        seasons_with_data = [s for s in seasons_out if s["n_cycles"] > 0]
+        if seasons_with_data:
+            slowest = max(seasons_with_data, key=lambda s: s["p50_ms"])
+            fastest = min(seasons_with_data, key=lambda s: s["p50_ms"])
+            slowest_season = slowest["season"]
+            fastest_season = fastest["season"]
+            slowest_p50 = slowest["p50_ms"]
+            fastest_p50 = fastest["p50_ms"]
+            if fastest_p50 and fastest_p50 > 0:
+                slowest_vs_fastest_pct = round(
+                    (slowest_p50 - fastest_p50) / fastest_p50 * 100, 2
+                )
+            else:
+                slowest_vs_fastest_pct = None
+        else:
+            slowest_season = None
+            fastest_season = None
+            slowest_p50 = None
+            fastest_p50 = None
+            slowest_vs_fastest_pct = None
+
+        result: Dict[str, Any] = {
+            "n_cycles_evaluated": n_total,
+            "n_seasons_with_data": len(seasons_with_data),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "seasons": seasons_out,
+            "global_stats": global_stats,
+            "slowest_season": slowest_season,
+            "fastest_season": fastest_season,
+            "slowest_p50_ms": slowest_p50,
+            "fastest_p50_ms": fastest_p50,
+            "slowest_vs_fastest_pct": slowest_vs_fastest_pct,
+        }
+        self._cache_set(_cache_key, result)
+        return result
