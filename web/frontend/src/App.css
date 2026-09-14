@@ -6354,3 +6354,261 @@ td.no-matches {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================ */
+/* iter #70: Cohort Retention by Season panel                    */
+/* ============================================================ */
+
+.cohort-retention-by-season {
+  /* Card defaults inherited from .card */
+}
+
+.cohort-retention-by-season .material-input {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #1e293b);
+  width: 220px;
+  transition: border-color 0.15s ease;
+}
+.cohort-retention-by-season .material-input:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
+
+.cohort-retention-by-season .season-extreme-badge {
+  display: inline-block;
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.4rem 0.85rem;
+  background: linear-gradient(90deg, #dbeafe 0%, #fef3c7 100%);
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-season .season-extreme-badge.tied {
+  background: var(--bg-elevated, #f1f5f9);
+  border-left-color: var(--border, #e2e8f0);
+}
+
+.cohort-retention-by-season .empty-state {
+  padding: 1rem;
+  background: var(--bg-elevated, #f8fafc);
+  border: 1px dashed var(--border, #e2e8f0);
+  border-radius: 8px;
+  color: var(--text-secondary, #64748b);
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.cohort-retention-by-season .season-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.cohort-retention-by-season .season-card {
+  background: var(--bg-card, #ffffff);
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.85rem;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cohort-retention-by-season .season-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.cohort-retention-by-season .season-card.best {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+.cohort-retention-by-season .season-card.worst {
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+.cohort-retention-by-season .season-card.empty {
+  opacity: 0.55;
+}
+
+.cohort-retention-by-season .season-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.cohort-retention-by-season .season-emoji-large {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.cohort-retention-by-season .season-card-title {
+  flex: 1;
+}
+.cohort-retention-by-season .season-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-season .season-months {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  font-family: 'JetBrains Mono', monospace;
+}
+.cohort-retention-by-season .season-tag {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cohort-retention-by-season .season-tag.best-tag {
+  background: #22c55e;
+  color: white;
+}
+.cohort-retention-by-season .season-tag.worst-tag {
+  background: #ef4444;
+  color: white;
+}
+
+.cohort-retention-by-season .season-card-retention {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.cohort-retention-by-season .retention-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.cohort-retention-by-season .retention-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.cohort-retention-by-season .season-card-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-elevated, #f1f5f9);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.65rem;
+}
+.cohort-retention-by-season .season-card-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.cohort-retention-by-season .season-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.35rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+  padding-top: 0.5rem;
+}
+.cohort-retention-by-season .sc-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.cohort-retention-by-season .sc-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.cohort-retention-by-season .sc-stat-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cohort-retention-by-season .season-chart {
+  margin: 1rem 0;
+}
+.cohort-retention-by-season .section-subheader {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0.5rem 0 0.5rem 0;
+}
+
+.cohort-retention-by-season .season-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.cohort-retention-by-season .season-bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  gap: 0.65rem;
+}
+.cohort-retention-by-season .season-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-season .season-bar-emoji {
+  font-size: 1rem;
+}
+.cohort-retention-by-season .season-bar-track {
+  position: relative;
+  height: 28px;
+  background: var(--bg-elevated, #f1f5f9);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cohort-retention-by-season .season-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.cohort-retention-by-season .season-bar-pct {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cohort-retention-by-season .season-table-wrapper {
+  margin: 1rem 0;
+}
+.cohort-retention-by-season .season-table {
+  width: 100%;
+  font-size: 0.85rem;
+}
+.cohort-retention-by-season .season-cell-emoji {
+  font-size: 1.05rem;
+  margin-right: 0.25rem;
+}
+
+@media (max-width: 900px) {
+  .cohort-retention-by-season .season-kpi-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .cohort-retention-by-season .season-kpi-row {
+    grid-template-columns: 1fr;
+  }
+  .cohort-retention-by-season .season-card-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cohort-retention-by-season .season-bar-row {
+    grid-template-columns: 90px 1fr;
+  }
+}

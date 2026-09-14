@@ -228,6 +228,7 @@ green-logistics-ai/
 | GET    | `/api/persistence/supply-cohort-retention` | Supply retention analysis: one-time vs repeating (iter #17) |
 | GET    | `/api/persistence/cohort-retention-by-material` | Per-material supply retention breakdown (iter #42) |
 | GET    | `/api/persistence/cohort-retention-by-period?material_type=X` | Per-period retention with optional material filter (iter #45) |
+| GET    | `/api/persistence/cohort-retention-by-season?material_type=X` | Per-season (winter/spring/summer/fall) retention with best/worst tracking (iter #70) |
 | GET    | `/api/persistence/cohort-retention-crosstab?n_periods=4&period_unit=quartile&material_type=X` | Cross-tab retention matrix: period × material (iter #44) |
 | GET    | `/api/persistence/perturbation-impact?limit=90` | Per-cycle perturbation impact: which cycles had active shocks, with delta + multiplier (iter #38) |
 | GET    | `/api/persistence/perturbation-impact-by-material?since_sim_day=0&until_sim_day=999` | Per-material perturbation breakdown: which materials get hit most by active shocks, with avg_ratio (iter #46) |

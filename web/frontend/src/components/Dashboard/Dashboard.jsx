@@ -142,6 +142,7 @@ const CycleDurationByProblemSize = lazy(() => import('./CycleDurationByProblemSi
 // iter #68: solver duration p50/p95 trend over time windows
 const SolverDurationTrend = lazy(() => import('./SolverDurationTrend').then(m => ({ default: m.SolverDurationTrend })))
 const SolverDurationBySeason = lazy(() => import('./SolverDurationBySeason').then(m => ({ default: m.SolverDurationBySeason })))
+const CohortRetentionBySeason = lazy(() => import('./CohortRetentionBySeason').then(m => ({ default: m.CohortRetentionBySeason })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -846,6 +847,11 @@ export default function Dashboard() {
           {/* iter #69: Solver duration breakdown by season (winter/spring/summer/fall) */}
           <Suspense fallback={<LoadingSpinner label="Loading solver duration by season…" />}>
             <SolverDurationBySeason />
+          </Suspense>
+
+          {/* iter #70: Cohort retention by season (winter/spring/summer/fall) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cohort retention by season…" />}>
+            <CohortRetentionBySeason />
           </Suspense>
 
           {/* iter #65: Vehicle timeseries (per-vehicle efficiency evolution) */}

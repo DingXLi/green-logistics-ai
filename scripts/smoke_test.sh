@@ -618,6 +618,15 @@ check_python_field "/api/admin/db-stats has db_size_bytes" GET "/api/admin/db-st
 check_python_field "/api/persistence/cycle-kpi-summary has total_cycles" GET "/api/persistence/cycle-kpi-summary" \
     "type(data.get('total_cycles', None)).__name__" "int"
 
+# ---- iter #70: cohort retention by season ----
+check_endpoint "/api/persistence/cohort-retention-by-season (iter #70)" 200 GET "/api/persistence/cohort-retention-by-season"
+check_json_field "/api/persistence/cohort-retention-by-season has seasons array" GET "/api/persistence/cohort-retention-by-season" ".seasons | type" "array"
+check_json_field "/api/persistence/cohort-retention-by-season has total_supply_ids" GET "/api/persistence/cohort-retention-by-season" ".total_supply_ids | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-season has n_seasons_with_data" GET "/api/persistence/cohort-retention-by-season" ".n_seasons_with_data | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-season has best_season" GET "/api/persistence/cohort-retention-by-season" ".best_season | type" "string"
+check_json_field "/api/persistence/cohort-retention-by-season has worst_season" GET "/api/persistence/cohort-retention-by-season" ".worst_season | type" "string"
+check_endpoint "/api/persistence/cohort-retention-by-season with material filter" 200 GET "/api/persistence/cohort-retention-by-season?material_type=concrete"
+
 echo ""
 echo "--- summary ---"
 echo "  passed: $PASS"
