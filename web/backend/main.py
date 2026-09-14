@@ -6709,6 +6709,49 @@ async def get_cohort_retention_by_period(
     )
 
 
+@app.get("/api/persistence/cohort-retention-by-season")
+async def get_cohort_retention_by_season(
+    material_type: Optional[str] = None,
+):
+    """
+    iter #70: Cohort retention broken down by SEASON (winter/spring/summer/fall).
+
+    跟 iter #19 (by-period) 互补 — 时间窗切时间维度, season 切日历季节。
+    Sweden 是季节性明显的国家, ops 可以看 retention 是否随 season 波动。
+    对比 retention_rate_pct 的 best/worst_season 立即定位 churn 的季节性模式。
+
+    Season 个月映射:
+      winter: [12, 1, 2]   ❄️
+      spring: [3, 4, 5]    🌱
+      summer: [6, 7, 8]    ☀️
+      fall:   [9, 10, 11]  🍂
+
+    Query:
+    - material_type: optional filter (e.g. 'concrete' / 'wood_waste')
+
+    Returns:
+        {
+          n_seasons_with_data, total_supply_ids,
+          seasons: [{
+            season, season_name, season_emoji, months,
+            n_supply_ids, n_one_time, n_repeating,
+            retention_rate_pct, one_time_pct,
+            total_supply_offers, n_cycles_in_season
+          }, ...],
+          best_season, worst_season,
+          best_season_pct, worst_season_pct,
+          worst_vs_best_pct,  # (worst-best)/best*100
+          material_type_filter
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    return coordinator.persistence.get_cohort_retention_by_season(
+        material_type=material_type,
+    )
+
+
 @app.get("/api/persistence/cohort-retention-crosstab")
 async def get_cohort_retention_crosstab(
     n_periods: int = 4,

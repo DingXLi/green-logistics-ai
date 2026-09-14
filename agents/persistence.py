@@ -5568,6 +5568,165 @@ class Persistence:
             "trend_per_material": trend_per_material,  # iter #46
         }
 
+    # iter #70: SEASON dimension
+    SEASON_MONTHS: Dict[str, List[int]] = {
+        "winter": [12, 1, 2],   # Dec → Jan → Feb
+        "spring": [3, 4, 5],
+        "summer": [6, 7, 8],
+        "fall":   [9, 10, 11],
+    }
+    SEASON_EMOJI: Dict[str, str] = {
+        "winter": "❄️",
+        "spring": "🌱",
+        "summer": "☀️",
+        "fall":   "🍂",
+    }
+    SEASON_NAMES: Dict[str, str] = {
+        "winter": "Winter",
+        "spring": "Spring",
+        "summer": "Summer",
+        "fall":   "Fall",
+    }
+
+    def get_cohort_retention_by_season(
+        self,
+        material_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #70: Cohort retention broken down by season (winter/spring/summer/fall).
+
+        Extends iter #19/65 cohort retention with a SEASONAL dimension. For each
+        season (defined by the cycle's `seasonal_month` column), compute retention
+        rates independently, then provide a global summary with the best/worst
+        season for retention.
+
+        Args:
+            material_type: optional filter to single material
+
+        Returns:
+            {
+              n_seasons_with_data: int,             # 0..4
+              total_supply_ids: int,                # dedup count across all seasons
+              seasons: [{
+                season: "winter" | "spring" | "summer" | "fall",
+                season_name: "Winter",
+                season_emoji: "❄️",
+                months: [12, 1, 2],
+                n_supply_ids: int,
+                n_one_time: int,
+                n_repeating: int,
+                retention_rate_pct: float,         # 0-100
+                one_time_pct: float,               # 0-100
+                total_supply_offers: int,
+                n_cycles_in_season: int,
+              }, ...],
+              best_season: "winter" | ...,          # by retention_rate_pct, None if 0 seasons
+              worst_season: ...,
+              best_season_pct: float,
+              worst_season_pct: float,
+              worst_vs_best_pct: float,            # (worst - best) / best * 100, 0 if best==0
+              material_type_filter: Optional[str],
+            }
+        """
+        # Iter #70: each season is a deterministic list of months
+        # using the cycle's seasonal_month column (set in begin_cycle).
+        season_results: List[Dict[str, Any]] = []
+        # Track best/worst as we go (avoid second pass)
+        best_season: Optional[str] = None
+        worst_season: Optional[str] = None
+        best_pct: float = -1.0  # sentinel
+        worst_pct: float = 101.0  # sentinel (so first real value overwrites)
+
+        seen_supply_ids: set = set()  # global dedup for total_supply_ids
+
+        with self._conn() as conn:
+            for season_key, months in self.SEASON_MONTHS.items():
+                # Build WHERE clause for season months + optional material filter
+                month_clause = ",".join("?" for _ in months)
+                mat_params: List[Any] = list(months)
+                extra_where = ""
+                if material_type:
+                    extra_where = " AND s.material_type = ?"
+                    mat_params.append(material_type)
+                # Get supply_ids + appearance counts for this season
+                rows = conn.execute(
+                    f"""SELECT s.supply_id, COUNT(DISTINCT s.cycle_id) as n_cycles
+                        FROM supply_offers s
+                        JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                        WHERE c.seasonal_month IN ({month_clause})
+                          {extra_where}
+                        GROUP BY s.supply_id""",
+                    mat_params,
+                ).fetchall()
+                n_ids = len(rows)
+                n_one = sum(1 for r in rows if r["n_cycles"] == 1)
+                n_rep = n_ids - n_one
+                ret_pct = round(n_rep / n_ids * 100, 1) if n_ids > 0 else 0.0
+                one_pct = round(n_one / n_ids * 100, 1) if n_ids > 0 else 0.0
+
+                # Total supply_offers (rows) in this season
+                # n_cycles_in_season: number of optimization_cycles whose seasonal_month is in this season
+                count_params: List[Any] = list(months)
+                count_extra = ""
+                if material_type:
+                    count_extra = " AND s.material_type = ?"
+                    count_params.append(material_type)
+                total_offers_row = conn.execute(
+                    f"""SELECT COUNT(*) as n_offers, COUNT(DISTINCT s.cycle_id) as n_cycles
+                        FROM supply_offers s
+                        JOIN optimization_cycles c ON c.cycle_id = s.cycle_id
+                        WHERE c.seasonal_month IN ({month_clause})
+                          {count_extra}""",
+                    count_params,
+                ).fetchone()
+                total_offers = total_offers_row["n_offers"] or 0
+                n_cycles_in_season = total_offers_row["n_cycles"] or 0
+
+                season_results.append({
+                    "season": season_key,
+                    "season_name": self.SEASON_NAMES[season_key],
+                    "season_emoji": self.SEASON_EMOJI[season_key],
+                    "months": months,
+                    "n_supply_ids": n_ids,
+                    "n_one_time": n_one,
+                    "n_repeating": n_rep,
+                    "retention_rate_pct": ret_pct,
+                    "one_time_pct": one_pct,
+                    "total_supply_offers": total_offers,
+                    "n_cycles_in_season": n_cycles_in_season,
+                })
+
+                if n_ids > 0:
+                    if ret_pct > best_pct:
+                        best_pct = ret_pct
+                        best_season = season_key
+                    if ret_pct < worst_pct:
+                        worst_pct = ret_pct
+                        worst_season = season_key
+
+                for r in rows:
+                    seen_supply_ids.add(r["supply_id"])
+
+        # Normalize best/worst when no seasons have data
+        if best_season is None:
+            best_pct = 0.0
+            worst_pct = 0.0
+            worst_vs_best_pct = 0.0
+        else:
+            worst_vs_best_pct = round((worst_pct - best_pct) / best_pct * 100, 1) if best_pct > 0 else 0.0
+
+        return {
+            "n_seasons_with_data": sum(1 for s in season_results if s["n_supply_ids"] > 0),
+            "total_supply_ids": len(seen_supply_ids),
+            "seasons": season_results,
+            "best_season": best_season,
+            "worst_season": worst_season,
+            "best_season_pct": best_pct,
+            "worst_season_pct": worst_pct,
+            "worst_vs_best_pct": worst_vs_best_pct,
+            "material_type_filter": material_type,
+        }
+
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
                            since_sim_day: Optional[int] = None,
                            until_sim_day: Optional[int] = None) -> Dict[str, Any]:
