@@ -6612,3 +6612,239 @@ td.no-matches {
     grid-template-columns: 90px 1fr;
   }
 }
+
+/* =========================================================================
+ * iter #71: Solver Duration by Status (OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN)
+ * ========================================================================= */
+
+.solver-duration-by-status-panel .status-extreme-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-right: 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+.solver-duration-by-status-panel .status-rate-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.solver-duration-by-status-panel .status-rate-pill {
+  background: var(--card-bg-soft, #f8fafc);
+  border-left: 4px solid;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.solver-duration-by-status-panel .status-rate-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.solver-duration-by-status-panel .status-rate-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-by-status-panel .status-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.solver-duration-by-status-panel .status-kpi {
+  background: var(--card-bg-soft, #f8fafc);
+  border-left: 4px solid;
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.solver-duration-by-status-panel .status-kpi:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.solver-duration-by-status-panel .status-kpi-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.solver-duration-by-status-panel .status-kpi-emoji {
+  font-size: 1.2rem;
+}
+
+.solver-duration-by-status-panel .status-kpi-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.solver-duration-by-status-panel .status-kpi-description {
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+  margin-bottom: 0.35rem;
+  text-transform: lowercase;
+}
+
+.solver-duration-by-status-panel .status-kpi-p50 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-by-status-panel .status-kpi-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  margin-top: 0.2rem;
+}
+
+.solver-duration-by-status-panel .status-chart {
+  margin: 1rem 0;
+  padding: 0.5rem;
+  background: var(--card-bg-soft, #f8fafc);
+  border-radius: 6px;
+}
+
+.solver-duration-by-status-panel .status-chart-label {
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.solver-duration-by-status-panel .status-bars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  align-items: end;
+  min-height: 180px;
+}
+
+.solver-duration-by-status-panel .status-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  height: 100%;
+  justify-content: end;
+}
+
+.solver-duration-by-status-panel .status-bar {
+  width: 100%;
+  border: 2px solid;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4px;
+  transition: filter 0.12s ease;
+}
+
+.solver-duration-by-status-panel .status-bar:hover {
+  filter: brightness(1.1);
+}
+
+.solver-duration-by-status-panel .status-bar-value {
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-by-status-panel .status-bar-label {
+  text-align: center;
+}
+
+.solver-duration-by-status-panel .bar-label-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.solver-duration-by-status-panel .bar-label-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.solver-duration-by-status-panel .status-table-wrap {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.solver-duration-by-status-panel .status-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.solver-duration-by-status-panel .status-table th {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  background: var(--card-bg-soft, #f1f5f9);
+  color: var(--text-muted, #475569);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--border-soft, #e2e8f0);
+}
+
+.solver-duration-by-status-panel .status-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border-soft, #e2e8f0);
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-by-status-panel .status-name-cell {
+  font-weight: 600;
+}
+
+.solver-duration-by-status-panel .duration-cell {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+}
+
+.solver-duration-by-status-panel .small {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}
+
+@media (max-width: 900px) {
+  .solver-duration-by-status-panel .status-kpi-row,
+  .solver-duration-by-status-panel .status-rate-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .solver-duration-by-status-panel .status-bars {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .solver-duration-by-status-panel .status-kpi-row,
+  .solver-duration-by-status-panel .status-rate-row {
+    grid-template-columns: 1fr;
+  }
+}
