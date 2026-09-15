@@ -9119,3 +9119,247 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def get_solver_duration_by_status(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #71: Solver wall-time breakdown by solver_status (OPTIMAL / FEASIBLE / INFEASIBLE / UNKNOWN).
+
+        Complements iter #68 (time-based: ``get_solver_duration_trend``) and
+        iter #69 (season-based: ``get_solver_duration_by_season``) by slicing
+        cycles into status buckets. Combined with iter #69, this gives a 3D
+        view (time / season / status) of solver performance.
+
+        For each status we report:
+          - n_cycles
+          - wall_duration_ms p50 / p95 / mean / min / max / stddev
+          - pct_of_total (share of all cycles in window)
+          - cost_sek mean + cost_per_ton_sek mean
+          - n_matches mean (solver output volume)
+          - tons mean (problem size proxy)
+
+        Plus overall global stats and a "slowest_status" badge by p50.
+
+        Args:
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+
+        Returns:
+          {
+            n_cycles_evaluated, n_statuses_with_data,
+            since_sim_day, until_sim_day,
+            statuses: [
+              {status, n_cycles, pct_of_total,
+               p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms,
+               mean_cost_sek, mean_cost_per_ton_sek,
+               mean_n_matches, mean_tons}, ...
+            ],
+            global_stats: {n_cycles, p50_ms, p95_ms, mean_ms,
+                           min_ms, max_ms, stddev_ms},
+            slowest_status, fastest_status,
+            slowest_p50_ms, fastest_p50_ms, slowest_vs_fastest_pct,
+            infeasible_rate_pct,  # share of cycles that are INFEASIBLE
+            feasible_rate_pct,    # share of cycles that are FEASIBLE
+            optimal_rate_pct,     # share of cycles that are OPTIMAL
+          }
+
+        Use cases:
+        - Detect if INFEASIBLE cycles are dramatically slower (solver
+          exhausts search budget on hard instances).
+        - Compare cost-per-ton across solver outcomes (FEASIBLE may be
+          costlier because the solver had to compromise).
+        - Compute infeasible_rate_pct as an SLO-style health metric.
+        - Spot if OPTIMAL cycles have lower p50 vs FEASIBLE (FEASIBLE
+          sometimes = solver worked harder to find any solution).
+        """
+        _cache_key = self._cache_key(
+            "get_solver_duration_by_status",
+            {"since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        # Always return the same 4 buckets for consistent frontend shape,
+        # even if some buckets have zero data.
+        status_defs: List[str] = ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN"]
+
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT cycle_id, sim_day, wall_duration_ms,
+                           solver_status, total_cost_sek, total_tons,
+                           n_matches
+                    FROM optimization_cycles
+                    WHERE {where_sql}""",
+                params,
+            ).fetchall()
+
+        n_total = len(rows)
+        # Bucket rows by status (case-insensitive, fall back to UNKNOWN)
+        status_buckets: Dict[str, List[Dict[str, Any]]] = {s: [] for s in status_defs}
+        for r in rows:
+            raw = r["solver_status"]
+            key = (raw.upper() if raw else "UNKNOWN")
+            if key not in status_buckets:
+                key = "UNKNOWN"
+            status_buckets[key].append({
+                "duration": float(r["wall_duration_ms"]),
+                "cost_sek": r["total_cost_sek"],
+                "tons": r["total_tons"],
+                "n_matches": r["n_matches"],
+            })
+
+        def _percentile(values: List[float], pct: float) -> float:
+            if not values:
+                return 0.0
+            sorted_v = sorted(values)
+            n = len(sorted_v)
+            if n == 1:
+                return sorted_v[0]
+            idx = (pct / 100.0) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return sorted_v[lo] * (1 - frac) + sorted_v[hi] * frac
+
+        def _safe_mean(values: List[Any]) -> Optional[float]:
+            nums = [v for v in values if v is not None]
+            if not nums:
+                return None
+            return round(sum(float(v) for v in nums) / len(nums), 2)
+
+        statuses_out: List[Dict[str, Any]] = []
+        for status in status_defs:
+            bucket = status_buckets[status]
+            durations = [b["duration"] for b in bucket]
+            n = len(durations)
+            if n == 0:
+                statuses_out.append({
+                    "status": status,
+                    "n_cycles": 0,
+                    "pct_of_total": 0.0,
+                    "p50_ms": None,
+                    "p95_ms": None,
+                    "mean_ms": None,
+                    "min_ms": None,
+                    "max_ms": None,
+                    "stddev_ms": None,
+                    "mean_cost_sek": None,
+                    "mean_cost_per_ton_sek": None,
+                    "mean_n_matches": None,
+                    "mean_tons": None,
+                })
+                continue
+            mean = sum(durations) / n
+            variance = sum((d - mean) ** 2 for d in durations) / n
+            stddev = variance ** 0.5
+            mean_cost = _safe_mean([b["cost_sek"] for b in bucket])
+            mean_tons = _safe_mean([b["tons"] for b in bucket])
+            mean_matches = _safe_mean([b["n_matches"] for b in bucket])
+            if mean_cost is not None and mean_tons is not None and mean_tons > 0:
+                mean_cpt = round(mean_cost / mean_tons, 2)
+            else:
+                mean_cpt = None
+            statuses_out.append({
+                "status": status,
+                "n_cycles": n,
+                "pct_of_total": round(100.0 * n / n_total, 2) if n_total > 0 else 0.0,
+                "p50_ms": round(_percentile(durations, 50), 2),
+                "p95_ms": round(_percentile(durations, 95), 2),
+                "mean_ms": round(mean, 2),
+                "min_ms": round(min(durations), 2),
+                "max_ms": round(max(durations), 2),
+                "stddev_ms": round(stddev, 2),
+                "mean_cost_sek": mean_cost,
+                "mean_cost_per_ton_sek": mean_cpt,
+                "mean_n_matches": mean_matches,
+                "mean_tons": mean_tons,
+            })
+
+        # Global stats across all cycles
+        all_durations = [float(r["wall_duration_ms"]) for r in rows]
+        n_all = len(all_durations)
+        if n_all > 0:
+            mean_g = sum(all_durations) / n_all
+            variance_g = sum((d - mean_g) ** 2 for d in all_durations) / n_all
+            stddev_g = variance_g ** 0.5
+            global_stats = {
+                "n_cycles": n_all,
+                "p50_ms": round(_percentile(all_durations, 50), 2),
+                "p95_ms": round(_percentile(all_durations, 95), 2),
+                "mean_ms": round(mean_g, 2),
+                "min_ms": round(min(all_durations), 2),
+                "max_ms": round(max(all_durations), 2),
+                "stddev_ms": round(stddev_g, 2),
+            }
+        else:
+            global_stats = {
+                "n_cycles": 0, "p50_ms": None, "p95_ms": None,
+                "mean_ms": None, "min_ms": None, "max_ms": None,
+                "stddev_ms": None,
+            }
+
+        # Slowest / fastest status by p50 (only buckets with data)
+        with_data = [s for s in statuses_out if s["n_cycles"] > 0]
+        if with_data:
+            slowest = max(with_data, key=lambda s: s["p50_ms"])
+            fastest = min(with_data, key=lambda s: s["p50_ms"])
+            slowest_status = slowest["status"]
+            fastest_status = fastest["status"]
+            slowest_p50 = slowest["p50_ms"]
+            fastest_p50 = fastest["p50_ms"]
+            if fastest_p50 and fastest_p50 > 0:
+                slowest_vs_fastest_pct = round(
+                    (slowest_p50 - fastest_p50) / fastest_p50 * 100, 2
+                )
+            else:
+                slowest_vs_fastest_pct = None
+        else:
+            slowest_status = None
+            fastest_status = None
+            slowest_p50 = None
+            fastest_p50 = None
+            slowest_vs_fastest_pct = None
+
+        # Rate percentages
+        def _rate(status: str) -> float:
+            if n_total == 0:
+                return 0.0
+            n = len(status_buckets[status])
+            return round(100.0 * n / n_total, 2)
+
+        infeasible_rate_pct = _rate("INFEASIBLE")
+        feasible_rate_pct = _rate("FEASIBLE")
+        optimal_rate_pct = _rate("OPTIMAL")
+
+        result: Dict[str, Any] = {
+            "n_cycles_evaluated": n_total,
+            "n_statuses_with_data": len(with_data),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "statuses": statuses_out,
+            "global_stats": global_stats,
+            "slowest_status": slowest_status,
+            "fastest_status": fastest_status,
+            "slowest_p50_ms": slowest_p50,
+            "fastest_p50_ms": fastest_p50,
+            "slowest_vs_fastest_pct": slowest_vs_fastest_pct,
+            "infeasible_rate_pct": infeasible_rate_pct,
+            "feasible_rate_pct": feasible_rate_pct,
+            "optimal_rate_pct": optimal_rate_pct,
+        }
+        self._cache_set(_cache_key, result)
+        return result

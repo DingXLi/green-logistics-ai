@@ -5711,6 +5711,69 @@ async def get_solver_duration_by_season(
     )
 
 
+@app.get("/api/persistence/solver-duration-by-status")
+async def get_solver_duration_by_status(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #71: Solver wall-time breakdown by solver_status (OPTIMAL / FEASIBLE / INFEASIBLE / UNKNOWN).
+
+    Complements /api/persistence/solver-duration-trend (iter #68, time-based)
+    and /api/persistence/solver-duration-by-season (iter #69, season-based)
+    by slicing cycles into 4 status buckets. Combined with iter #69, this
+    gives a 3D view (time / season / status) of solver performance.
+
+    For each status we report:
+      - n_cycles, pct_of_total
+      - wall_duration_ms p50 / p95 / mean / min / max / stddev
+      - mean_cost_sek, mean_cost_per_ton_sek
+      - mean_n_matches, mean_tons
+
+    Plus global stats across all cycles, slowest/fastest status by p50,
+    and rate percentages (optimal_rate_pct / feasible_rate_pct /
+    infeasible_rate_pct) — these act as SLO-style health metrics.
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles_evaluated, n_statuses_with_data,
+        since_sim_day, until_sim_day,
+        statuses: [
+          {status, n_cycles, pct_of_total,
+           p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms,
+           mean_cost_sek, mean_cost_per_ton_sek,
+           mean_n_matches, mean_tons}, ...
+        ],
+        global_stats: {n_cycles, p50_ms, p95_ms, mean_ms,
+                       min_ms, max_ms, stddev_ms},
+        slowest_status, fastest_status,
+        slowest_p50_ms, fastest_p50_ms, slowest_vs_fastest_pct,
+        infeasible_rate_pct, feasible_rate_pct, optimal_rate_pct,
+      }
+
+    Use cases:
+    - Detect INFEASIBLE cycles that exhaust solver search budget (slow p50)
+    - Compare cost-per-ton across solver outcomes
+    - Compute infeasible_rate_pct as an SLO-style health metric
+    - Spot if FEASIBLE cycles are costlier than OPTIMAL (solver compromised)
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_solver_duration_by_status(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/cycle-duration-by-problem-size")
 async def get_cycle_duration_by_problem_size(
     since_sim_day: Optional[int] = None,
