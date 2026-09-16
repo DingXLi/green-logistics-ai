@@ -6848,3 +6848,294 @@ td.no-matches {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================
+   iter #72: Solver Duration 3D Heatmap (season × status)
+   ============================================ */
+
+.solver-duration-3d-panel .extreme-badge {
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.solver-duration-3d-panel .heatmap-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.solver-duration-3d-panel .heatmap-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6px;
+  table-layout: fixed;
+}
+
+.solver-duration-3d-panel .heatmap-corner {
+  width: 110px;
+  background: transparent;
+}
+
+.solver-duration-3d-panel .heatmap-status-header {
+  text-align: center;
+  padding: 0.4rem 0.5rem;
+  background: var(--card-bg-soft, #f1f5f9);
+  border-bottom: 2px solid;
+  border-radius: 4px 4px 0 0;
+  vertical-align: bottom;
+}
+
+.solver-duration-3d-panel .heatmap-status-emoji {
+  font-size: 1.05rem;
+  margin-bottom: 0.1rem;
+}
+
+.solver-duration-3d-panel .heatmap-status-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.solver-duration-3d-panel .heatmap-season-header {
+  text-align: right;
+  padding: 0.4rem 0.6rem;
+  background: var(--card-bg-soft, #f1f5f9);
+  border-right: 2px solid var(--border-soft, #e2e8f0);
+  border-radius: 4px 0 0 4px;
+  width: 110px;
+  vertical-align: middle;
+}
+
+.solver-duration-3d-panel .heatmap-season-emoji {
+  font-size: 1.1rem;
+  margin-bottom: 0.1rem;
+}
+
+.solver-duration-3d-panel .heatmap-season-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-default, #0f172a);
+}
+
+.solver-duration-3d-panel .heatmap-cell {
+  position: relative;
+  height: 90px;
+  border: 2px solid;
+  border-radius: 6px;
+  padding: 0;
+  vertical-align: top;
+  overflow: hidden;
+}
+
+.solver-duration-3d-panel .heatmap-cell-empty {
+  height: 90px;
+  border: 2px dashed var(--border-soft, #cbd5e1);
+  border-radius: 6px;
+  background: transparent;
+  text-align: center;
+  vertical-align: middle;
+  opacity: 0.5;
+}
+
+.solver-duration-3d-panel .heatmap-cell-empty-label {
+  color: var(--text-muted, #94a3b8);
+  font-size: 1.2rem;
+}
+
+.solver-duration-3d-panel .heatmap-cell-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  opacity: 0.25;
+  transition: height 0.3s ease;
+}
+
+.solver-duration-3d-panel .heatmap-cell-content {
+  position: relative;
+  padding: 0.35rem 0.5rem;
+  z-index: 1;
+}
+
+.solver-duration-3d-panel .heatmap-cell-p50 {
+  font-weight: 700;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-3d-panel .heatmap-cell-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted, #475569);
+  margin-top: 0.1rem;
+}
+
+.solver-duration-3d-panel .heatmap-cell-pct {
+  font-size: 0.72rem;
+  color: var(--text-muted, #475569);
+  margin-top: 0.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rollup bars (per-season & per-status) */
+.solver-duration-3d-panel .rollup-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.solver-duration-3d-panel .rollup-block-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.solver-duration-3d-panel .rollup-bars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  align-items: end;
+  height: 130px;
+  border-bottom: 1px solid var(--border-soft, #e2e8f0);
+  border-left: 1px solid var(--border-soft, #e2e8f0);
+}
+
+.solver-duration-3d-panel .rollup-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.solver-duration-3d-panel .rollup-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.solver-duration-3d-panel .rollup-bar {
+  width: 80%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.2rem;
+  position: relative;
+}
+
+.solver-duration-3d-panel .rollup-bar-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.solver-duration-3d-panel .rollup-bar-label {
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+.solver-duration-3d-panel .rollup-label-emoji {
+  font-size: 0.95rem;
+}
+
+.solver-duration-3d-panel .rollup-label-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-default, #0f172a);
+  margin-top: 0.1rem;
+}
+
+.solver-duration-3d-panel .rollup-label-n {
+  font-size: 0.65rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Top-5 slowest cells table */
+.solver-duration-3d-panel .top5-wrap {
+  margin-top: 1.5rem;
+}
+
+.solver-duration-3d-panel .top5-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 0.5rem;
+}
+
+.solver-duration-3d-panel .top5-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.solver-duration-3d-panel .top5-table th {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  background: var(--card-bg-soft, #f1f5f9);
+  color: var(--text-muted, #475569);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--border-soft, #e2e8f0);
+}
+
+.solver-duration-3d-panel .top5-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border-soft, #e2e8f0);
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-duration-3d-panel .top5-cell-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.solver-duration-3d-panel .duration-cell {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .solver-duration-3d-panel .rollup-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .solver-duration-3d-panel .heatmap-table {
+    font-size: 0.75rem;
+  }
+  .solver-duration-3d-panel .heatmap-cell,
+  .solver-duration-3d-panel .heatmap-cell-empty {
+    height: 70px;
+  }
+  .solver-duration-3d-panel .heatmap-cell-p50 {
+    font-size: 0.8rem;
+  }
+  .solver-duration-3d-panel .heatmap-season-header {
+    width: 70px;
+  }
+}

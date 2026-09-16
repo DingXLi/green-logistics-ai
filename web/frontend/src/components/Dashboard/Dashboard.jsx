@@ -143,6 +143,7 @@ const CycleDurationByProblemSize = lazy(() => import('./CycleDurationByProblemSi
 const SolverDurationTrend = lazy(() => import('./SolverDurationTrend').then(m => ({ default: m.SolverDurationTrend })))
 const SolverDurationBySeason = lazy(() => import('./SolverDurationBySeason').then(m => ({ default: m.SolverDurationBySeason })))
 const SolverDurationByStatus = lazy(() => import('./SolverDurationByStatus').then(m => ({ default: m.SolverDurationByStatus })))
+const SolverDurationBySeasonStatus = lazy(() => import('./SolverDurationBySeasonStatus').then(m => ({ default: m.SolverDurationBySeasonStatus })))
 const CohortRetentionBySeason = lazy(() => import('./CohortRetentionBySeason').then(m => ({ default: m.CohortRetentionBySeason })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
@@ -853,6 +854,11 @@ export default function Dashboard() {
           {/* iter #71: Solver duration breakdown by status (OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN) */}
           <Suspense fallback={<LoadingSpinner label="Loading solver duration by status…" />}>
             <SolverDurationByStatus />
+          </Suspense>
+
+          {/* iter #72: Solver duration 3D heatmap (season × status) */}
+          <Suspense fallback={<LoadingSpinner label="Loading solver duration 3D heatmap…" />}>
+            <SolverDurationBySeasonStatus />
           </Suspense>
 
           {/* iter #70: Cohort retention by season (winter/spring/summer/fall) */}
