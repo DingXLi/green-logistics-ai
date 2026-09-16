@@ -9363,3 +9363,354 @@ class Persistence:
         }
         self._cache_set(_cache_key, result)
         return result
+
+    def get_solver_duration_by_season_status(
+        self,
+        since_sim_day: Optional[int] = None,
+        until_sim_day: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #72: Solver wall-time 3D heatmap (season × status).
+
+        Complements iter #69 (``get_solver_duration_by_season``) and iter
+        #71 (``get_solver_duration_by_status``) by slicing cycles along
+        BOTH axes simultaneously, yielding a 4×4 = 16-cell matrix (4
+        seasons × 4 statuses):
+
+        - winter/spring/summer/fall × OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN
+
+        Each cell contains n_cycles + p50_ms + mean_ms + min/max + stddev
+        + pct_of_total (share of all cycles in window). Cells with no data
+        are reported as ``null`` values (not omitted) so the frontend can
+        render a stable 16-cell heatmap.
+
+        Also reports:
+          - per-season rollup (sum of all statuses for that season)
+          - per-status rollup (sum of all seasons for that status)
+          - global stats across the entire matrix
+          - slowest_cell / fastest_cell (season, status) by p50
+          - top_5 slowest_cells (sorted by p50, useful for hotspot table)
+
+        Args:
+            since_sim_day: optional lower bound (inclusive)
+            until_sim_day: optional upper bound (inclusive)
+
+        Returns:
+          {
+            n_cycles_evaluated, n_cells_with_data,
+            since_sim_day, until_sim_day,
+            seasons: ["winter", "spring", "summer", "fall"],
+            statuses: ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN"],
+            cells: [
+              {
+                season, status, n_cycles,
+                pct_of_total,
+                p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms,
+                mean_cost_sek, mean_cost_per_ton_sek,
+              },
+              ...
+            ],
+            season_rollup: [
+              {season, n_cycles, p50_ms, mean_ms}, ...
+            ],
+            status_rollup: [
+              {status, n_cycles, p50_ms, mean_ms}, ...
+            ],
+            global_stats: {
+              n_cycles, p50_ms, p95_ms, mean_ms,
+              min_ms, max_ms, stddev_ms,
+            },
+            slowest_cell: {season, status, p50_ms} | null,
+            fastest_cell: {season, status, p50_ms} | null,
+            slowest_vs_fastest_pct: float | null,
+            top_5_slowest_cells: [
+              {season, status, n_cycles, p50_ms, mean_ms}, ...
+            ],
+          }
+
+        Use cases:
+        - 3D heatmap of solver performance (color = p50, size = n_cycles)
+        - Spot "winter INFEASIBLE" hotspot — slowest cell across both axes
+        - Detect "summer OPTIMAL" sweet spot — fastest cell across both axes
+        - Find the top-5 problematic (season, status) combinations for ops
+        """
+        _cache_key = self._cache_key(
+            "get_solver_duration_by_season_status",
+            {"since_sim_day": since_sim_day, "until_sim_day": until_sim_day},
+        )
+        _cached = self._cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
+        season_defs: List[Dict[str, Any]] = [
+            {"season": "winter", "months": [12, 1, 2]},
+            {"season": "spring", "months": [3, 4, 5]},
+            {"season": "summer", "months": [6, 7, 8]},
+            {"season": "fall",   "months": [9, 10, 11]},
+        ]
+        status_defs: List[str] = ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN"]
+        season_names: List[str] = [s["season"] for s in season_defs]
+
+        # Build season lookup: month -> season
+        month_to_season: Dict[int, str] = {}
+        for sd in season_defs:
+            for m in sd["months"]:
+                month_to_season[m] = sd["season"]
+
+        where_clauses: List[str] = ["wall_duration_ms IS NOT NULL"]
+        params: List[Any] = []
+        if since_sim_day is not None:
+            where_clauses.append("sim_day >= ?")
+            params.append(int(since_sim_day))
+        if until_sim_day is not None:
+            where_clauses.append("sim_day <= ?")
+            params.append(int(until_sim_day))
+        where_sql = " AND ".join(where_clauses)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""SELECT cycle_id, sim_day, wall_duration_ms,
+                           seasonal_month, solver_status,
+                           total_cost_sek, total_tons
+                    FROM optimization_cycles
+                    WHERE {where_sql}""",
+                params,
+            ).fetchall()
+
+        n_total = len(rows)
+
+        # Bucket rows by (season, status)
+        # cells[(season, status)] = list of dicts {duration, cost_sek, tons}
+        cells: Dict[Tuple[str, str], List[Dict[str, Any]]] = {
+            (s, st): [] for s in season_names for st in status_defs
+        }
+        for r in rows:
+            sm = r["seasonal_month"]
+            raw = r["solver_status"]
+            season = month_to_season.get(sm)
+            if season is None:
+                # Unknown month → assign to UNKNOWN cell of that status
+                # (preserve data, bucket by status only).
+                status = (raw.upper() if raw else "UNKNOWN")
+                if status not in status_defs:
+                    status = "UNKNOWN"
+                # Use winter as default bucket so we don't drop the row.
+                season = "winter"
+            else:
+                status = (raw.upper() if raw else "UNKNOWN")
+                if status not in status_defs:
+                    status = "UNKNOWN"
+            cells[(season, status)].append({
+                "duration": float(r["wall_duration_ms"]),
+                "cost_sek": r["total_cost_sek"],
+                "tons": r["total_tons"],
+            })
+
+        def _percentile(values: List[float], pct: float) -> float:
+            if not values:
+                return 0.0
+            sorted_v = sorted(values)
+            n = len(sorted_v)
+            if n == 1:
+                return sorted_v[0]
+            idx = (pct / 100.0) * (n - 1)
+            lo = int(idx)
+            hi = min(lo + 1, n - 1)
+            frac = idx - lo
+            return sorted_v[lo] * (1 - frac) + sorted_v[hi] * frac
+
+        def _safe_mean(values: List[Any]) -> Optional[float]:
+            nums = [v for v in values if v is not None]
+            if not nums:
+                return None
+            return round(sum(float(v) for v in nums) / len(nums), 2)
+
+        # Build 16-cell matrix in stable order
+        cells_out: List[Dict[str, Any]] = []
+        for season in season_names:
+            for status in status_defs:
+                bucket = cells[(season, status)]
+                durations = [b["duration"] for b in bucket]
+                n = len(durations)
+                if n == 0:
+                    cells_out.append({
+                        "season": season,
+                        "status": status,
+                        "n_cycles": 0,
+                        "pct_of_total": 0.0,
+                        "p50_ms": None,
+                        "p95_ms": None,
+                        "mean_ms": None,
+                        "min_ms": None,
+                        "max_ms": None,
+                        "stddev_ms": None,
+                        "mean_cost_sek": None,
+                        "mean_cost_per_ton_sek": None,
+                    })
+                    continue
+                mean = sum(durations) / n
+                variance = sum((d - mean) ** 2 for d in durations) / n
+                stddev = variance ** 0.5
+                mean_cost = _safe_mean([b["cost_sek"] for b in bucket])
+                mean_tons = _safe_mean([b["tons"] for b in bucket])
+                if (
+                    mean_cost is not None
+                    and mean_tons is not None
+                    and mean_tons > 0
+                ):
+                    mean_cpt = round(mean_cost / mean_tons, 2)
+                else:
+                    mean_cpt = None
+                cells_out.append({
+                    "season": season,
+                    "status": status,
+                    "n_cycles": n,
+                    "pct_of_total": round(
+                        100.0 * n / n_total, 2
+                    ) if n_total > 0 else 0.0,
+                    "p50_ms": round(_percentile(durations, 50), 2),
+                    "p95_ms": round(_percentile(durations, 95), 2),
+                    "mean_ms": round(mean, 2),
+                    "min_ms": round(min(durations), 2),
+                    "max_ms": round(max(durations), 2),
+                    "stddev_ms": round(stddev, 2),
+                    "mean_cost_sek": mean_cost,
+                    "mean_cost_per_ton_sek": mean_cpt,
+                })
+
+        # Per-season rollup (across all statuses for that season)
+        season_rollup: List[Dict[str, Any]] = []
+        for season in season_names:
+            all_durs: List[float] = []
+            for status in status_defs:
+                for b in cells[(season, status)]:
+                    all_durs.append(b["duration"])
+            n = len(all_durs)
+            if n == 0:
+                season_rollup.append({
+                    "season": season,
+                    "n_cycles": 0,
+                    "p50_ms": None,
+                    "mean_ms": None,
+                })
+                continue
+            mean = sum(all_durs) / n
+            season_rollup.append({
+                "season": season,
+                "n_cycles": n,
+                "p50_ms": round(_percentile(all_durs, 50), 2),
+                "mean_ms": round(mean, 2),
+            })
+
+        # Per-status rollup (across all seasons for that status)
+        status_rollup: List[Dict[str, Any]] = []
+        for status in status_defs:
+            all_durs: List[float] = []
+            for season in season_names:
+                for b in cells[(season, status)]:
+                    all_durs.append(b["duration"])
+            n = len(all_durs)
+            if n == 0:
+                status_rollup.append({
+                    "status": status,
+                    "n_cycles": 0,
+                    "p50_ms": None,
+                    "mean_ms": None,
+                })
+                continue
+            mean = sum(all_durs) / n
+            status_rollup.append({
+                "status": status,
+                "n_cycles": n,
+                "p50_ms": round(_percentile(all_durs, 50), 2),
+                "mean_ms": round(mean, 2),
+            })
+
+        # Global stats
+        all_durations = [float(r["wall_duration_ms"]) for r in rows]
+        n_all = len(all_durations)
+        if n_all > 0:
+            mean_g = sum(all_durations) / n_all
+            variance_g = sum((d - mean_g) ** 2 for d in all_durations) / n_all
+            stddev_g = variance_g ** 0.5
+            global_stats = {
+                "n_cycles": n_all,
+                "p50_ms": round(_percentile(all_durations, 50), 2),
+                "p95_ms": round(_percentile(all_durations, 95), 2),
+                "mean_ms": round(mean_g, 2),
+                "min_ms": round(min(all_durations), 2),
+                "max_ms": round(max(all_durations), 2),
+                "stddev_ms": round(stddev_g, 2),
+            }
+        else:
+            global_stats = {
+                "n_cycles": 0,
+                "p50_ms": None,
+                "p95_ms": None,
+                "mean_ms": None,
+                "min_ms": None,
+                "max_ms": None,
+                "stddev_ms": None,
+            }
+
+        # Slowest / fastest cell
+        with_data = [c for c in cells_out if c["n_cycles"] > 0 and c["p50_ms"] is not None]
+        if with_data:
+            slowest_cell_obj = max(with_data, key=lambda c: c["p50_ms"])
+            fastest_cell_obj = min(with_data, key=lambda c: c["p50_ms"])
+            slowest_cell = {
+                "season": slowest_cell_obj["season"],
+                "status": slowest_cell_obj["status"],
+                "p50_ms": slowest_cell_obj["p50_ms"],
+            }
+            fastest_cell = {
+                "season": fastest_cell_obj["season"],
+                "status": fastest_cell_obj["status"],
+                "p50_ms": fastest_cell_obj["p50_ms"],
+            }
+            sp = slowest_cell["p50_ms"]
+            fp = fastest_cell["p50_ms"]
+            if fp and fp > 0 and sp is not None:
+                slowest_vs_fastest_pct = round(
+                    (sp - fp) / fp * 100, 2
+                )
+            else:
+                slowest_vs_fastest_pct = None
+        else:
+            slowest_cell = None
+            fastest_cell = None
+            slowest_vs_fastest_pct = None
+
+        # Top-5 slowest cells (by p50)
+        top_5_slowest = sorted(
+            with_data, key=lambda c: c["p50_ms"], reverse=True
+        )[:5]
+        top_5_slowest_cells = [
+            {
+                "season": c["season"],
+                "status": c["status"],
+                "n_cycles": c["n_cycles"],
+                "p50_ms": c["p50_ms"],
+                "mean_ms": c["mean_ms"],
+            }
+            for c in top_5_slowest
+        ]
+
+        result: Dict[str, Any] = {
+            "n_cycles_evaluated": n_total,
+            "n_cells_with_data": len(with_data),
+            "since_sim_day": since_sim_day,
+            "until_sim_day": until_sim_day,
+            "seasons": season_names,
+            "statuses": status_defs,
+            "cells": cells_out,
+            "season_rollup": season_rollup,
+            "status_rollup": status_rollup,
+            "global_stats": global_stats,
+            "slowest_cell": slowest_cell,
+            "fastest_cell": fastest_cell,
+            "slowest_vs_fastest_pct": slowest_vs_fastest_pct,
+            "top_5_slowest_cells": top_5_slowest_cells,
+        }
+        self._cache_set(_cache_key, result)
+        return result

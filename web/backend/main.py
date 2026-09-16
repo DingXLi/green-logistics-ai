@@ -5774,6 +5774,76 @@ async def get_solver_duration_by_status(
     )
 
 
+@app.get("/api/persistence/solver-duration-by-season-status")
+async def get_solver_duration_by_season_status(
+    since_sim_day: Optional[int] = None,
+    until_sim_day: Optional[int] = None,
+):
+    """
+    iter #72: Solver wall-time 3D heatmap (season × status).
+
+    Complements /api/persistence/solver-duration-by-season (iter #69) and
+    /api/persistence/solver-duration-by-status (iter #71) by slicing
+    cycles along BOTH axes simultaneously — a 4×4 = 16-cell matrix
+    (winter/spring/summer/fall × OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN).
+
+    Each cell reports n_cycles + p50/p95/mean/min/max/stddev + mean_cost
+    + cost_per_ton + pct_of_total. Cells with no data are returned with
+    null values (not omitted) so the frontend can render a stable 16-cell
+    heatmap.
+
+    Also exposes:
+      - season_rollup / status_rollup (1D marginals)
+      - global_stats across the entire matrix
+      - slowest_cell / fastest_cell (season, status) by p50
+      - top_5_slowest_cells (hotspot table for ops)
+
+    Query:
+    - since_sim_day: 起始 sim_day (含)
+    - until_sim_day: 结束 sim_day (含)
+
+    Returns:
+      {
+        n_cycles_evaluated, n_cells_with_data,
+        since_sim_day, until_sim_day,
+        seasons: ["winter", "spring", "summer", "fall"],
+        statuses: ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN"],
+        cells: [
+          {season, status, n_cycles, pct_of_total,
+           p50_ms, p95_ms, mean_ms, min_ms, max_ms, stddev_ms,
+           mean_cost_sek, mean_cost_per_ton_sek}, ...
+        ],
+        season_rollup: [{season, n_cycles, p50_ms, mean_ms}, ...],
+        status_rollup:  [{status, n_cycles, p50_ms, mean_ms}, ...],
+        global_stats: {n_cycles, p50_ms, p95_ms, mean_ms,
+                       min_ms, max_ms, stddev_ms},
+        slowest_cell: {season, status, p50_ms} | null,
+        fastest_cell: {season, status, p50_ms} | null,
+        slowest_vs_fastest_pct: float | null,
+        top_5_slowest_cells: [
+          {season, status, n_cycles, p50_ms, mean_ms}, ...
+        ],
+      }
+
+    Use cases:
+    - Spot "winter INFEASIBLE" hotspot — slowest (season, status) pair
+    - Detect "summer OPTIMAL" sweet spot — fastest (season, status) pair
+    - Render 3D heatmap with color = p50 and size = n_cycles
+    - Find top-5 problematic combinations for ops triage
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+    if since_sim_day is not None and until_sim_day is not None:
+        if since_sim_day > until_sim_day:
+            raise HTTPException(
+                status_code=400,
+                detail="since_sim_day must be <= until_sim_day",
+            )
+    return coordinator.persistence.get_solver_duration_by_season_status(
+        since_sim_day=since_sim_day, until_sim_day=until_sim_day,
+    )
+
+
 @app.get("/api/persistence/cycle-duration-by-problem-size")
 async def get_cycle_duration_by_problem_size(
     since_sim_day: Optional[int] = None,
