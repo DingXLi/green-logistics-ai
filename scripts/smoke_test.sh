@@ -490,6 +490,14 @@ check_json_field "/api/persistence/solver-duration-by-status has n_cycles_evalua
 check_json_field "/api/persistence/solver-duration-by-status has optimal_rate_pct" GET "/api/persistence/solver-duration-by-status" ".optimal_rate_pct | type" "number"
 check_json_field "/api/persistence/solver-duration-by-status has infeasible_rate_pct" GET "/api/persistence/solver-duration-by-status" ".infeasible_rate_pct | type" "number"
 check_endpoint "/api/persistence/solver-duration-by-status with sim_day filter" 200 GET "/api/persistence/solver-duration-by-status?since_sim_day=1&until_sim_day=100"
+# iter #72: solver-duration-by-season-status endpoint
+check_endpoint "/api/persistence/solver-duration-by-season-status (iter #72)" 200 GET "/api/persistence/solver-duration-by-season-status"
+check_json_field "/api/persistence/solver-duration-by-season-status has seasons array" GET "/api/persistence/solver-duration-by-season-status" ".seasons | type" "array"
+check_json_field "/api/persistence/solver-duration-by-season-status has statuses array" GET "/api/persistence/solver-duration-by-season-status" ".statuses | type" "array"
+check_json_field "/api/persistence/solver-duration-by-season-status has 16 cells" GET "/api/persistence/solver-duration-by-season-status" ".cells | length" "16"
+check_json_field "/api/persistence/solver-duration-by-season-status has global_stats" GET "/api/persistence/solver-duration-by-season-status" ".global_stats | type" "object"
+check_json_field "/api/persistence/solver-duration-by-season-status has n_cycles_evaluated" GET "/api/persistence/solver-duration-by-season-status" ".n_cycles_evaluated | type" "number"
+check_endpoint "/api/persistence/solver-duration-by-season-status with sim_day filter" 200 GET "/api/persistence/solver-duration-by-season-status?since_sim_day=1&until_sim_day=100"
 # iter #65: vehicle-timeseries endpoint
 check_endpoint "/api/persistence/vehicle-timeseries (iter #65)" 200 GET "/api/persistence/vehicle-timeseries"
 check_json_field "/api/persistence/vehicle-timeseries has metric" GET "/api/persistence/vehicle-timeseries" ".metric | type" "string"
