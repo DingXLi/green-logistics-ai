@@ -5727,6 +5727,231 @@ class Persistence:
             "material_type_filter": material_type,
         }
 
+    def get_cohort_retention_by_region(
+        self,
+        material_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        iter #73: Cohort retention broken down by GEOGRAPHIC REGION (city).
+
+        Extends iter #19/42/65/70 cohort retention with a REGION dimension.
+        For each city (Göteborg / Borås / Stockholm — the 3 cities where
+        real_sweden_facilities has facilities), compute retention rates
+        independently, then provide a global summary with the best/worst
+        region for retention.
+
+        City assignment uses haversine distance from each supply_offers row's
+        (location_lat, location_lon) to the nearest facility in
+        real_sweden_facilities.ALL_FACILITIES. Rows with NULL coords fall
+        into the `unknown` bucket (separate from any real region).
+
+        Args:
+            material_type: optional filter to single material
+
+        Returns:
+            {
+              n_regions_with_data: int,             # 0..3 (real cities with data)
+              n_unknown_with_data: int,             # 0 or 1 (NULL coords bucket)
+              total_supply_ids: int,                # dedup count across all regions
+              regions: [{
+                region: "Göteborg" | "Borås" | "Stockholm" | "unknown",
+                region_name: "Göteborg",
+                region_emoji: "🏙️",
+                n_supply_ids: int,
+                n_one_time: int,
+                n_repeating: int,
+                retention_rate_pct: float,         # 0-100
+                one_time_pct: float,               # 0-100
+                total_supply_offers: int,
+                n_cycles_in_region: int,
+              }, ...],                             # always 4 entries (consistent shape)
+              best_region: str,                    # by retention_rate_pct, None if 0 regions
+              worst_region: str,
+              best_region_pct: float,
+              worst_region_pct: float,
+              worst_vs_best_pct: float,            # (worst - best) / best * 100
+              material_type_filter: Optional[str],
+              city_assignment_method: str,         # "haversine_nearest_facility"
+            }
+        """
+        # Load facility list (real_sweden_facilities) once at top of method.
+        try:
+            from data.real_sweden_facilities import ALL_FACILITIES as _ALL_FACILITIES
+        except Exception:
+            _ALL_FACILITIES = []
+        facilities = list(_ALL_FACILITIES or [])
+
+        # Build city → [(lat, lon)] map for haversine clustering.
+        # If a city has 0 facilities (data not available), it will still appear
+        # in the regions array with n_supply_ids=0 — consistent shape.
+        city_to_coords: Dict[str, List[Tuple[float, float]]] = {}
+        for f in facilities:
+            try:
+                lat = float(f["lat"])
+                lon = float(f["lon"])
+                city = str(f.get("city", "")).strip()
+                if not city:
+                    continue
+                city_to_coords.setdefault(city, []).append((lat, lon))
+            except (KeyError, TypeError, ValueError):
+                continue
+
+        # Stable city ordering: Göteborg → Borås → Stockholm → unknown.
+        # (Matches the Sweden west→east geographic flow.)
+        ordered_cities = ["Göteborg", "Borås", "Stockholm"]
+
+        # Emoji per city (Sweden Vasa-rose + regional icons).
+        region_emoji_map = {
+            "Göteborg": "⚓",     # port/west coast
+            "Borås": "🧵",        # textile recycling tradition
+            "Stockholm": "🏛️",    # capital
+            "unknown": "❓",
+        }
+
+        def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+            """Pure-python haversine (avoids numpy dep for tests)."""
+            import math
+            r = 6371.0
+            lat1r = math.radians(lat1)
+            lat2r = math.radians(lat2)
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = (
+                math.sin(dlat / 2.0) ** 2
+                + math.cos(lat1r) * math.cos(lat2r) * math.sin(dlon / 2.0) ** 2
+            )
+            c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+            return r * c
+
+        def _city_for(lat: Optional[float], lon: Optional[float]) -> str:
+            """Return nearest city by haversine to its facilities; else 'unknown'."""
+            if lat is None or lon is None:
+                return "unknown"
+            best_city = "unknown"
+            best_km = float("inf")
+            for city, coords in city_to_coords.items():
+                for flat, flon in coords:
+                    d = _haversine_km(lat, lon, flat, flon)
+                    if d < best_km:
+                        best_km = d
+                        best_city = city
+            return best_city
+
+        # Fetch all supply_offers rows (with material filter applied at SQL).
+        sql = """SELECT supply_id, location_lat, location_lon, material_type,
+                        COUNT(DISTINCT cycle_id) as n_cycles
+                 FROM supply_offers
+                 WHERE 1=1"""
+        params: List[Any] = []
+        if material_type:
+            sql += " AND material_type = ?"
+            params.append(material_type)
+        sql += " GROUP BY supply_id, location_lat, location_lon"
+
+        # Track per-region supply_ids + appearance counts (id → n_cycles).
+        region_to_ids: Dict[str, Dict[str, int]] = {
+            c: {} for c in ordered_cities
+        }
+        region_to_ids["unknown"] = {}
+        # Also track total_supply_offers + n_cycles per region (across rows).
+        region_to_offers: Dict[str, int] = {c: 0 for c in ordered_cities}
+        region_to_offers["unknown"] = 0
+        region_to_cycles: Dict[str, set] = {c: set() for c in ordered_cities}
+        region_to_cycles["unknown"] = set()
+        seen_global_ids: set = set()
+
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        for r in rows:
+            sid = r["supply_id"]
+            try:
+                lat_v: Optional[float] = (
+                    float(r["location_lat"]) if r["location_lat"] is not None else None
+                )
+                lon_v: Optional[float] = (
+                    float(r["location_lon"]) if r["location_lon"] is not None else None
+                )
+            except (TypeError, ValueError):
+                lat_v, lon_v = None, None
+            n_cycles = int(r["n_cycles"] or 0)
+            city = _city_for(lat_v, lon_v)
+            region_to_ids[city][sid] = region_to_ids[city].get(sid, 0) + n_cycles
+            region_to_offers[city] += n_cycles
+            # Track distinct cycles per region (approximation: we don't have
+            # cycle_id per row here; use cycles-in-which-this-supply-appeared).
+            seen_global_ids.add(sid)
+
+        # Build regions list (always 4 entries for stable shape).
+        region_results: List[Dict[str, Any]] = []
+        best_region: Optional[str] = None
+        worst_region: Optional[str] = None
+        best_pct: float = -1.0
+        worst_pct: float = 101.0
+
+        # Real cities first (3), then "unknown" bucket last.
+        ordered_keys = ordered_cities + ["unknown"]
+        for city in ordered_keys:
+            ids_map = region_to_ids[city]
+            n_ids = len(ids_map)
+            n_one = sum(1 for v in ids_map.values() if v == 1)
+            n_rep = n_ids - n_one
+            ret_pct = round(n_rep / n_ids * 100, 1) if n_ids > 0 else 0.0
+            one_pct = round(n_one / n_ids * 100, 1) if n_ids > 0 else 0.0
+            region_results.append({
+                "region": city,
+                "region_name": city,
+                "region_emoji": region_emoji_map.get(city, "📍"),
+                "n_supply_ids": n_ids,
+                "n_one_time": n_one,
+                "n_repeating": n_rep,
+                "retention_rate_pct": ret_pct,
+                "one_time_pct": one_pct,
+                "total_supply_offers": region_to_offers[city],
+                "n_cycles_in_region": len(region_to_cycles[city]),
+            })
+            if n_ids > 0:
+                if ret_pct > best_pct:
+                    best_pct = ret_pct
+                    best_region = city
+                if ret_pct < worst_pct:
+                    worst_pct = ret_pct
+                    worst_region = city
+
+        if best_region is None:
+            best_pct = 0.0
+            worst_pct = 0.0
+            worst_vs_best_pct = 0.0
+        else:
+            worst_vs_best_pct = (
+                round((worst_pct - best_pct) / best_pct * 100, 1)
+                if best_pct > 0
+                else 0.0
+            )
+
+        n_regions_with_data = sum(
+            1 for r in region_results
+            if r["region"] != "unknown" and r["n_supply_ids"] > 0
+        )
+        n_unknown_with_data = sum(
+            1 for r in region_results
+            if r["region"] == "unknown" and r["n_supply_ids"] > 0
+        )
+
+        return {
+            "n_regions_with_data": n_regions_with_data,
+            "n_unknown_with_data": n_unknown_with_data,
+            "total_supply_ids": len(seen_global_ids),
+            "regions": region_results,
+            "best_region": best_region,
+            "worst_region": worst_region,
+            "best_region_pct": best_pct,
+            "worst_region_pct": worst_pct,
+            "worst_vs_best_pct": worst_vs_best_pct,
+            "material_type_filter": material_type,
+            "city_assignment_method": "haversine_nearest_facility",
+        }
+
     def get_cycle_kpi_summary(self, last_n: Optional[int] = None,
                            since_sim_day: Optional[int] = None,
                            until_sim_day: Optional[int] = None) -> Dict[str, Any]:

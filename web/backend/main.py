@@ -6885,6 +6885,49 @@ async def get_cohort_retention_by_season(
     )
 
 
+@app.get("/api/persistence/cohort-retention-by-region")
+async def get_cohort_retention_by_region(
+    material_type: Optional[str] = None,
+):
+    """
+    iter #73: Cohort retention broken down by GEOGRAPHIC REGION (city).
+
+    跟 iter #70 (by-season) 互补 — season 切时间维度, region 切空间维度。
+    Sweden 主要 supply 集中在 Borås / Göteborg / Stockholm 三角区域,
+    ops 可以看 retention 是否随地理区域波动 (例如港口城市 churn 更高)。
+
+    City assignment:
+      使用 haversine 公式找 supply_offers 最近的 real_sweden_facilities
+      设施, 用最近设施的城市作为 region。lat/lon 为 NULL 的 supply
+      归到 `unknown` bucket (跟真实 region 分开计数)。
+
+    Query:
+    - material_type: optional filter (e.g. 'concrete' / 'wood_waste')
+
+    Returns:
+        {
+          n_regions_with_data, n_unknown_with_data, total_supply_ids,
+          regions: [{
+            region, region_name, region_emoji,
+            n_supply_ids, n_one_time, n_repeating,
+            retention_rate_pct, one_time_pct,
+            total_supply_offers, n_cycles_in_region
+          }, ...],                  # always 4 (3 cities + unknown)
+          best_region, worst_region,
+          best_region_pct, worst_region_pct,
+          worst_vs_best_pct,        # (worst-best)/best*100
+          material_type_filter,
+          city_assignment_method: "haversine_nearest_facility"
+        }
+    """
+    if coordinator is None or coordinator.persistence is None:
+        raise HTTPException(status_code=503, detail="Persistence not initialized")
+
+    return coordinator.persistence.get_cohort_retention_by_region(
+        material_type=material_type,
+    )
+
+
 @app.get("/api/persistence/cohort-retention-crosstab")
 async def get_cohort_retention_crosstab(
     n_periods: int = 4,
