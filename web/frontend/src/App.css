@@ -6614,6 +6614,290 @@ td.no-matches {
 }
 
 /* =========================================================================
+ * iter #73: Cohort Retention by Region (Göteborg/Borås/Stockholm/unknown)
+ * ========================================================================= */
+
+.cohort-retention-by-region {
+  /* Card defaults inherited from .card */
+}
+
+.cohort-retention-by-region .material-input {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #1e293b);
+  width: 220px;
+  transition: border-color 0.15s ease;
+}
+.cohort-retention-by-region .material-input:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
+
+.cohort-retention-by-region .region-extreme-badge {
+  display: inline-block;
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.4rem 0.85rem;
+  background: linear-gradient(90deg, #e0f2fe 0%, #fce7f3 100%);
+  border-left: 4px solid #a855f7;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-region .region-extreme-badge.tied {
+  background: var(--bg-elevated, #f1f5f9);
+  border-left-color: var(--border, #e2e8f0);
+}
+
+.cohort-retention-by-region .empty-state {
+  padding: 1rem;
+  background: var(--bg-elevated, #f8fafc);
+  border: 1px dashed var(--border, #e2e8f0);
+  border-radius: 8px;
+  color: var(--text-secondary, #64748b);
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.cohort-retention-by-region .region-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.cohort-retention-by-region .region-card {
+  background: var(--bg-elevated, #f8fafc);
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cohort-retention-by-region .region-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.cohort-retention-by-region .region-card.best {
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4);
+  background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%);
+}
+.cohort-retention-by-region .region-card.worst {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #fef2f2 0%, #f8fafc 100%);
+}
+.cohort-retention-by-region .region-card.empty {
+  opacity: 0.6;
+}
+.cohort-retention-by-region .region-card.unknown-bucket {
+  background: var(--bg-elevated, #f1f5f9);
+  border-style: dashed;
+}
+
+.cohort-retention-by-region .region-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cohort-retention-by-region .region-emoji-large {
+  font-size: 1.5rem;
+}
+
+.cohort-retention-by-region .region-card-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.cohort-retention-by-region .region-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-region .region-tagline {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cohort-retention-by-region .region-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.cohort-retention-by-region .region-tag.best-tag {
+  background: #22c55e;
+  color: white;
+}
+.cohort-retention-by-region .region-tag.worst-tag {
+  background: #ef4444;
+  color: white;
+}
+
+.cohort-retention-by-region .region-card-retention {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.cohort-retention-by-region .region-card-retention .retention-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.cohort-retention-by-region .region-card-retention .retention-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cohort-retention-by-region .region-card-bar {
+  height: 6px;
+  background: var(--border, #e2e8f0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cohort-retention-by-region .region-card-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.cohort-retention-by-region .region-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+.cohort-retention-by-region .rc-stat {
+  display: flex;
+  flex-direction: column;
+}
+.cohort-retention-by-region .rc-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.cohort-retention-by-region .rc-stat-value {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary, #1e293b);
+}
+
+.cohort-retention-by-region .region-chart {
+  margin-top: 1.25rem;
+}
+.cohort-retention-by-region .region-chart .section-subheader {
+  margin: 0 0 0.6rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cohort-retention-by-region .region-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cohort-retention-by-region .region-bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 0.6rem;
+  align-items: center;
+}
+.cohort-retention-by-region .region-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-primary, #1e293b);
+}
+.cohort-retention-by-region .region-bar-emoji {
+  font-size: 1.1rem;
+}
+.cohort-retention-by-region .region-bar-track {
+  position: relative;
+  height: 22px;
+  background: var(--border, #e2e8f0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cohort-retention-by-region .region-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.cohort-retention-by-region .region-bar-pct {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  mix-blend-mode: difference;
+}
+
+.cohort-retention-by-region .region-table-wrapper {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+.cohort-retention-by-region .region-table-wrapper .section-subheader {
+  margin: 0 0 0.6rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cohort-retention-by-region .region-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.cohort-retention-by-region .region-table th,
+.cohort-retention-by-region .region-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.cohort-retention-by-region .region-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  letter-spacing: 0.04em;
+  background: var(--bg-elevated, #f8fafc);
+}
+.cohort-retention-by-region .region-cell-emoji {
+  margin-right: 0.25rem;
+}
+
+@media (max-width: 1100px) {
+  .cohort-retention-by-region .region-kpi-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .cohort-retention-by-region .region-kpi-row {
+    grid-template-columns: 1fr;
+  }
+  .cohort-retention-by-region .region-card-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cohort-retention-by-region .region-bar-row {
+    grid-template-columns: 90px 1fr;
+  }
+}
+
+/* =========================================================================
  * iter #71: Solver Duration by Status (OPTIMAL/FEASIBLE/INFEASIBLE/UNKNOWN)
  * ========================================================================= */
 

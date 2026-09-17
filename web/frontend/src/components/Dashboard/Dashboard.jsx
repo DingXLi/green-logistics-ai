@@ -145,6 +145,7 @@ const SolverDurationBySeason = lazy(() => import('./SolverDurationBySeason').the
 const SolverDurationByStatus = lazy(() => import('./SolverDurationByStatus').then(m => ({ default: m.SolverDurationByStatus })))
 const SolverDurationBySeasonStatus = lazy(() => import('./SolverDurationBySeasonStatus').then(m => ({ default: m.SolverDurationBySeasonStatus })))
 const CohortRetentionBySeason = lazy(() => import('./CohortRetentionBySeason').then(m => ({ default: m.CohortRetentionBySeason })))
+const CohortRetentionByRegion = lazy(() => import('./CohortRetentionByRegion').then(m => ({ default: m.CohortRetentionByRegion })))
 
 // iter #7: 通用 LoadingSpinner for fetch + Suspense fallback
 import { LoadingSpinner } from '../common/LoadingSpinner'
@@ -864,6 +865,11 @@ export default function Dashboard() {
           {/* iter #70: Cohort retention by season (winter/spring/summer/fall) */}
           <Suspense fallback={<LoadingSpinner label="Loading cohort retention by season…" />}>
             <CohortRetentionBySeason />
+          </Suspense>
+
+          {/* iter #73: Cohort retention by region (Göteborg/Borås/Stockholm/unknown) */}
+          <Suspense fallback={<LoadingSpinner label="Loading cohort retention by region…" />}>
+            <CohortRetentionByRegion />
           </Suspense>
 
           {/* iter #65: Vehicle timeseries (per-vehicle efficiency evolution) */}
