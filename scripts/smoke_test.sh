@@ -643,6 +643,20 @@ check_json_field "/api/persistence/cohort-retention-by-season has best_season" G
 check_json_field "/api/persistence/cohort-retention-by-season has worst_season" GET "/api/persistence/cohort-retention-by-season" ".worst_season | type" "string"
 check_endpoint "/api/persistence/cohort-retention-by-season with material filter" 200 GET "/api/persistence/cohort-retention-by-season?material_type=concrete"
 
+# ---- iter #73: cohort retention by region (Göteborg/Borås/Stockholm/unknown) ----
+check_endpoint "/api/persistence/cohort-retention-by-region (iter #73)" 200 GET "/api/persistence/cohort-retention-by-region"
+check_json_field "/api/persistence/cohort-retention-by-region has regions array" GET "/api/persistence/cohort-retention-by-region" ".regions | type" "array"
+check_json_field "/api/persistence/cohort-retention-by-region has 4 regions" GET "/api/persistence/cohort-retention-by-region" ".regions | length" "4"
+check_json_field "/api/persistence/cohort-retention-by-region has total_supply_ids" GET "/api/persistence/cohort-retention-by-region" ".total_supply_ids | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-region has n_regions_with_data" GET "/api/persistence/cohort-retention-by-region" ".n_regions_with_data | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-region has n_unknown_with_data" GET "/api/persistence/cohort-retention-by-region" ".n_unknown_with_data | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-region has best_region" GET "/api/persistence/cohort-retention-by-region" ".best_region | type" "string"
+check_json_field "/api/persistence/cohort-retention-by-region has worst_region" GET "/api/persistence/cohort-retention-by-region" ".worst_region | type" "string"
+check_json_field "/api/persistence/cohort-retention-by-region has best_region_pct" GET "/api/persistence/cohort-retention-by-region" ".best_region_pct | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-region has worst_vs_best_pct" GET "/api/persistence/cohort-retention-by-region" ".worst_vs_best_pct | type" "number"
+check_json_field "/api/persistence/cohort-retention-by-region has city_assignment_method" GET "/api/persistence/cohort-retention-by-region" ".city_assignment_method | type" "string"
+check_endpoint "/api/persistence/cohort-retention-by-region with material filter" 200 GET "/api/persistence/cohort-retention-by-region?material_type=concrete"
+
 echo ""
 echo "--- summary ---"
 echo "  passed: $PASS"
