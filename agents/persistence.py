@@ -20,7 +20,7 @@ import io
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, TypedDict, Union
 from contextlib import contextmanager
 
 from loguru import logger
@@ -214,6 +214,13 @@ CREATE TABLE IF NOT EXISTS runtime_config (
     updated_at TEXT NOT NULL
 );
 """
+
+
+class _BucketSpec(TypedDict):
+    """吨位分桶定义（label 用于输出，min/max_tons 界定区间，max=None 表示无上限）。"""
+    label: str
+    min_tons: float
+    max_tons: Optional[float]
 
 
 class Persistence:
@@ -4704,7 +4711,7 @@ class Persistence:
                 mat_cost = 0.0
 
             if metric == "matched_tons":
-                v = matched_tons
+                v: Union[int, float] = matched_tons
             elif metric == "n_matches":
                 v = n_matches
             elif metric == "avg_match_tons":
@@ -4720,7 +4727,7 @@ class Persistence:
             if v is None:
                 continue
             if metric == "n_matches":
-                value = int(v)
+                value: Union[int, float] = int(v)
             elif metric == "match_rate":
                 value = round(v, 4)
             elif metric == "co2_per_ton" or metric == "cost_per_ton":
@@ -8738,7 +8745,7 @@ class Persistence:
             return cached
 
         # Bucket definitions — kept in sync with the docstring above
-        BUCKETS = [
+        BUCKETS: List[_BucketSpec] = [
             {"label": "small",  "min_tons": 0,   "max_tons": 10},
             {"label": "medium", "min_tons": 10,  "max_tons": 50},
             {"label": "large",  "min_tons": 50,  "max_tons": 200},
@@ -8780,11 +8787,12 @@ class Persistence:
         # Bucket each cycle row by total_tons
         def _bucket_for(tons: float) -> Optional[str]:
             for b in BUCKETS:
-                if b["max_tons"] is None:
+                max_tons = b["max_tons"]
+                if max_tons is None:
                     if tons >= b["min_tons"]:
                         return b["label"]
                 else:
-                    if b["min_tons"] <= tons < b["max_tons"]:
+                    if b["min_tons"] <= tons < max_tons:
                         return b["label"]
             return None
 
@@ -9830,11 +9838,11 @@ class Persistence:
         # Per-status rollup (across all seasons for that status)
         status_rollup: List[Dict[str, Any]] = []
         for status in status_defs:
-            all_durs: List[float] = []
+            status_durs: List[float] = []
             for season in season_names:
                 for b in cells[(season, status)]:
-                    all_durs.append(b["duration"])
-            n = len(all_durs)
+                    status_durs.append(b["duration"])
+            n = len(status_durs)
             if n == 0:
                 status_rollup.append({
                     "status": status,
@@ -9843,11 +9851,11 @@ class Persistence:
                     "mean_ms": None,
                 })
                 continue
-            mean = sum(all_durs) / n
+            mean = sum(status_durs) / n
             status_rollup.append({
                 "status": status,
                 "n_cycles": n,
-                "p50_ms": round(_percentile(all_durs, 50), 2),
+                "p50_ms": round(_percentile(status_durs, 50), 2),
                 "mean_ms": round(mean, 2),
             })
 

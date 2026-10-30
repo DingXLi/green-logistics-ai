@@ -25,7 +25,13 @@ def test_carbon_scenarios_endpoint_validates_carbon_prices():
         assert r.status_code == 400
 
         # 空字符串走默认 fallback (返回 200 + 4 默认场景)
-        r = client.get("/api/optimize/carbon-scenarios?carbon_prices=")
+        # iter #74: 带 time_limit_seconds=1 + use_real_roads=false —— 这个用例只验证
+        # 「参数为空 → 默认 4 场景」, 不需要真实路网距离矩阵（OSM 矩阵占掉 ~70s,
+        # 会撞上 CI 的 --timeout=60 而假失败）
+        r = client.get(
+            "/api/optimize/carbon-scenarios?carbon_prices="
+            "&time_limit_seconds=1&use_real_roads=false"
+        )
         assert r.status_code == 200
         assert len(r.json()["scenarios"]) == 4
 

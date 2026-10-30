@@ -1211,6 +1211,7 @@ async def _check_simulation_subsystem() -> Dict[str, Any]:
         pass
 
     # Batch tasks summary
+    batch_summary: Dict[str, Any]
     try:
         n_pending = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "pending")
         n_running = sum(1 for t in _BATCH_TASKS.values() if t.get("status") == "running")
@@ -8199,7 +8200,6 @@ async def scheduler_control(action: str = "status"):
 
     返回: {action, success, status (scheduler 当前状态)}
     """
-    global scheduler
     action = action.lower().strip()
 
     if scheduler is None:

@@ -76,8 +76,12 @@ jobs:
     name: Fast unit tests (iter #36: -m "not slow")
     runs-on: ubuntu-latest
     strategy:
+      # iter #74: fail-fast=false —— 之前 3.11 档挂了会把 3.12 档直接 cancel 掉,
+      # 导致真正的失败原因被掩盖 (只看到一档红)。各版本独立报结果。
+      fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        # iter #74: 补 3.13 —— 与本地开发环境 (venv 3.13.5) 一致, 测你真正在跑的版本
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
@@ -108,10 +112,13 @@ jobs:
         # coordinator bootstrap, heavy DB perf benchmarks).
         # pytest-timeout gives every test a hard wall-clock budget; prevents
         # a single hanging optimization from blocking the entire CI matrix.
+        # iter #74: 60 → 120 秒 —— 最重的两个集成用例在慢 runner 上会擦到 60s
+        # (test_seasonal_adjuster ~40s / test_seasonal_persistence ~37s)，加上
+        # coverage 追踪的额外开销，60s 太贴边、容易假失败。
         pytest tests/ \
           --ignore=tests/test_llm_integration.py \
           -m "not slow" \
-          --timeout=60 \
+          --timeout=120 \
           --timeout-method=thread \
           --cov=agents --cov=optimization --cov=data --cov=web/backend \
           --cov-report=term-missing \
