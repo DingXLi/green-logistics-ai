@@ -104,6 +104,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Seed CI fixture DB (iter #74)
+      run: |
+        # data/*.db 被 .gitignore 排除 → fresh checkout 里没有 DB。
+        # 依赖「已有多天历史」的 dashboard / forecast 测试在 CI 必挂
+        # (need >= 2 cycles / confidence 为空) —— 这里造一份确定性合成 fixture。
+        python scripts/seed_ci_fixture.py
+
     - name: Test with pytest (fast only) + coverage (iter #36)
       run: |
         pip install pytest pytest-asyncio pytest-cov pytest-timeout
