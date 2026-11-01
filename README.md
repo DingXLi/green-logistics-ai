@@ -287,6 +287,13 @@ docker build -f Dockerfile.backend -t green-logistics-backend .
 docker run -p 8000:8000 green-logistics-backend
 ```
 
+### Architecture Decision Records (ADR)
+
+Every non-obvious design choice is written down with its context, alternatives and cost —
+see [`docs/adr/`](docs/adr/README.md) (7 ADRs: multi-agent orchestration, OR-Tools VRP core,
+LLM config source of truth, LLM resilience + observability, SQLite persistence, CI strategy,
+frontend & deployment).
+
 ### References
 
 - [Google ADK](https://github.com/google/adk-python)
@@ -458,6 +465,12 @@ git push hf main
 docker build -f Dockerfile.backend -t green-logistics-backend .
 docker run -p 8000:8000 green-logistics-backend
 ```
+
+### 架构决策记录（ADR）
+
+所有「为什么不那么做」的决策都留了档（背景 / 备选 / 决策 / 代价）：
+[`docs/adr/`](docs/adr/README.md) —— 共 7 篇：多智能体编排、OR-Tools VRP 内核、
+LLM 配置单一来源、LLM 韧性与可观测、SQLite 持久化、CI 策略、前端与部署。
 
 ### 参考资料
 
