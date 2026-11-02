@@ -1,6 +1,6 @@
 # ADR-0003: LLM 选型与配置 —— Gemini 2.5 Flash + 配置单一来源
 
-- **状态**：已接受（含一条 SDK 迁移债）
+- **状态**：已接受（SDK 债已于 2026-11-02 由 [ADR-0008](0008-google-genai-sdk-migration.md) 解掉）
 - **记录日期**：2026-11-01
 - **相关代码**：`agents/llm_config.py`, `config/settings.yaml`（`ai:` 段）, `agents/llm_caller.py`
 
@@ -32,9 +32,9 @@ LLM-native 指标（tokens/sec、cost-per-request）。
 
    解析入口是 `agents/llm_config.py:get_llm_config()`，用 `lru_cache(maxsize=1)` 做单例，
    保证进程内只解析一次、所有 agent 拿到同一份。
-3. **默认参数**：`temperature 0.7` / `max_tokens 4096` / `max_retries 4` / `timeout_seconds 30`，
-   每一项都能被环境变量单独覆盖（`GEMINI_MODEL`、`GEMINI_TEMPERATURE`、`GEMINI_MAX_TOKENS`、
-   `GEMINI_MAX_RETRIES`、`GEMINI_TIMEOUT`）。
+3. **默认参数**：`temperature 0.7` / `max_tokens 4096` / `max_retries 4` / `timeout_seconds 30` /
+   `thinking_budget 0`，每一项都能被环境变量单独覆盖（`GEMINI_MODEL`、`GEMINI_TEMPERATURE`、
+   `GEMINI_MAX_TOKENS`、`GEMINI_MAX_RETRIES`、`GEMINI_TIMEOUT`、`GEMINI_THINKING_BUDGET`）。
 4. **model 名不硬编码在 agent 里**：agent 一律 `from .llm_config import MODEL`。
 
 ## 备选方案
@@ -54,10 +54,10 @@ LLM-native 指标（tokens/sec、cost-per-request）。
 
 **负面 / 技术债**
 
-- ⚠️ **SDK 仍是 legacy 的 `google-generativeai`**（`agents/llm_caller.py:22`
-  `import google.generativeai as genai`）。官方已把它并入新的 `google-genai` SDK，
-  而 `google-adk` 的新版本也以 `google-genai` 为准。
-  这条**不影响当前功能**，但会影响未来升级路径与「SDK 用得够不够新」的细节追问 —— 属于必须记着的技术债。
+- ✅ ~~**SDK 仍是 legacy 的 `google-generativeai`**~~ — **已解决（2026-11-02）**：
+  LLM 调用层已整体迁到官方新 SDK `google-genai`（`agents/llm_caller.py`），
+  错误分类同步改成「先看 HTTP code 再看 message」。
+  详见 [ADR-0008](0008-google-genai-sdk-migration.md)。
 - `lru_cache` 单例意味着进程内改环境变量不会立即生效（改完要重启），
   对长驻进程（比如 uvicorn worker）是个小坑。
 - `temperature 0.7` 对「要可复现」的目标是矛盾的折中：LLM 侧的输出并非严格确定，

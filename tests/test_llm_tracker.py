@@ -314,16 +314,14 @@ class TestCallGeminiIntegration:
         mock_um.total_token_count = 300
         mock_resp.usage_metadata = mock_um
 
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_resp
-
         # Patch GOOGLE_API_KEY
         monkeypatch.setenv("GOOGLE_API_KEY", "test-key-12345")
 
-        with patch("google.generativeai.GenerativeModel", return_value=mock_model):
-            with patch("google.generativeai.configure"):
-                from agents.llm_caller import call_gemini
-                result = call_gemini("test prompt", caller="integration.test")
+        # iter #76: 新 SDK 的调用面 = genai.Client().models.generate_content(...)
+        with patch("agents.llm_caller.genai") as mock_genai:
+            mock_genai.Client.return_value.models.generate_content.return_value = mock_resp
+            from agents.llm_caller import call_gemini
+            result = call_gemini("test prompt", caller="integration.test")
 
         assert result == "OK response"
         s = tracker.get_stats()
@@ -338,10 +336,6 @@ class TestCallGeminiIntegration:
         tracker_module._TRACKER = None
         tracker = get_llm_tracker()
 
-        # Mock genai to raise 429
-        mock_model = MagicMock()
-        mock_model.generate_content.side_effect = Exception("429 RESOURCE_EXHAUSTED")
-
         monkeypatch.setenv("GOOGLE_API_KEY", "test-key-12345")
 
         # Disable retries via direct patch (config is cached)
@@ -355,11 +349,12 @@ class TestCallGeminiIntegration:
             },
         )
 
-        with patch("google.generativeai.GenerativeModel", return_value=mock_model):
-            with patch("google.generativeai.configure"):
-                from agents.llm_caller import call_gemini, GeminiAPIError
-                with pytest.raises(GeminiAPIError):
-                    call_gemini("test prompt", caller="integration.fail")
+        with patch("agents.llm_caller.genai") as mock_genai:
+            # Mock genai to raise 429
+            mock_genai.Client.return_value.models.generate_content.side_effect = Exception("429 RESOURCE_EXHAUSTED")
+            from agents.llm_caller import call_gemini, GeminiAPIError
+            with pytest.raises(GeminiAPIError):
+                call_gemini("test prompt", caller="integration.fail")
 
         s = tracker.get_stats()
         assert s["total_calls"] == 1

@@ -25,6 +25,8 @@ ai:
   max_tokens: 4096
   max_retries: 4            # 429/5xx backoff retries (overridable via GEMINI_MAX_RETRIES)
   timeout_seconds: 30        # per-request timeout (overridable via GEMINI_TIMEOUT)
+  thinking_budget: 0         # 思考预算 token; 0 = 关闭思考 (overridable via GEMINI_THINKING_BUDGET)
+                              # 注意: 新 SDK 对 Gemini 2.5 默认开思考,思考 token 计入 max_tokens → 会截断 JSON 输出
   
   # API Keys (use environment variables in production)
   google_api_key: "${GOOGLE_API_KEY}"

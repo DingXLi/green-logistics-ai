@@ -23,6 +23,7 @@ FDE 的工作现场反复被问的一句话就是「为什么这么设计，而�
 | [0005](0005-persistence-sqlite.md) | 持久化 | SQLite 11 张表 + 单一建表来源，承认 persistence.py 过大 | 已接受（含技术债） |
 | [0006](0006-ci-strategy-and-deterministic-fixture.md) | CI 策略 | 分层 + 多版本矩阵 + fail-fast=false + 确定性 DB fixture | 已接受 |
 | [0007](0007-frontend-and-deployment.md) | 前端与部署 | React+Vite 单页 + Docker 双镜像 + HF Spaces 公网 demo | 已接受（含技术债） |
+| [0008](0008-google-genai-sdk-migration.md) | SDK 迁移 | LLM 调用层从 legacy `google-generativeai` 切到官方新 SDK `google-genai` | 已接受 |
 
 ---
 
@@ -40,6 +41,8 @@ FDE 的工作现场反复被问的一句话就是「为什么这么设计，而�
 - **0004 韧性 + 可观测** → 讲「客户现场 429 怎么办、成本怎么回答」，对应岗位要求里的
   tokens/sec、cost-per-request
 - **0006 CI 策略** → 讲「我交付的东西自己先得是绿的」，这是 FDE 区别于纯后端的地方
+- **0008 SDK 迁移** → 讲「我自己写的债我自己还，而且迁移时还挖出了一个真 bug」，
+  这是「生产级 AI 系统」最直接的证据
 
 三条合起来正好覆盖 JD 里的「解决方案架构」「技术决策权衡」「把痛点转化为产品需求」。
 
@@ -70,4 +73,4 @@ FDE 的工作现场反复被问的一句话就是「为什么这么设计，而�
 
 ---
 
-_最后更新：2026-11-01（AI FDE 突击 · Day 70 补写）_
+_最后更新：2026-11-02（AI FDE 突击 · Day 71 补 ADR-0008）_

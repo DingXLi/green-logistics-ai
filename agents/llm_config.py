@@ -12,6 +12,7 @@ LLM 集中配置 / Centralised LLM configuration
     GEMINI_MAX_TOKENS  覆盖 max output tokens
     GEMINI_MAX_RETRIES 429/5xx 时重试次数
     GEMINI_TIMEOUT     单次请求超时秒数
+    GEMINI_THINKING_BUDGET  思考预算(token);0 = 关闭思考(默认)
 """
 
 from __future__ import annotations
@@ -27,6 +28,10 @@ DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_MAX_RETRIES = 4
 DEFAULT_TIMEOUT_S = 30
+# 思考预算:新 SDK (google-genai) 对 Gemini 2.5 默认开思考,
+# 而思考 token 计入 max_output_tokens —— 会在输出 JSON 时被截断。
+# 默认 0 = 关闭思考(与迁移前的 legacy SDK 行为一致),需要时按调用场景打开。
+DEFAULT_THINKING_BUDGET = 0
 
 
 def _load_yaml_settings() -> Dict[str, Any]:
@@ -84,8 +89,8 @@ def get_llm_config() -> Dict[str, Any]:
         "max_tokens": as_int("GEMINI_MAX_TOKENS", "max_tokens", DEFAULT_MAX_TOKENS),
         "max_retries": as_int("GEMINI_MAX_RETRIES", "max_retries", DEFAULT_MAX_RETRIES),
         "timeout_s": as_int("GEMINI_TIMEOUT", "timeout_seconds", DEFAULT_TIMEOUT_S),
-        "provider": pick("GEMINI_PROVIDER", "provider", "google"),
-    }
+        "thinking_budget": as_int("GEMINI_THINKING_BUDGET", "thinking_budget", DEFAULT_THINKING_BUDGET),
+        "provider": pick("GEMINI_PROVIDER", "provider", "google"),    }
 
 
 # 便捷常量 (用 property 风格,在 import 时一次性解析)
@@ -94,6 +99,7 @@ TEMPERATURE: float = get_llm_config()["temperature"]
 MAX_TOKENS: int = get_llm_config()["max_tokens"]
 MAX_RETRIES: int = get_llm_config()["max_retries"]
 TIMEOUT_S: int = get_llm_config()["timeout_s"]
+THINKING_BUDGET: int = get_llm_config()["thinking_budget"]
 
 
 def reload() -> Dict[str, Any]:
@@ -108,6 +114,7 @@ __all__ = [
     "MAX_TOKENS",
     "MAX_RETRIES",
     "TIMEOUT_S",
+    "THINKING_BUDGET",
     "get_llm_config",
     "reload",
 ]

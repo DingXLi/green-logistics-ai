@@ -61,7 +61,7 @@
 | **FastAPI** | REST API + WebSocket | ≥0.110 |
 | **uvicorn** | ASGI server | ≥0.29 |
 | **pydantic** | Data validation | ≥2.6 |
-| **google-generativeai** | LLM (Gemini 2.5-flash) | ≥0.8 |
+| **google-genai** | LLM (Gemini 2.5-flash) | ≥1.0 |
 | **google-adk** | Agent Development Kit | ≥0.1 |
 | **ortools** | VRP solver (Pareto front + carbon) | ≥9.10 |
 | **sqlite3** (stdlib) | Persistence layer | built-in |
@@ -283,7 +283,7 @@ local main (130 commits) ──push──> hf/main (production)
 
 ### 10.1 Type hints
 - 一些 untyped functions (notes only, not errors)
-- mypy strict 模式未启用 (因 google-generativeai 等第三方库)
+- mypy strict 模式未启用 (因 google-genai 等第三方库)
 
 ### 10.2 Frontend
 - React 18 (考虑升级 19? 评估成本)

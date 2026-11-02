@@ -59,7 +59,7 @@ jobs:
     - name: Type-check with mypy (iter #13)
       run: |
         pip install mypy
-        # Non-strict mode to avoid breaking on third-party libs (google-generativeai etc.)
+        # Non-strict mode to avoid breaking on third-party libs (google-genai etc.)
         # Fail on real type errors in our own code
         MYPYPATH=. mypy agents/ optimization/ web/backend/ data/real_sweden_facilities.py data/swedish_waste_stats.py data/seasonal_adjuster.py \
           --ignore-missing-imports \

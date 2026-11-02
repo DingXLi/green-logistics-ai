@@ -24,6 +24,13 @@ from agents.llm_caller import (
 )
 
 
+def _api_error(code: int, status: str, message: str) -> Exception:
+    """构造 google-genai 新 SDK 的 APIError(带 code → 走新的 code 优先分类逻辑)。"""
+    from google.genai.errors import ClientError, ServerError  # type: ignore
+    payload = {"error": {"code": code, "status": status, "message": message}}
+    return ClientError(code, payload) if code < 500 else ServerError(code, payload)
+
+
 # ============================================================
 # llm_config 优先级测试
 # ============================================================
@@ -61,6 +68,19 @@ class TestLLMConfigPriority:
         monkeypatch.setenv("GEMINI_MAX_RETRIES", "not-a-number")
         reload()
         assert get_llm_config()["max_retries"] == DEFAULT_MAX_RETRIES
+
+    def test_thinking_budget_defaults_to_zero(self, monkeypatch):
+        """新 SDK 对 Gemini 2.5 默认开思考，思考 token 计入 max_tokens → 默认关掉。"""
+        monkeypatch.delenv("GEMINI_THINKING_BUDGET", raising=False)
+        reload()
+        assert get_llm_config()["thinking_budget"] == 0
+
+    def test_thinking_budget_env_override(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_THINKING_BUDGET", "1024")
+        reload()
+        assert get_llm_config()["thinking_budget"] == 1024
+        monkeypatch.delenv("GEMINI_THINKING_BUDGET", raising=False)
+        reload()
 
 
 # ============================================================
@@ -108,44 +128,41 @@ class TestCallGeminiRetry:
     @patch("agents.llm_caller.genai")
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x" * 1})  # any non-empty
     def test_succeeds_first_try(self, mock_genai):
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = self._make_fake_response("hi")
+        mock_genai.Client.return_value.models.generate_content.return_value = self._make_fake_response("hi")
         text = call_gemini("hello")
         assert text == "hi"
         # 1 次成功就不应重试
-        assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 1
+        assert mock_genai.Client.return_value.models.generate_content.call_count == 1
 
     @patch("agents.llm_caller.genai")
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
     def test_retries_on_429_then_succeeds(self, mock_genai):
         # 前两次 429,第三次成功
-        from google.api_core.exceptions import ResourceExhausted  # type: ignore
         side_effects = [
-            ResourceExhausted("429 quota"),
-            ResourceExhausted("429 quota again"),
+            _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded"),
+            _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded again"),
             self._make_fake_response("recovered"),
         ]
-        mock_genai.GenerativeModel.return_value.generate_content.side_effect = side_effects
+        mock_genai.Client.return_value.models.generate_content.side_effect = side_effects
         text = call_gemini("hello")
         assert text == "recovered"
-        assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 3
+        assert mock_genai.Client.return_value.models.generate_content.call_count == 3
 
     @patch("agents.llm_caller.genai")
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
     def test_does_not_retry_on_4xx(self, mock_genai):
         # 400 应该直接抛 GeminiClientError,不重试
-        from google.api_core.exceptions import InvalidArgument  # type: ignore
-        mock_genai.GenerativeModel.return_value.generate_content.side_effect = InvalidArgument("400 bad request")
+        mock_genai.Client.return_value.models.generate_content.side_effect = _api_error(400, "INVALID_ARGUMENT", "bad request")
         with pytest.raises(GeminiClientError):
             call_gemini("hello")
         # 1 次就不重试
-        assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 1
+        assert mock_genai.Client.return_value.models.generate_content.call_count == 1
 
     @patch("agents.llm_caller.genai")
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
     def test_safe_returns_none_on_failure(self, mock_genai):
-        from google.api_core.exceptions import ResourceExhausted  # type: ignore
         # 5 次 429 — 超过 max_retries+1
-        mock_genai.GenerativeModel.return_value.generate_content.side_effect = ResourceExhausted("429")
+        mock_genai.Client.return_value.models.generate_content.side_effect = _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded")
         text = call_gemini_safe("hello")
         assert text is None
 
@@ -154,6 +171,48 @@ class TestCallGeminiRetry:
     def test_raises_client_error_when_no_key(self, mock_genai):
         with pytest.raises(GeminiClientError, match="GOOGLE_API_KEY"):
             call_gemini("hello")
+
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    def test_retry_survives_braces_in_error_payload(self, mock_genai):
+        """iter #76 回归测试：错误消息里带 dict payload 时，重试路径不能被日志炸掉。
+
+        背景：新 SDK 的错误消息永远带大括号（{'error': {...}}），
+        而 loguru 会把消息当 format string 处理 → 以前会抛 KeyError，
+        tenacity 的 before_sleep_log 一炸，整个重试逻辑就挂了。
+        """
+        side_effects = [
+            _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded"),
+            self._make_fake_response("recovered"),
+        ]
+        mock_genai.Client.return_value.models.generate_content.side_effect = side_effects
+        text = call_gemini("hello")
+        assert text == "recovered"
+        assert mock_genai.Client.return_value.models.generate_content.call_count == 2
+
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    def test_thinking_budget_is_passed_to_sdk(self, mock_genai):
+        """思考预算要显式传给 SDK(默认 0 = 关闭思考)。"""
+        mock_genai.Client.return_value.models.generate_content.return_value = self._make_fake_response("ok")
+        call_gemini("hello")
+        cfg = mock_genai.Client.return_value.models.generate_content.call_args.kwargs["config"]
+        assert cfg.thinking_config.thinking_budget == 0
+        assert cfg.max_output_tokens == 4096
+
+    @patch("agents.llm_caller.genai")
+    @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
+    def test_max_tokens_raised_when_thinking_budget_too_big(self, mock_genai):
+        """开了思考且输出预算 <= 思考预算时,自动抬高输出预算(否则 JSON 会被截断)。"""
+        monkey_budget = {"model": "gemini-2.5-flash", "temperature": 0.5,
+                         "max_tokens": 100, "max_retries": 0, "timeout_s": 30,
+                         "thinking_budget": 2048}
+        mock_genai.Client.return_value.models.generate_content.return_value = self._make_fake_response("ok")
+        with patch("agents.llm_caller.get_llm_config", lambda: monkey_budget):
+            call_gemini("hello")
+        cfg = mock_genai.Client.return_value.models.generate_content.call_args.kwargs["config"]
+        assert cfg.thinking_config.thinking_budget == 2048
+        assert cfg.max_output_tokens > 2048
 
 
 # ============================================================
@@ -209,7 +268,7 @@ class TestPredictDemandLLM:
         )
         resp = MagicMock()
         resp.text = llm_json
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await market.predict_demand(days=1, sim_day=5, weekday=2)
         assert result["source"] == "llm"
@@ -228,7 +287,7 @@ class TestPredictDemandLLM:
                     '{"id":"DEM002","multiplier":0.05,"trend":"falling","confidence":0.5,"reason":"closed"}]'
         resp = MagicMock()
         resp.text = llm_json
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await market.predict_demand(sim_day=1, weekday=0)
         by_id = {p["id"]: p for p in result["predictions"]}
@@ -243,7 +302,7 @@ class TestPredictDemandLLM:
         llm_text = "```json\n[{\"id\":\"DEM001\",\"multiplier\":1.0,\"trend\":\"stable\",\"confidence\":0.5,\"reason\":\"ok\"}]\n```"
         resp = MagicMock()
         resp.text = llm_text
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await market.predict_demand(sim_day=1, weekday=0)
         assert result["source"] == "llm"
@@ -253,8 +312,7 @@ class TestPredictDemandLLM:
     @patch("agents.llm_caller.genai")
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
     async def test_fallback_on_429(self, mock_genai, market):
-        from google.api_core.exceptions import ResourceExhausted  # type: ignore
-        mock_genai.GenerativeModel.return_value.generate_content.side_effect = ResourceExhausted("429")
+        mock_genai.Client.return_value.models.generate_content.side_effect = _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded")
 
         result = await market.predict_demand(sim_day=1, weekday=5)  # Sat
         assert result["source"] == "fallback"
@@ -269,7 +327,7 @@ class TestPredictDemandLLM:
     async def test_fallback_on_invalid_json(self, mock_genai, market):
         resp = MagicMock()
         resp.text = "sorry, I cannot predict demand"  # not JSON
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await market.predict_demand(sim_day=1, weekday=0)
         assert result["source"] == "fallback"
@@ -284,7 +342,7 @@ class TestPredictDemandLLM:
                     '{"name":"oops"},{"id":"DEM002"}]'
         resp = MagicMock()
         resp.text = llm_json
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await market.predict_demand(sim_day=1, weekday=0)
         assert result["source"] == "llm"
@@ -322,7 +380,7 @@ class TestPredictSupplyBatchLLM:
         )
         resp = MagicMock()
         resp.text = llm_json
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await SupplyAgent.predict_supply_batch(two_agents, days=1, sim_day=2, weekday=1)
         assert set(result.keys()) == {"SUP000", "SUP001"}
@@ -340,7 +398,7 @@ class TestPredictSupplyBatchLLM:
                     '{"id":"SUP001","multiplier":-1.0,"trend":"falling","confidence":0.5,"reason":"neg"}]'
         resp = MagicMock()
         resp.text = llm_json
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
         # supply clamp [0.1, 2.0]
@@ -352,8 +410,7 @@ class TestPredictSupplyBatchLLM:
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaTestFakeKeyForUnitTest_x"})
     async def test_fallback_on_429(self, mock_genai, two_agents):
         SupplyAgent = self._import_sa()
-        from google.api_core.exceptions import ResourceExhausted  # type: ignore
-        mock_genai.GenerativeModel.return_value.generate_content.side_effect = ResourceExhausted("429")
+        mock_genai.Client.return_value.models.generate_content.side_effect = _api_error(429, "RESOURCE_EXHAUSTED", "quota exceeded")
 
         result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
         assert all(p["source"] == "fallback" for p in result.values())
@@ -366,7 +423,7 @@ class TestPredictSupplyBatchLLM:
         SupplyAgent = self._import_sa()
         resp = MagicMock()
         resp.text = "not a json"
-        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+        mock_genai.Client.return_value.models.generate_content.return_value = resp
 
         result = await SupplyAgent.predict_supply_batch(two_agents, sim_day=1, weekday=0)
         assert all(p["source"] == "fallback" for p in result.values())
