@@ -105,7 +105,24 @@ green-logistics-ai/
 │   ├── market_agent.py           # Market agent (LLM-driven demand)
 │   ├── logistics_agent.py        # Logistics agent (VRP optimization)
 │   ├── coordinator.py            # Cycle coordinator (orchestrates agents)
-│   ├── persistence.py            # SQLite persistence + aggregation queries
+│   ├── persistence/               # SQLite persistence layer (package, iter #77)
+│   │   ├── __init__.py            #   Persistence = composition of domain mixins
+│   │   ├── _base.py               #   connection / schema init+migration / TTL cache
+│   │   ├── _schema.py             #   SCHEMA_SQL (11 tables) + shared types
+│   │   ├── _contract.py           #   cross-module query contract
+│   │   ├── _forecast_math.py      #   linear / moving-average / exp-smoothing fits
+│   │   ├── _cycles.py             #   cycle write + cycle queries
+│   │   ├── _llm.py                #   LLM decision log + cost analytics
+│   │   ├── _analytics.py          #   KPI / time series / trends
+│   │   ├── _exports.py            #   CSV / row exports
+│   │   ├── _stats.py              #   fleet / material / retention / CO₂ stats
+│   │   ├── _anomalies.py          #   anomaly detection
+│   │   ├── _maintenance.py        #   VACUUM / ANALYZE + maintenance log
+│   │   ├── _config.py             #   runtime config + method prefs
+│   │   ├── _forecasting.py        #   forecast calibration (pred vs actual)
+│   │   ├── _perturbation.py       #   seasonal perturbation rules
+│   │   ├── _comparisons.py        #   cycle / material / route comparison
+│   │   └── _solver.py             #   solver duration analytics
 │   ├── world_builder.py          # Real-facility world builder
 │   ├── llm_caller.py             # Gemini wrapper with retry + fallback
 │   ├── llm_config.py             # Centralized model config
@@ -290,9 +307,9 @@ docker run -p 8000:8000 green-logistics-backend
 ### Architecture Decision Records (ADR)
 
 Every non-obvious design choice is written down with its context, alternatives and cost —
-see [`docs/adr/`](docs/adr/README.md) (8 ADRs: multi-agent orchestration, OR-Tools VRP core,
+see [`docs/adr/`](docs/adr/README.md) (9 ADRs: multi-agent orchestration, OR-Tools VRP core,
 LLM config source of truth, LLM resilience + observability, SQLite persistence, CI strategy,
-frontend & deployment, Google GenAI SDK migration).
+frontend & deployment, Google GenAI SDK migration, persistence-layer package split).
 
 ### References
 
@@ -394,7 +411,24 @@ green-logistics-ai/
 │   ├── market_agent.py           # 市场智能体 (LLM 需求)
 │   ├── logistics_agent.py        # 物流智能体 (VRP 优化)
 │   ├── coordinator.py            # 协调器
-│   ├── persistence.py            # SQLite 持久化 + 聚合查询
+│   ├── persistence/               # SQLite 持久化层（包，iter #77）
+│   │   ├── __init__.py            #   Persistence = 各领域 mixin 组合
+│   │   ├── _base.py               #   连接 / schema 初始化+迁移 / TTL 缓存
+│   │   ├── _schema.py             #   SCHEMA_SQL（11 张表）+ 共享类型
+│   │   ├── _contract.py           #   跨模块查询契约
+│   │   ├── _forecast_math.py      #   预测拟合数学（linear / MA / ES）
+│   │   ├── _cycles.py             #   周期写入 + 周期查询
+│   │   ├── _llm.py                #   LLM 决策落库 + 成本分析
+│   │   ├── _analytics.py          #   KPI / 时间序列 / 趋势
+│   │   ├── _exports.py            #   CSV / 行式导出
+│   │   ├── _stats.py              #   车辆 / 材料 / 留存 / 碳排统计
+│   │   ├── _anomalies.py          #   异常周期检测
+│   │   ├── _maintenance.py        #   VACUUM / ANALYZE + 维护日志
+│   │   ├── _config.py             #   运行时配置 + method 偏好
+│   │   ├── _forecasting.py        #   预测校准（预测 vs 实际）
+│   │   ├── _perturbation.py       #   季节扰动规则
+│   │   ├── _comparisons.py        #   周期 / 材料 / 路线对比
+│   │   └── _solver.py             #   求解器耗时分析
 │   ├── world_builder.py          # 真实设施世界构建
 │   ├── llm_caller.py             # Gemini wrapper + fallback
 │   ├── llm_config.py             # 模型配置中心
@@ -469,9 +503,9 @@ docker run -p 8000:8000 green-logistics-backend
 ### 架构决策记录（ADR）
 
 所有「为什么不那么做」的决策都留了档（背景 / 备选 / 决策 / 代价）：
-[`docs/adr/`](docs/adr/README.md) —— 共 8 篇：多智能体编排、OR-Tools VRP 内核、
+[`docs/adr/`](docs/adr/README.md) —— 共 9 篇：多智能体编排、OR-Tools VRP 内核、
 LLM 配置单一来源、LLM 韧性与可观测、SQLite 持久化、CI 策略、前端与部署、
-Google GenAI SDK 迁移。
+Google GenAI SDK 迁移、持久化层拆包。
 
 ### 参考资料
 

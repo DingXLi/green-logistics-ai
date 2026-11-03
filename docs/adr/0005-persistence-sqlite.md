@@ -1,6 +1,6 @@
 # ADR-0005: 持久化 —— SQLite + 11 张表（单一建表来源），并承认 persistence.py 已经太大
 
-- **状态**：已接受（含一条明确的技术债）
+- **状态**：已接受（原技术债已于 2026-11-03 由 [ADR-0009](0009-persistence-package-split.md) 还清）
 - **记录日期**：2026-11-01
 - **相关代码**：`agents/persistence.py`, `.gitignore`, `scripts/seed_ci_fixture.py`
 
@@ -60,14 +60,15 @@ LLM 决策、预测结果、季节性扰动、运行时配置…… 这些数据
 
 **负面 / 技术债**
 
-- ⚠️ **`agents/persistence.py` 已经涨到 9,949 行 / 423 KB 单文件**：
-  11 张表的建表、写入、查询、业务辅助逻辑全混在一个文件里。
-  这是目前仓库里最明显的结构债 —— 下一步应按领域拆包
-  （例如 `persistence/schema.py` + `persistence/repositories/<表>.py`），
-  但拆分要配合测试保护，**不适合在赶 deadline 的冲刺期里做**。
+- ~~⚠️ **`agents/persistence.py` 已经涨到 9,949 行 / 423 KB 单文件**~~
+  → **已解决（2026-11-03，见 ADR-0009）**：已拆成 `agents/persistence/` 包，
+  按领域分 16 个模块（`_base` / `_schema` / `_contract` / `_forecast_math` + 12 个领域 mixin），
+  最大文件降到 1,271 行；**公开 API 114 个方法零变化**，schema 仍是单一来源
+  （`_schema.py` 的 `SCHEMA_SQL`）。当时的顾虑「不适合在赶 deadline 的冲刺期里做」
+  被证明是对的 —— 拆分本身半天，但**必须有 1,600+ 测试兜底**才敢动。
 - 单文件 SQLite 的写入是串行的，并发写会排队（当前用单进程顺序跑 cycle，尚可）。
 - 没有连接池与迁移工具（alembic 之类），schema 变更靠 `CREATE TABLE IF NOT EXISTS` + 手工 ALTER。
 
 ---
 
-_相关：[ADR-0004](0004-llm-resilience-and-observability.md) 决策落库 · [ADR-0006](0006-ci-strategy-and-deterministic-fixture.md) CI fixture_
+_相关：[ADR-0004](0004-llm-resilience-and-observability.md) 决策落库 · [ADR-0006](0006-ci-strategy-and-deterministic-fixture.md) CI fixture · [ADR-0009](0009-persistence-package-split.md) 持久化层拆分_
