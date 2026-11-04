@@ -1,0 +1,2886 @@
+{
+  "class": "Persistence",
+  "constant_count": 4,
+  "method_count": 104,
+  "public": {
+    "constants": {
+      "CO2_FACTORS_KG_PER_TON_KM": {
+        "keys": [
+          "optimized_fleet",
+          "traditional_baseline",
+          "truck_heavy",
+          "truck_light",
+          "truck_medium"
+        ],
+        "length": 5,
+        "type": "dict"
+      },
+      "SEASON_EMOJI": {
+        "keys": [
+          "fall",
+          "spring",
+          "summer",
+          "winter"
+        ],
+        "length": 4,
+        "type": "dict"
+      },
+      "SEASON_MONTHS": {
+        "keys": [
+          "fall",
+          "spring",
+          "summer",
+          "winter"
+        ],
+        "length": 4,
+        "type": "dict"
+      },
+      "SEASON_NAMES": {
+        "keys": [
+          "fall",
+          "spring",
+          "summer",
+          "winter"
+        ],
+        "length": 4,
+        "type": "dict"
+      }
+    },
+    "methods": {
+      "add_seasonal_perturbation": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "label"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "start_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "end_sim_day"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "multiplier"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "backfill_forecast_actuals": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "begin_cycle": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_hour"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "activity_factor"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "n_supply_offers"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "n_demand_requests"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "1.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "seasonal_factor_avg"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "1",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "seasonal_month"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "1.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "base_seasonal_factor_avg"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "perturbation_count"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "1.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "perturbation_total_multiplier"
+          }
+        ],
+        "returns": "None"
+      },
+      "cache_clear": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "cache_stats": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "clear_method_prefs": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "clear_seasonal_perturbations": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "commit_cycle": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Dict[str, Any]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "kpi"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "wall_duration_ms"
+          }
+        ],
+        "returns": "None"
+      },
+      "compare_cycles": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id_a"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id_b"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "compare_materials": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_a"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_b"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "compare_routes": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "route_id_a"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "route_id_b"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "count_forecast_predictions": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "cycle_trend_comparison": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "5",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "early_window"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "5",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "late_window"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'co2_per_ton'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "deactivate_seasonal_perturbation": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "perturbation_id"
+          }
+        ],
+        "returns": "<class 'bool'>"
+      },
+      "delete_method_pref": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          }
+        ],
+        "returns": "<class 'bool'>"
+      },
+      "delete_runtime_config": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "key"
+          }
+        ],
+        "returns": "<class 'bool'>"
+      },
+      "delete_seasonal_perturbation": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "perturbation_id"
+          }
+        ],
+        "returns": "<class 'bool'>"
+      },
+      "detect_anomalous_cycles": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "2.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "z_threshold"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "5",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "min_history"
+          },
+          {
+            "annotation": "Optional[List[str]]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metrics"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "export_cycle_detail_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          }
+        ],
+        "returns": "Optional[str]"
+      },
+      "export_cycles_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "1000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          }
+        ],
+        "returns": "<class 'str'>"
+      },
+      "export_cycles_rows": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "1000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "export_matches_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          }
+        ],
+        "returns": "<class 'str'>"
+      },
+      "export_matches_rows": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "export_perturbed_supplies_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "False",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "only_perturbed"
+          }
+        ],
+        "returns": "<class 'str'>"
+      },
+      "export_routes_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          }
+        ],
+        "returns": "<class 'str'>"
+      },
+      "export_routes_rows": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "export_supplies_csv": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_metadata"
+          }
+        ],
+        "returns": "<class 'str'>"
+      },
+      "export_supplies_rows": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10000",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "forecast_llm_cost": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "7",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "horizon"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "14",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "history_n"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'linear'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "forecast_next_n_sim_days": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "7",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "horizon"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "14",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "history_n"
+          },
+          {
+            "annotation": "Optional[List[str]]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metrics"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'linear'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_active_perturbations": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_anomaly_summary": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "2.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "z_threshold"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "5",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "min_history"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_best_method": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          }
+        ],
+        "returns": "Optional[str]"
+      },
+      "get_carbon_savings_summary": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'traditional_baseline'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "baseline_factor_key"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cohort_by_hour_of_day": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cohort_retention_by_material": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_cohort_retention_by_period": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "4",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "n_periods"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'quartile'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "period_unit"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cohort_retention_by_region": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cohort_retention_by_season": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cohort_retention_crosstab": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "4",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "n_periods"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'quartile'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "period_unit"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cycle_detail": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "match_limit"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "match_offset"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "route_limit"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "route_offset"
+          }
+        ],
+        "returns": "Optional[Dict[str, Any]]"
+      },
+      "get_cycle_duration_by_problem_size": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cycle_duration_histogram": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cycle_duration_stats": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_cycle_history": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "50",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day_min"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day_max"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "False",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "has_matches_only"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_cycle_kpi_summary": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "last_n"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_db_info": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_db_stats": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_demand_aggregates": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "demand_id"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "100",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit_demands"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_efficiency_metrics": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_fleet_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_fleet_utilization_summary": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_forecast_calibration": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_forecast_calibration_trend": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'evaluated_at_day'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "bucket"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_kpi_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_llm_cost_by_decision_type": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_llm_cost_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_llm_decision_targets": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "decision_type"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "50",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_llm_decisions": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "decision_type"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "target_id"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day_min"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day_max"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_llm_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'demand_prediction'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "decision_type"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_maintenance_log": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "20",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_match_distance_buckets": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_match_distance_stats": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_material_aggregates": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "50",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_material_supply_demand_balance": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_material_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'matched_tons'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "200",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_method_prefs": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_monthly_efficiency_trend": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_perturbation_history": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "include_inactive"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_perturbation_impact": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "90",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_perturbation_impact_by_material": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_prediction_accuracy_by_day": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          },
+          {
+            "annotation": "Optional[List[Tuple[int, int]]]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "lead_time_buckets"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_created_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_created_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_recent_cycles": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_seasonal_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_seasonal_timeseries_by_material": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_solver_duration_by_season": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_solver_duration_by_season_status": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_solver_duration_by_status": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_solver_duration_trend": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "5",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "window_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_summary": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_supply_aggregates": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "supply_id"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "100",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit_supplies"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_supply_cohort_retention": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_cycles_by_efficiency": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'co2_per_ton'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "1",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "min_matches"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_demands_by_fulfillment": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'fulfillment_rate'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'float'>",
+            "default": "0.0",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "min_required_tons"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_facilities_by_distance": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'avg_distance'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[List[str]]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "facility_ids"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "city"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "facility_type"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_materials_by_volume": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'total_matched_tons'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_routes_by_efficiency": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'co2_per_km'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "vehicle_id"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_top_suppliers_by_efficiency": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'co2_per_ton'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "material_type"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "10",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "get_vehicle_stats": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "vehicle_id"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "100",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "get_vehicle_timeseries": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "vehicle_id"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'co2_per_km'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "since_sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "until_sim_day"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "100",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "limit"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "list_runtime_config_overrides": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "list_seasonal_perturbations": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'bool'>",
+            "default": "True",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "active_only"
+          }
+        ],
+        "returns": "List[Dict[str, Any]]"
+      },
+      "load_runtime_config": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "record_demand": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Dict[str, Any]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "demand"
+          }
+        ],
+        "returns": "None"
+      },
+      "record_forecast_predictions": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          },
+          {
+            "annotation": "List[Dict[str, Any]]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "predictions"
+          },
+          {
+            "annotation": "<class 'int'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "created_at_sim_day"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "record_llm_decision": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "decision_type"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "target_id"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "''",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "target_type"
+          },
+          {
+            "annotation": "Optional[float]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "multiplier"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "trend"
+          },
+          {
+            "annotation": "Optional[float]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "confidence"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "reason"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'unknown'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "source"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "raw_json"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_hour"
+          }
+        ],
+        "returns": "None"
+      },
+      "record_llm_decisions_batch": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "decision_type"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "target_type"
+          },
+          {
+            "annotation": "List[Dict[str, Any]]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "predictions"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_day"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "sim_hour"
+          }
+        ],
+        "returns": "<class 'int'>"
+      },
+      "record_match": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Dict[str, Any]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "match"
+          }
+        ],
+        "returns": "None"
+      },
+      "record_route": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Dict[str, Any]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "route"
+          }
+        ],
+        "returns": "None"
+      },
+      "record_supply": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "cycle_id"
+          },
+          {
+            "annotation": "Dict[str, Any]",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "supply"
+          }
+        ],
+        "returns": "None"
+      },
+      "save_method_pref": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "metric"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "method"
+          },
+          {
+            "annotation": "Optional[float]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "r_squared"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": "None",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "history_n"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "save_runtime_config": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "key"
+          },
+          {
+            "annotation": "Any",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "value"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "should_auto_vacuum": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      },
+      "vacuum": {
+        "kind": "method",
+        "params": [
+          {
+            "annotation": "",
+            "default": "<empty>",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<class 'str'>",
+            "default": "'manual'",
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "triggered_by"
+          }
+        ],
+        "returns": "Dict[str, Any]"
+      }
+    }
+  },
+  "structure": {
+    "mro": [
+      "Persistence",
+      "CycleMixin",
+      "LlmMixin",
+      "AnalyticsMixin",
+      "ExportMixin",
+      "StatsMixin",
+      "AnomalyMixin",
+      "MaintenanceMixin",
+      "ConfigMixin",
+      "ForecastMixin",
+      "PerturbationMixin",
+      "ComparisonMixin",
+      "SolverMixin",
+      "PersistenceBase",
+      "ForecastMathMixin",
+      "SharedQueryMixin",
+      "object"
+    ],
+    "owners": {
+      "AnalyticsMixin": [
+        "forecast_next_n_sim_days",
+        "get_efficiency_metrics",
+        "get_fleet_timeseries",
+        "get_kpi_timeseries",
+        "get_seasonal_timeseries",
+        "get_seasonal_timeseries_by_material",
+        "get_summary"
+      ],
+      "AnomalyMixin": [
+        "detect_anomalous_cycles",
+        "get_anomaly_summary"
+      ],
+      "ComparisonMixin": [
+        "compare_cycles",
+        "compare_materials",
+        "compare_routes",
+        "cycle_trend_comparison",
+        "get_top_facilities_by_distance"
+      ],
+      "ConfigMixin": [
+        "clear_method_prefs",
+        "delete_method_pref",
+        "delete_runtime_config",
+        "get_best_method",
+        "get_method_prefs",
+        "list_runtime_config_overrides",
+        "load_runtime_config",
+        "save_method_pref",
+        "save_runtime_config"
+      ],
+      "CycleMixin": [
+        "begin_cycle",
+        "commit_cycle",
+        "get_cycle_detail",
+        "get_cycle_history",
+        "get_monthly_efficiency_trend",
+        "get_recent_cycles",
+        "record_demand",
+        "record_match",
+        "record_route",
+        "record_supply"
+      ],
+      "ExportMixin": [
+        "export_cycle_detail_csv",
+        "export_cycles_csv",
+        "export_cycles_rows",
+        "export_matches_csv",
+        "export_matches_rows",
+        "export_perturbed_supplies_csv",
+        "export_routes_csv",
+        "export_routes_rows",
+        "export_supplies_csv",
+        "export_supplies_rows"
+      ],
+      "ForecastMixin": [
+        "backfill_forecast_actuals",
+        "count_forecast_predictions",
+        "get_forecast_calibration",
+        "get_forecast_calibration_trend",
+        "get_prediction_accuracy_by_day",
+        "record_forecast_predictions"
+      ],
+      "LlmMixin": [
+        "forecast_llm_cost",
+        "get_llm_cost_by_decision_type",
+        "get_llm_cost_timeseries",
+        "get_llm_decision_targets",
+        "get_llm_decisions",
+        "get_llm_timeseries",
+        "record_llm_decision",
+        "record_llm_decisions_batch"
+      ],
+      "MaintenanceMixin": [
+        "get_maintenance_log",
+        "should_auto_vacuum",
+        "vacuum"
+      ],
+      "PersistenceBase": [
+        "cache_clear",
+        "cache_stats"
+      ],
+      "PerturbationMixin": [
+        "add_seasonal_perturbation",
+        "clear_seasonal_perturbations",
+        "deactivate_seasonal_perturbation",
+        "delete_seasonal_perturbation",
+        "get_active_perturbations",
+        "get_perturbation_history",
+        "get_perturbation_impact",
+        "get_perturbation_impact_by_material",
+        "list_seasonal_perturbations"
+      ],
+      "SharedQueryMixin": [
+        "get_cycle_detail",
+        "get_cycle_history",
+        "get_summary"
+      ],
+      "SolverMixin": [
+        "get_cycle_duration_by_problem_size",
+        "get_solver_duration_by_season",
+        "get_solver_duration_by_season_status",
+        "get_solver_duration_by_status",
+        "get_solver_duration_trend"
+      ],
+      "StatsMixin": [
+        "get_carbon_savings_summary",
+        "get_cohort_by_hour_of_day",
+        "get_cohort_retention_by_material",
+        "get_cohort_retention_by_period",
+        "get_cohort_retention_by_region",
+        "get_cohort_retention_by_season",
+        "get_cohort_retention_crosstab",
+        "get_cycle_duration_histogram",
+        "get_cycle_duration_stats",
+        "get_cycle_kpi_summary",
+        "get_db_info",
+        "get_db_stats",
+        "get_demand_aggregates",
+        "get_fleet_utilization_summary",
+        "get_match_distance_buckets",
+        "get_match_distance_stats",
+        "get_material_aggregates",
+        "get_material_supply_demand_balance",
+        "get_material_timeseries",
+        "get_supply_aggregates",
+        "get_supply_cohort_retention",
+        "get_top_cycles_by_efficiency",
+        "get_top_demands_by_fulfillment",
+        "get_top_materials_by_volume",
+        "get_top_routes_by_efficiency",
+        "get_top_suppliers_by_efficiency",
+        "get_vehicle_stats",
+        "get_vehicle_timeseries"
+      ]
+    }
+  }
+}

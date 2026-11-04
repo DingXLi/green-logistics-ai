@@ -137,6 +137,13 @@ jobs:
       # coverage 报告: term-missing 给每个未覆盖的行号, xml 供 Codecov 上传
       # 35% 阈值: 现状 39% (as of iter #14), 随新测试递增
 
+    - name: Public API contract gate (iter #78)
+      run: |
+        # 公开 API 契约: 把「重构不改公开面」变成 CI 里的常驻不变量 (ADR-0010)。
+        # 任何方法增删 / 参数改名 / 默认值改动 / 公开常量变形 都会让这一步失败。
+        # 故意改 API 时: python scripts/gen_api_contract.py --write + 在 PR 里说明。
+        python scripts/gen_api_contract.py
+
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12'
       uses: codecov/codecov-action@v4
