@@ -144,6 +144,14 @@ jobs:
         # 故意改 API 时: python scripts/gen_api_contract.py --write + 在 PR 里说明。
         python scripts/gen_api_contract.py
 
+    - name: HTTP API contract gate (iter #79)
+      run: |
+        # HTTP 面契约: 客户调的那层接口也冻结 (ADR-0011)。
+        # 端点增删 / 路径改名 / 状态码 / 参数必填性 / 响应模型字段 /
+        # **admin 鉴权依赖被摘掉** —— 任何一条都会让这一步失败。
+        # 故意改 API 时: python scripts/gen_http_contract.py --write + 在 PR 里说明。
+        python scripts/gen_http_contract.py
+
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12'
       uses: codecov/codecov-action@v4

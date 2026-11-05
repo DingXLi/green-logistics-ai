@@ -1,0 +1,5017 @@
+{
+  "app_title": "Green Logistics AI",
+  "generated_by": "scripts/gen_http_contract.py",
+  "http_route_count": 136,
+  "models": {
+    "BatchOptimizeRequest": {
+      "field_count": 1,
+      "fields": {
+        "scenarios": {
+          "required": true,
+          "type": "array<ref:BatchScenarioRequest>"
+        }
+      }
+    },
+    "FleetStatusResponse": {
+      "field_count": 8,
+      "fields": {
+        "available": {
+          "required": true,
+          "type": "integer"
+        },
+        "avg_distance_to_depot_km": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "depot": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "en_route": {
+          "required": true,
+          "type": "integer"
+        },
+        "loading": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "total_distance_km": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "total_vehicles": {
+          "required": true,
+          "type": "integer"
+        },
+        "utilization_rate": {
+          "required": true,
+          "type": "number"
+        }
+      }
+    },
+    "HTTPValidationError": {
+      "field_count": 1,
+      "fields": {
+        "detail": {
+          "required": false,
+          "type": "array<ref:ValidationError>"
+        }
+      }
+    },
+    "OptimizationRequest": {
+      "field_count": 5,
+      "fields": {
+        "region": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "run_simulation": {
+          "required": false,
+          "type": "boolean"
+        },
+        "simulation_days": {
+          "required": false,
+          "type": "integer"
+        },
+        "use_real_roads": {
+          "required": false,
+          "type": "boolean"
+        },
+        "ws_broadcast": {
+          "required": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "OptimizationResponse": {
+      "field_count": 8,
+      "fields": {
+        "distance_source": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "matches_count": {
+          "required": true,
+          "type": "integer"
+        },
+        "optimization_id": {
+          "required": false,
+          "type": "anyOf"
+        },
+        "status": {
+          "required": true,
+          "type": "string"
+        },
+        "timestamp": {
+          "required": true,
+          "type": "string"
+        },
+        "total_co2_kg": {
+          "required": true,
+          "type": "number"
+        },
+        "total_cost_sek": {
+          "required": true,
+          "type": "number"
+        },
+        "total_tons": {
+          "required": true,
+          "type": "number"
+        }
+      }
+    },
+    "SupplyPoint": {
+      "field_count": 4,
+      "fields": {
+        "agent_id": {
+          "required": true,
+          "type": "string"
+        },
+        "location": {
+          "required": true,
+          "type": "object"
+        },
+        "material_type": {
+          "required": true,
+          "type": "string"
+        },
+        "stock_tons": {
+          "required": true,
+          "type": "number"
+        }
+      }
+    }
+  },
+  "openapi_version": "3.1.0",
+  "routes": [
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/auth/status",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "fmt",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "gzip",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "table",
+            "required": true,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/admin/db-export",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/db-info",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/db-maintenance",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/admin/db-maintenance/log",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/db-maintenance/recommendation",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/db-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "recent",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/admin/llm-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/llm-stats/reset",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "top",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/admin/perf-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/perf-stats/reset",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/persistence/cache",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/persistence/cache/clear",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/runtime-config",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "key",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "persist",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "value",
+            "required": true,
+            "type": "any"
+          }
+        ]
+      },
+      "path": "/api/admin/runtime-config",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "persist",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "updates",
+            "required": true,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/admin/runtime-config/apply",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/admin/runtime-config/overrides",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "clear_persisted",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/admin/runtime-config/reset",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "active_only",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/admin/seasonal-perturbations",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "end_sim_day",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "label",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "multiplier",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "name": "start_sim_day",
+            "required": true,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/admin/seasonal-perturbations",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "DELETE",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [
+          {
+            "name": "perturbation_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "query": []
+      },
+      "path": "/api/admin/seasonal-perturbations/{perturbation_id}",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [
+          {
+            "name": "perturbation_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "query": []
+      },
+      "path": "/api/admin/seasonal-perturbations/{perturbation_id}/deactivate",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "status_filter",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/admin/simulate/batch",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "days",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "dry_run",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/admin/simulate/batch",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [
+          {
+            "name": "task_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": []
+      },
+      "path": "/api/admin/simulate/batch/{task_id}",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/dashboard-summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "city",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "limit_per_panel",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/dashboard-top-summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/debug/llm",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "city",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "facility_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "include_distance_to_depot",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/facilities",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "city",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "facility_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "use_real_roads",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/facilities/distance-matrix",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/fleet",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "ref:FleetStatusResponse"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/fleet-snapshot",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/health/deep",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [
+          {
+            "name": "vehicle_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": [
+          {
+            "name": "hours",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/iot-telemetry/{vehicle_id}",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/materials",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/optimize",
+      "request_body": {
+        "required": false,
+        "schema": "ref:OptimizationRequest"
+      },
+      "responses": {
+        "200": "ref:OptimizationResponse",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/optimize/batch",
+      "request_body": {
+        "required": true,
+        "schema": "ref:BatchOptimizeRequest"
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "carbon_prices",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "time_limit_seconds",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "use_real_roads",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/optimize/carbon-scenarios",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/optimize/last",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "n_points",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "region",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "time_limit_seconds",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "use_real_roads",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/optimize/pareto",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "time_limit_seconds",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "use_real_roads",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "weight_co2",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "name": "weight_cost",
+            "required": false,
+            "type": "number"
+          }
+        ]
+      },
+      "path": "/api/optimize/sweet-spot",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "min_history",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "z_threshold",
+            "required": false,
+            "type": "number"
+          }
+        ]
+      },
+      "path": "/api/persistence/anomalous-cycles",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "min_history",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "z_threshold",
+            "required": false,
+            "type": "number"
+          }
+        ]
+      },
+      "path": "/api/persistence/anomaly-summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "baseline_factor_key",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/carbon-savings",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cohort-by-hour",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/cohort-retention-by-material",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "n_periods",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "period_unit",
+            "required": false,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/persistence/cohort-retention-by-period",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cohort-retention-by-region",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cohort-retention-by-season",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "n_periods",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "period_unit",
+            "required": false,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/persistence/cohort-retention-crosstab",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "cycle_id_a",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "cycle_id_b",
+            "required": true,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/persistence/compare-cycles",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_a",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "material_b",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/compare-materials",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "route_id_a",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "route_id_b",
+            "required": true,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/compare-routes",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [
+          {
+            "name": "cycle_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": [
+          {
+            "name": "match_limit",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "match_offset",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "route_limit",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "route_offset",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-detail/{cycle_id}",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-duration-by-problem-size",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-duration-histogram",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-duration-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "has_matches_only",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "sim_day_max",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "sim_day_min",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-history",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "last_n",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-kpi-summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "early_window",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "late_window",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/cycle-trend-comparison",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "demand_id",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/demand-aggregates",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/efficiency-metrics",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [
+          {
+            "name": "cycle_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/cycle-detail/{cycle_id}.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/cycles.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/cycles.json",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/cycles.ndjson",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/cycles.parquet",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/matches.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/matches.json",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/matches.ndjson",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/matches.parquet",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "only_perturbed",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/perturbed-supplies.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/routes.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/routes.json",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/routes.ndjson",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/routes.parquet",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_metadata",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/supplies.csv",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/supplies.json",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/supplies.ndjson",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/export/supplies.parquet",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/fleet-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/fleet-utilization-summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "history_n",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "horizon",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "method",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "metrics",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "method",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast-calibration",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "method",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast-calibration/trend",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "history_n",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "horizon",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "methods",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metrics",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast-confidence",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "DELETE",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": [
+          {
+            "name": "metric",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast-method-prefs",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/forecast-method-prefs",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "history_n",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "horizon",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "methods",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metrics",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/forecast/multi",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/kpi-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/llm-cost-by-type",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "history_n",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "horizon",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "method",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/llm-cost-forecast",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/llm-cost-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "decision_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/llm-decision-targets",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/match-distance-buckets",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/match-distance-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/material-aggregates",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/material-supply-demand-balance",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/material-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/monthly-efficiency-trend",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "include_inactive",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/perturbation-history",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/perturbation-impact",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/perturbation-impact-by-material",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "lead_time_buckets",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "method",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "since_created_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_created_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/prediction-accuracy-by-day",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/recent-cycles",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/seasonal-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/seasonal-timeseries-by-material",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/solver-duration-by-season",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/solver-duration-by-season-status",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/solver-duration-by-status",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "window_size",
+            "required": false,
+            "type": "integer"
+          }
+        ]
+      },
+      "path": "/api/persistence/solver-duration-trend",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/persistence/summary",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "supply_id",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/supply-aggregates",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/supply-cohort-retention",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "min_matches",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-cycles",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "min_required_tons",
+            "required": false,
+            "type": "number"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-demands",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "city",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "facility_ids",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "facility_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-facilities",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-materials",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "vehicle_id",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-routes",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "material_type",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-suppliers",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/persistence/top-vehicles",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "vehicle_id",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/vehicle-stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "metric",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "since_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "until_sim_day",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "vehicle_id",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/persistence/vehicle-timeseries",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/regions",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "action",
+            "required": false,
+            "type": "string"
+          }
+        ]
+      },
+      "path": "/api/scheduler/control",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/scheduler/status",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "sim_day",
+            "required": false,
+            "type": "anyOf"
+          }
+        ]
+      },
+      "path": "/api/seasonal-factors",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "country",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "use_cache",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/signals/external",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "days",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "dry_run",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/simulate/run",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/status",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "object"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/supply-points",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "array<ref:SupplyPoint>"
+      },
+      "status_codes": [
+        "200"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": [
+          {
+            "name": "lat",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "name": "lon",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "name": "use_cache",
+            "required": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "path": "/api/weather",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/ws/stats",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": true,
+      "deprecated": false,
+      "method": "POST",
+      "params": {
+        "cookie": [],
+        "header": [
+          {
+            "name": "X-Admin-Token",
+            "required": false,
+            "type": "anyOf"
+          },
+          {
+            "name": "authorization",
+            "required": false,
+            "type": "anyOf"
+          }
+        ],
+        "path": [],
+        "query": []
+      },
+      "path": "/api/ws/stats/reset",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any",
+        "422": "ref:HTTPValidationError"
+      },
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    {
+      "admin_protected": false,
+      "deprecated": false,
+      "method": "GET",
+      "params": {
+        "cookie": [],
+        "header": [],
+        "path": [],
+        "query": []
+      },
+      "path": "/health",
+      "request_body": {
+        "required": false,
+        "schema": ""
+      },
+      "responses": {
+        "200": "any"
+      },
+      "status_codes": [
+        "200"
+      ]
+    }
+  ],
+  "websocket_routes": [
+    "/ws/cycle-updates"
+  ]
+}

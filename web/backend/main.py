@@ -1987,25 +1987,47 @@ async def get_auth_status():
 
 def _get_protected_endpoints() -> list:
     """
-    Return the static list of endpoints currently protected by ``require_admin``.
+    Return the list of endpoints currently protected by ``require_admin``.
 
-    iter #36: Single source of truth for both runtime auth and the
-    ``/api/admin/auth/status`` discovery endpoint.
+    iter #79: **从真实路由表推导**，不再手工维护字面量清单。
 
-    The list is computed at call time (cheap — just a list literal) so that
-    if a future iteration adds a new protected endpoint, this single source
-    stays in sync via this function. The list itself is defined at module
-    import, but the function call indirection means tests can patch it if
-    needed.
+    iter #36 的时候这里是 19 行硬编码列表，注释写着「keep in sync with all
+    ``Depends(require_admin)`` usages above」—— 靠人肉同步。iter #79 的 HTTP
+    契约测试一上来就抓到它已经漂了：实际受保护的端点有 29 个路由，清单里只有 19 条，
+    漏掉了 ``/api/admin/persistence/cache*``、``/api/admin/runtime-config/reset``、
+    ``/api/admin/simulate/batch*`` 等路径。
+
+    漏报的代价是真实的：``/api/admin/auth/status`` 是给客户端「发现哪些端点需要
+    token」用的公开清单，漏一个 = 客户端以为自己没权限 / 或者安全审计看漏了入口。
+
+    推导方式：遍历 ``app.routes``，看每个路由的依赖树里有没有 ``require_admin``。
+    这跟运行时鉴权用的是**同一份依赖声明**，所以「清单」和「实际行为」在结构上
+    就不可能再漂移 —— 单一事实来源终于名副其实。
+
+    仍然保留一份 fallback 列表：万一在 app 还没建好的时候被调用（比如 import
+    期间），至少不会抛异常。
     """
-    # NOTE: keep in sync with all ``Depends(require_admin)`` usages above.
-    # When you add a new protected endpoint, add it here too — the auth/status
-    # endpoint will then expose it for client discovery.
+    derived = []
+    for route in getattr(app, "routes", []):
+        dependant = getattr(route, "dependant", None)
+        if dependant is None:
+            continue
+        for dep in getattr(dependant, "dependencies", []) or []:
+            call = getattr(dep, "call", None)
+            if getattr(call, "__name__", None) == "require_admin":
+                path = getattr(route, "path", None)
+                if path and path not in derived:
+                    derived.append(path)
+                break
+    if derived:
+        return sorted(derived)
+
+    # fallback（app 尚未就绪时）：iter #36 时代的最小集合
     return [
         "/api/ws/stats",
         "/api/ws/stats/reset",
         "/api/debug/llm",
-        "/api/persistence/forecast-method-prefs",  # GET (DELETE also protected)
+        "/api/persistence/forecast-method-prefs",
         "/api/admin/db-maintenance",
         "/api/admin/db-export",
         "/api/admin/db-stats",
@@ -2014,16 +2036,12 @@ def _get_protected_endpoints() -> list:
         "/api/admin/perf-stats/reset",
         "/api/admin/llm-stats",
         "/api/admin/llm-stats/reset",
-        # iter #37: seasonal perturbation endpoints (CRUD)
         "/api/admin/seasonal-perturbations",
-        # iter #42: db-maintenance recommendation + log
         "/api/admin/db-maintenance/recommendation",
         "/api/admin/db-maintenance/log",
-        # iter #43: runtime config
-        "/api/admin/runtime-config",  # GET, POST (also reset)
-        # iter #44: runtime config batch + overrides
-        "/api/admin/runtime-config/apply",  # POST
-        "/api/admin/runtime-config/overrides",  # GET
+        "/api/admin/runtime-config",
+        "/api/admin/runtime-config/apply",
+        "/api/admin/runtime-config/overrides",
     ]
 
 
