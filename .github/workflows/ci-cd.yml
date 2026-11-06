@@ -152,6 +152,15 @@ jobs:
         # 故意改 API 时: python scripts/gen_http_contract.py --write + 在 PR 里说明。
         python scripts/gen_http_contract.py
 
+    - name: HTTP payload shape gate (iter #80)
+      run: |
+        # 响应体运行时形状契约: 补上 ADR-0011 自己写下的已知边界
+        # (绝大多数端点响应是 Dict[str, Any], OpenAPI 对响应体字段是瞎的)。
+        # **字段被删 / 类型被加宽(原来 integer 现在可能是 null) / 类型被替换**
+        # —— 任何一条都会让这一步失败; 新增字段只打印不阻断。
+        # 故意改响应体结构时: python scripts/gen_payload_shapes.py --write + 在 PR 里说明。
+        python scripts/gen_payload_shapes.py
+
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12'
       uses: codecov/codecov-action@v4

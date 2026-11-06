@@ -1,0 +1,5311 @@
+{
+  "endpoints": {
+    "GET /api/admin/auth/status": {
+      "shape": {
+        "fields": {
+          "auth_enabled": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "header_formats": {
+            "items": {
+              "types": [
+                "string"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "protected_endpoint_count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "protected_endpoints": {
+            "items": {
+              "types": [
+                "string"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "token_length": {
+            "types": [
+              "integer"
+            ]
+          },
+          "token_preview": {
+            "types": [
+              "string"
+            ]
+          },
+          "usage_hint": {
+            "types": [
+              "string"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/db-info": {
+      "shape": {
+        "fields": {
+          "auto_vacuum_mode": {
+            "types": [
+              "string"
+            ]
+          },
+          "db_exists": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "db_modified_at": {
+            "types": [
+              "string"
+            ]
+          },
+          "db_path": {
+            "types": [
+              "string"
+            ]
+          },
+          "db_size_bytes": {
+            "types": [
+              "integer"
+            ]
+          },
+          "db_size_mb": {
+            "types": [
+              "number"
+            ]
+          },
+          "index_count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "md5_checksum_first_100kb": {
+            "types": [
+              "string"
+            ]
+          },
+          "schema_version": {
+            "types": [
+              "integer"
+            ]
+          },
+          "sqlite_version": {
+            "types": [
+              "string"
+            ]
+          },
+          "table_counts": {
+            "fields": {
+              "demand_requests": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "llm_decisions": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "optimization_cycles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "routes": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "supply_offers": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "time_range": {
+            "fields": {
+              "newest_cycle": {
+                "types": [
+                  "string"
+                ]
+              },
+              "oldest_cycle": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "total_rows": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/db-maintenance/log": {
+      "shape": {
+        "fields": {
+          "entries": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "n_entries": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/db-maintenance/recommendation": {
+      "shape": {
+        "fields": {
+          "reasons": {
+            "items": {
+              "types": [
+                "string"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "should_vacuum": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "stats": {
+            "fields": {
+              "days_since_last_vacuum": {
+                "types": [
+                  "null"
+                ]
+              },
+              "db_size_bytes": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "db_size_mb": {
+                "types": [
+                  "number"
+                ]
+              },
+              "last_vacuum_at": {
+                "types": [
+                  "null"
+                ]
+              },
+              "size_after_last_vacuum_bytes": {
+                "types": [
+                  "null"
+                ]
+              },
+              "size_growth_pct_since_last_vacuum": {
+                "types": [
+                  "null"
+                ]
+              },
+              "total_cycles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_maintenance_runs": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/db-stats": {
+      "shape": {
+        "fields": {
+          "db_path": {
+            "types": [
+              "string"
+            ]
+          },
+          "db_size_bytes": {
+            "types": [
+              "integer"
+            ]
+          },
+          "db_size_mb": {
+            "types": [
+              "number"
+            ]
+          },
+          "indexes": {
+            "items": {
+              "fields": {
+                "name": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "table": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "table_counts": {
+            "fields": {
+              "demand_requests": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "llm_decisions": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "optimization_cycles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "routes": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "supply_offers": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "time_range": {
+            "fields": {
+              "newest_cycle": {
+                "types": [
+                  "string"
+                ]
+              },
+              "oldest_cycle": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "total_rows": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/llm-stats": {
+      "shape": {
+        "fields": {
+          "avg_tokens_per_call": {
+            "types": [
+              "number"
+            ]
+          },
+          "buffer_max": {
+            "types": [
+              "integer"
+            ]
+          },
+          "buffer_size": {
+            "types": [
+              "integer"
+            ]
+          },
+          "by_caller": {
+            "types": [
+              "object"
+            ]
+          },
+          "by_model": {
+            "types": [
+              "object"
+            ]
+          },
+          "error_rate_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "recent": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "total_calls": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_candidate_tokens": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_cost_usd": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_errors": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_prompt_tokens": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_tokens": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/perf-stats": {
+      "shape": {
+        "fields": {
+          "buffer_size_per_endpoint": {
+            "types": [
+              "integer"
+            ]
+          },
+          "endpoints": {
+            "items": {
+              "fields": {
+                "avg_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "endpoint": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "error_rate_pct": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "last_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "max_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "min_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "n_calls": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "n_errors": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "p50_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "p95_ms": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "p99_ms": {
+                  "types": [
+                    "number"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "error_rate_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_errors": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_requests": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/persistence/cache": {
+      "shape": {
+        "fields": {
+          "n_active": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_entries": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_expired": {
+            "types": [
+              "integer"
+            ]
+          },
+          "ttl_seconds": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/runtime-config": {
+      "shape": {
+        "fields": {
+          "items": {
+            "items": {
+              "fields": {
+                "default": {
+                  "types": [
+                    "boolean",
+                    "integer",
+                    "null",
+                    "number"
+                  ]
+                },
+                "key": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "modified": {
+                  "types": [
+                    "boolean"
+                  ]
+                },
+                "type": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "value": {
+                  "types": [
+                    "boolean",
+                    "integer",
+                    "null",
+                    "number"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "n_keys": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/runtime-config/overrides": {
+      "shape": {
+        "fields": {
+          "n_overrides": {
+            "types": [
+              "integer"
+            ]
+          },
+          "overrides": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/admin/seasonal-perturbations": {
+      "shape": {
+        "fields": {
+          "active_count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "perturbations": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/dashboard-summary": {
+      "shape": {
+        "fields": {
+          "efficiency": {
+            "fields": {
+              "avg_co2_per_cycle": {
+                "types": [
+                  "number"
+                ]
+              },
+              "avg_cost_per_cycle": {
+                "types": [
+                  "number"
+                ]
+              },
+              "avg_fleet_util_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "avg_tons_per_cycle": {
+                "types": [
+                  "number"
+                ]
+              },
+              "co2_per_ton_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cost_per_ton_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cycles_with_matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "match_rate_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "max_sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "min_sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_cycles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "fleet": {
+            "fields": {
+              "avg_utilization_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cycles": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "health": {
+            "fields": {
+              "environment": {
+                "types": [
+                  "string"
+                ]
+              },
+              "features": {
+                "fields": {
+                  "carbon_scenarios": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "real_sweden_facilities": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "scheduler_enabled": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "seasonal_factors": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "websocket_enabled": {
+                    "types": [
+                      "boolean"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "status": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "last_cycle": {
+            "types": [
+              "null"
+            ]
+          },
+          "scheduler": {
+            "fields": {
+              "enabled": {
+                "types": [
+                  "boolean"
+                ]
+              },
+              "reason": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "summary": {
+            "fields": {
+              "avg_utilization": {
+                "types": [
+                  "number"
+                ]
+              },
+              "llm_decisions": {
+                "fields": {
+                  "n_fallback": {
+                    "types": [
+                      "null"
+                    ]
+                  },
+                  "n_real_llm": {
+                    "types": [
+                      "null"
+                    ]
+                  },
+                  "n_total": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_types": {
+                    "types": [
+                      "integer"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "n_cycles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "timestamp": {
+            "types": [
+              "string"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/dashboard-top-summary": {
+      "shape": {
+        "fields": {
+          "cache": {
+            "fields": {
+              "n_active": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_entries": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_expired": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "ttl_seconds": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "compare_preview": {
+            "fields": {
+              "cycle_a": {
+                "types": [
+                  "string"
+                ]
+              },
+              "cycle_b": {
+                "types": [
+                  "string"
+                ]
+              },
+              "winner": {
+                "fields": {
+                  "highest_fleet_utilization_pct": {
+                    "types": [
+                      "object"
+                    ]
+                  },
+                  "lowest_co2_per_ton_kg": {
+                    "types": [
+                      "object"
+                    ]
+                  },
+                  "lowest_cost_per_ton_sek": {
+                    "types": [
+                      "object"
+                    ]
+                  },
+                  "most_matches": {
+                    "types": [
+                      "object"
+                    ]
+                  },
+                  "most_tons": {
+                    "types": [
+                      "object"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "limit_per_panel": {
+            "types": [
+              "integer"
+            ]
+          },
+          "source": {
+            "types": [
+              "string"
+            ]
+          },
+          "timestamp": {
+            "types": [
+              "string"
+            ]
+          },
+          "top_cycles": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "object"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_demands": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "unknown"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_facilities": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "unknown"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_materials": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "unknown"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_routes": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "unknown"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_suppliers": {
+            "fields": {
+              "metric": {
+                "types": [
+                  "string"
+                ]
+              },
+              "metric_description": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_evaluated": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "top": {
+                "items": {
+                  "types": [
+                    "unknown"
+                  ]
+                },
+                "types": [
+                  "array"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/facilities": {
+      "shape": {
+        "fields": {
+          "depot": {
+            "fields": {
+              "city": {
+                "types": [
+                  "string"
+                ]
+              },
+              "lat": {
+                "types": [
+                  "number"
+                ]
+              },
+              "lon": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "facilities": {
+            "items": {
+              "fields": {
+                "city": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "distance_to_depot_km": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "facility_type": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "id": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "lat": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "lon": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "name": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "operator": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "preferred_materials": {
+                  "types": [
+                    "array"
+                  ]
+                },
+                "processing_capacity_tons_per_day": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "source": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "facility_type_counts": {
+            "fields": {
+              "concrete_recycling": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "harbor_cargo": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "metal_recovery": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "paper_mill": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "plastic_recycling": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "recycling_center": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "textile_recycling": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "waste_to_energy": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "total": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_available": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/fleet": {
+      "shape": {
+        "fields": {
+          "available": {
+            "types": [
+              "integer"
+            ]
+          },
+          "avg_distance_to_depot_km": {
+            "types": [
+              "number"
+            ]
+          },
+          "depot": {
+            "fields": {
+              "lat": {
+                "types": [
+                  "number"
+                ]
+              },
+              "lon": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "en_route": {
+            "types": [
+              "integer"
+            ]
+          },
+          "loading": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_distance_km": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_vehicles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "utilization_rate": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/materials": {
+      "shape": {
+        "fields": {
+          "data_source": {
+            "types": [
+              "string"
+            ]
+          },
+          "materials": {
+            "items": {
+              "fields": {
+                "material": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "per_capita_kg": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "seasonal_factor_max": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "seasonal_factor_min": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "seasonal_pattern": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "seasonal_peak_month": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "source": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "total_kt_per_year": {
+                  "types": [
+                    "integer"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "n_materials": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/anomalous-cycles": {
+      "shape": {
+        "fields": {
+          "anomalies": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "min_history": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_anomalous": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_total_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "z_threshold": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/anomaly-summary": {
+      "shape": {
+        "fields": {
+          "anomaly_rate_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "cycles_with_multiple_anomalies": {
+            "types": [
+              "integer"
+            ]
+          },
+          "insufficient_history": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "min_history": {
+            "types": [
+              "integer"
+            ]
+          },
+          "most_common_metric": {
+            "types": [
+              "null"
+            ]
+          },
+          "most_common_severity": {
+            "types": [
+              "null"
+            ]
+          },
+          "multi_anomaly_rate_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "n_anomalous_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_total_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "per_metric_counts": {
+            "fields": {
+              "fleet_utilization_pct": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "per_metric_pct": {
+            "fields": {
+              "fleet_utilization_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "per_severity_counts": {
+            "fields": {
+              "high": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "low": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "medium": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "top_anomalous_metrics": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "total_anomaly_events": {
+            "types": [
+              "integer"
+            ]
+          },
+          "z_threshold": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/carbon-savings": {
+      "shape": {
+        "fields": {
+          "actual_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "available_factors": {
+            "items": {
+              "types": [
+                "string"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "baseline_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "baseline_factor_key": {
+            "types": [
+              "string"
+            ]
+          },
+          "baseline_factor_kg_per_ton_km": {
+            "types": [
+              "number"
+            ]
+          },
+          "co2_per_ton_actual_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "co2_per_ton_baseline_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "n_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "savings_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "savings_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "since_sim_day": {
+            "types": [
+              "null"
+            ]
+          },
+          "total_distance_km": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_tons": {
+            "types": [
+              "number"
+            ]
+          },
+          "until_sim_day": {
+            "types": [
+              "null"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/compare-cycles": {
+      "shape": {
+        "fields": {
+          "cycle_a": {
+            "fields": {
+              "activity_factor": {
+                "types": [
+                  "number"
+                ]
+              },
+              "avg_tons_per_match": {
+                "types": [
+                  "number"
+                ]
+              },
+              "base_seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "co2_per_km_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "co2_per_ton_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cost_per_km_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cost_per_ton_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "fleet_utilization_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "n_demand_requests": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_supply_offers": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_available": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_used": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_count": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_total_multiplier": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_month": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_hour": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "solver_status": {
+                "types": [
+                  "string"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              },
+              "wall_duration_ms": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "wall_timestamp": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "cycle_b": {
+            "fields": {
+              "activity_factor": {
+                "types": [
+                  "number"
+                ]
+              },
+              "avg_tons_per_match": {
+                "types": [
+                  "number"
+                ]
+              },
+              "base_seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "co2_per_km_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "co2_per_ton_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cost_per_km_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cost_per_ton_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "fleet_utilization_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "n_demand_requests": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_supply_offers": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_available": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_used": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_count": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_total_multiplier": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_month": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_hour": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "solver_status": {
+                "types": [
+                  "string"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              },
+              "wall_duration_ms": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "wall_timestamp": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "differences": {
+            "fields": {
+              "absolute": {
+                "fields": {
+                  "avg_tons_per_match": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "co2_per_km_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "co2_per_ton_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cost_per_km_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cost_per_ton_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "fleet_utilization_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_demand_requests": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_matches": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_supply_offers": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_vehicles_available": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_vehicles_used": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "total_co2_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_cost_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_distance_km": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_tons": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "pct_change": {
+                "fields": {
+                  "avg_tons_per_match": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "co2_per_km_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "co2_per_ton_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cost_per_km_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cost_per_ton_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "fleet_utilization_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_demand_requests": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_matches": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_supply_offers": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_vehicles_available": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "n_vehicles_used": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_co2_kg": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_cost_sek": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_distance_km": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "total_tons": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "winner": {
+            "fields": {
+              "highest_fleet_utilization_pct": {
+                "fields": {
+                  "a_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "b_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_abs": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cycle_id": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "direction": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "lowest_co2_per_ton_kg": {
+                "fields": {
+                  "a_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "b_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_abs": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cycle_id": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "direction": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "lowest_cost_per_ton_sek": {
+                "fields": {
+                  "a_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "b_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_abs": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cycle_id": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "direction": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "most_matches": {
+                "fields": {
+                  "a_value": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "b_value": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "by_abs": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "by_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cycle_id": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "direction": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "most_tons": {
+                "fields": {
+                  "a_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "b_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_abs": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "by_pct": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "cycle_id": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "direction": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/cycle-detail/ci-fixture-cycle-001": {
+      "shape": {
+        "fields": {
+          "cycle": {
+            "fields": {
+              "activity_factor": {
+                "types": [
+                  "number"
+                ]
+              },
+              "base_seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "fleet_utilization_pct": {
+                "types": [
+                  "number"
+                ]
+              },
+              "id": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_demand_requests": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_supply_offers": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_available": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_vehicles_used": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_count": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "perturbation_total_multiplier": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_factor_avg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "seasonal_month": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_hour": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "solver_status": {
+                "types": [
+                  "string"
+                ]
+              },
+              "total_co2_kg": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              },
+              "wall_duration_ms": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "wall_timestamp": {
+                "types": [
+                  "string"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "demand_requests": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "matches": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "pagination": {
+            "fields": {
+              "matches": {
+                "fields": {
+                  "has_more": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "limit": {
+                    "types": [
+                      "null"
+                    ]
+                  },
+                  "offset": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "total": {
+                    "types": [
+                      "integer"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "routes": {
+                "fields": {
+                  "has_more": {
+                    "types": [
+                      "boolean"
+                    ]
+                  },
+                  "limit": {
+                    "types": [
+                      "null"
+                    ]
+                  },
+                  "offset": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "total": {
+                    "types": [
+                      "integer"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "routes": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "supply_offers": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/cycle-duration-stats": {
+      "shape": {
+        "fields": {
+          "fast_cycles_count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "max_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "mean_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "median_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "min_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "n_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "p25_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "p50_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "p75_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "p90_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "p95_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "p99_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "since_sim_day": {
+            "types": [
+              "null"
+            ]
+          },
+          "slow_cycles_count": {
+            "types": [
+              "integer"
+            ]
+          },
+          "stddev_ms": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_solver_time_seconds": {
+            "types": [
+              "number"
+            ]
+          },
+          "until_sim_day": {
+            "types": [
+              "null"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/cycle-history": {
+      "shape": {
+        "items": {
+          "fields": {
+            "activity_factor": {
+              "types": [
+                "number"
+              ]
+            },
+            "cycle_id": {
+              "types": [
+                "string"
+              ]
+            },
+            "fleet_utilization_pct": {
+              "types": [
+                "number"
+              ]
+            },
+            "n_demand_requests": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_matches": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_routes": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_supply_offers": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_vehicles_available": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_vehicles_used": {
+              "types": [
+                "integer"
+              ]
+            },
+            "seasonal_factor_avg": {
+              "types": [
+                "number"
+              ]
+            },
+            "seasonal_month": {
+              "types": [
+                "integer"
+              ]
+            },
+            "sim_day": {
+              "types": [
+                "integer"
+              ]
+            },
+            "sim_hour": {
+              "types": [
+                "integer"
+              ]
+            },
+            "solver_status": {
+              "types": [
+                "string"
+              ]
+            },
+            "total_co2_kg": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_cost_sek": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_distance_km": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_tons": {
+              "types": [
+                "number"
+              ]
+            },
+            "wall_duration_ms": {
+              "types": [
+                "integer"
+              ]
+            },
+            "wall_timestamp": {
+              "types": [
+                "string"
+              ]
+            }
+          },
+          "types": [
+            "object"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/cycle-kpi-summary": {
+      "shape": {
+        "fields": {
+          "avg_co2_per_ton_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "avg_cost_per_ton_sek": {
+            "types": [
+              "number"
+            ]
+          },
+          "avg_tons_per_cycle": {
+            "types": [
+              "number"
+            ]
+          },
+          "best_cycle": {
+            "fields": {
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "filter": {
+            "fields": {
+              "last_n": {
+                "types": [
+                  "null"
+                ]
+              },
+              "since_sim_day": {
+                "types": [
+                  "null"
+                ]
+              },
+              "until_sim_day": {
+                "types": [
+                  "null"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "fleet_utilization_avg_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "last_cycle": {
+            "fields": {
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "n_matches": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "n_cycles_with_matches": {
+            "types": [
+              "integer"
+            ]
+          },
+          "sim_day_range": {
+            "fields": {
+              "max": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "min": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "total_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_cost_sek": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_distance_km": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_tons_matched": {
+            "types": [
+              "number"
+            ]
+          },
+          "worst_cycle": {
+            "fields": {
+              "cycle_id": {
+                "types": [
+                  "string"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_cost_sek": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_tons": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/demand-aggregates": {
+      "shape": {
+        "items": {
+          "types": [
+            "unknown"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/efficiency-metrics": {
+      "shape": {
+        "fields": {
+          "avg_co2_per_cycle": {
+            "types": [
+              "number"
+            ]
+          },
+          "avg_cost_per_cycle": {
+            "types": [
+              "number"
+            ]
+          },
+          "avg_fleet_util_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "avg_tons_per_cycle": {
+            "types": [
+              "number"
+            ]
+          },
+          "co2_per_ton_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "cost_per_ton_sek": {
+            "types": [
+              "number"
+            ]
+          },
+          "cycles_with_matches": {
+            "types": [
+              "integer"
+            ]
+          },
+          "match_rate_pct": {
+            "types": [
+              "number"
+            ]
+          },
+          "max_sim_day": {
+            "types": [
+              "integer"
+            ]
+          },
+          "min_sim_day": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_cost_sek": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_tons": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/fleet-utilization-summary": {
+      "shape": {
+        "fields": {
+          "max": {
+            "types": [
+              "number"
+            ]
+          },
+          "mean": {
+            "types": [
+              "number"
+            ]
+          },
+          "median": {
+            "types": [
+              "number"
+            ]
+          },
+          "min": {
+            "types": [
+              "number"
+            ]
+          },
+          "n_busy_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_idle_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "p10": {
+            "types": [
+              "number"
+            ]
+          },
+          "p25": {
+            "types": [
+              "number"
+            ]
+          },
+          "p50": {
+            "types": [
+              "number"
+            ]
+          },
+          "p75": {
+            "types": [
+              "number"
+            ]
+          },
+          "p90": {
+            "types": [
+              "number"
+            ]
+          },
+          "p99": {
+            "types": [
+              "number"
+            ]
+          },
+          "since_sim_day": {
+            "types": [
+              "null"
+            ]
+          },
+          "stddev": {
+            "types": [
+              "number"
+            ]
+          },
+          "until_sim_day": {
+            "types": [
+              "null"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/forecast": {
+      "shape": {
+        "fields": {
+          "forecast_sim_days": {
+            "items": {
+              "types": [
+                "integer"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "history_n": {
+            "types": [
+              "integer"
+            ]
+          },
+          "horizon": {
+            "types": [
+              "integer"
+            ]
+          },
+          "last_sim_day": {
+            "types": [
+              "integer"
+            ]
+          },
+          "method": {
+            "types": [
+              "string"
+            ]
+          },
+          "metrics": {
+            "fields": {
+              "co2_kg": {
+                "fields": {
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "intercept": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mean_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "r_squared": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "residual_std": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "slope_per_day": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "trend": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "cost_sek": {
+                "fields": {
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "intercept": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mean_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "r_squared": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "residual_std": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "slope_per_day": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "trend": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "matches": {
+                "fields": {
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "intercept": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mean_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "r_squared": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "residual_std": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "slope_per_day": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "trend": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "util_pct": {
+                "fields": {
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "intercept": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mean_value": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "r_squared": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "residual_std": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "slope_per_day": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "trend": {
+                    "types": [
+                      "string"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/forecast-confidence": {
+      "shape": {
+        "fields": {
+          "confidence": {
+            "fields": {
+              "co2_kg": {
+                "fields": {
+                  "best_method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "n_methods": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "per_method_quality": {
+                    "types": [
+                      "object"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "cost_sek": {
+                "fields": {
+                  "best_method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "n_methods": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "per_method_quality": {
+                    "types": [
+                      "object"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "matches": {
+                "fields": {
+                  "best_method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "n_methods": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "per_method_quality": {
+                    "types": [
+                      "object"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "util_pct": {
+                "fields": {
+                  "best_method": {
+                    "types": [
+                      "string"
+                    ]
+                  },
+                  "forecast": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "history": {
+                    "types": [
+                      "array"
+                    ]
+                  },
+                  "n_methods": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "per_method_quality": {
+                    "types": [
+                      "object"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "forecast_sim_days": {
+            "items": {
+              "types": [
+                "integer"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "history_n": {
+            "types": [
+              "integer"
+            ]
+          },
+          "horizon": {
+            "types": [
+              "integer"
+            ]
+          },
+          "last_sim_day": {
+            "types": [
+              "integer"
+            ]
+          },
+          "methods": {
+            "items": {
+              "types": [
+                "string"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/kpi-timeseries": {
+      "shape": {
+        "items": {
+          "fields": {
+            "co2_kg": {
+              "types": [
+                "number"
+              ]
+            },
+            "co2_per_ton_kg": {
+              "types": [
+                "number"
+              ]
+            },
+            "cost_per_match_sek": {
+              "types": [
+                "number"
+              ]
+            },
+            "cost_per_ton_sek": {
+              "types": [
+                "number"
+              ]
+            },
+            "cost_sek": {
+              "types": [
+                "number"
+              ]
+            },
+            "matches": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_cycles_in_day": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_demand_requests": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_supply_offers": {
+              "types": [
+                "integer"
+              ]
+            },
+            "sim_day": {
+              "types": [
+                "integer"
+              ]
+            },
+            "supply_demand_ratio": {
+              "types": [
+                "number"
+              ]
+            },
+            "tons": {
+              "types": [
+                "number"
+              ]
+            },
+            "util_pct": {
+              "types": [
+                "number"
+              ]
+            }
+          },
+          "types": [
+            "object"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/llm-cost-timeseries": {
+      "shape": {
+        "fields": {
+          "rows": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "since_sim_day": {
+            "types": [
+              "null"
+            ]
+          },
+          "until_sim_day": {
+            "types": [
+              "null"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/llm-decision-targets": {
+      "shape": {
+        "fields": {
+          "decision_type": {
+            "types": [
+              "null"
+            ]
+          },
+          "limit": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_targets": {
+            "types": [
+              "integer"
+            ]
+          },
+          "targets": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/match-distance-stats": {
+      "shape": {
+        "fields": {
+          "avg_distance_km": {
+            "types": [
+              "null"
+            ]
+          },
+          "distance_distribution": {
+            "fields": {
+              "long_50-100km": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "medium_10-50km": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "short_<10km": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "very_long_>=100km": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "max_distance_km": {
+            "types": [
+              "null"
+            ]
+          },
+          "median_distance_km": {
+            "types": [
+              "null"
+            ]
+          },
+          "min_distance_km": {
+            "types": [
+              "null"
+            ]
+          },
+          "n_cycles_with_matches": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_matches": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/material-aggregates": {
+      "shape": {
+        "items": {
+          "types": [
+            "unknown"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/perturbation-impact": {
+      "shape": {
+        "fields": {
+          "cycles": {
+            "items": {
+              "fields": {
+                "base_seasonal_factor_avg": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "delta": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "perturbation_count": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "perturbation_total_multiplier": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "seasonal_factor_avg": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "sim_day": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "wall_timestamp": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "summary": {
+            "fields": {
+              "avg_delta": {
+                "types": [
+                  "number"
+                ]
+              },
+              "max_delta": {
+                "types": [
+                  "number"
+                ]
+              },
+              "max_total_multiplier": {
+                "types": [
+                  "number"
+                ]
+              },
+              "min_delta": {
+                "types": [
+                  "number"
+                ]
+              },
+              "n_cycles_total": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_cycles_with_perturbation": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "window_end": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "window_start": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/recent-cycles": {
+      "shape": {
+        "items": {
+          "fields": {
+            "activity_factor": {
+              "types": [
+                "number"
+              ]
+            },
+            "base_seasonal_factor_avg": {
+              "types": [
+                "number"
+              ]
+            },
+            "cycle_id": {
+              "types": [
+                "string"
+              ]
+            },
+            "fleet_utilization_pct": {
+              "types": [
+                "number"
+              ]
+            },
+            "id": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_demand_requests": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_matches": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_supply_offers": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_vehicles_available": {
+              "types": [
+                "integer"
+              ]
+            },
+            "n_vehicles_used": {
+              "types": [
+                "integer"
+              ]
+            },
+            "perturbation_count": {
+              "types": [
+                "integer"
+              ]
+            },
+            "perturbation_total_multiplier": {
+              "types": [
+                "number"
+              ]
+            },
+            "seasonal_factor_avg": {
+              "types": [
+                "number"
+              ]
+            },
+            "seasonal_month": {
+              "types": [
+                "integer"
+              ]
+            },
+            "sim_day": {
+              "types": [
+                "integer"
+              ]
+            },
+            "sim_hour": {
+              "types": [
+                "integer"
+              ]
+            },
+            "solver_status": {
+              "types": [
+                "string"
+              ]
+            },
+            "total_co2_kg": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_cost_sek": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_distance_km": {
+              "types": [
+                "number"
+              ]
+            },
+            "total_tons": {
+              "types": [
+                "number"
+              ]
+            },
+            "wall_duration_ms": {
+              "types": [
+                "integer"
+              ]
+            },
+            "wall_timestamp": {
+              "types": [
+                "string"
+              ]
+            }
+          },
+          "types": [
+            "object"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/summary": {
+      "shape": {
+        "fields": {
+          "avg_utilization": {
+            "types": [
+              "number"
+            ]
+          },
+          "llm_decisions": {
+            "fields": {
+              "n_fallback": {
+                "types": [
+                  "null"
+                ]
+              },
+              "n_real_llm": {
+                "types": [
+                  "null"
+                ]
+              },
+              "n_total": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "n_types": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "n_cycles": {
+            "types": [
+              "integer"
+            ]
+          },
+          "total_co2_kg": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_cost_sek": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_tons": {
+            "types": [
+              "number"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/top-suppliers": {
+      "shape": {
+        "fields": {
+          "direction": {
+            "types": [
+              "string"
+            ]
+          },
+          "metric": {
+            "types": [
+              "string"
+            ]
+          },
+          "metric_description": {
+            "types": [
+              "string"
+            ]
+          },
+          "n_suppliers_evaluated": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_suppliers_returned": {
+            "types": [
+              "integer"
+            ]
+          },
+          "top_suppliers": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/persistence/top-vehicles": {
+      "shape": {
+        "fields": {
+          "direction": {
+            "types": [
+              "string"
+            ]
+          },
+          "metric": {
+            "types": [
+              "string"
+            ]
+          },
+          "metric_description": {
+            "types": [
+              "string"
+            ]
+          },
+          "n_vehicles_evaluated": {
+            "types": [
+              "integer"
+            ]
+          },
+          "n_vehicles_returned": {
+            "types": [
+              "integer"
+            ]
+          },
+          "top_vehicles": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/regions": {
+      "shape": {
+        "fields": {
+          "data_source": {
+            "types": [
+              "string"
+            ]
+          },
+          "n_regions": {
+            "types": [
+              "integer"
+            ]
+          },
+          "regions": {
+            "items": {
+              "fields": {
+                "city": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "construction_share_pct": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "estimated_daily_waste_tons": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "industry_focus": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "lat": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "lon": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "per_capita_waste_kg": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "population": {
+                  "types": [
+                    "integer"
+                  ]
+                },
+                "source": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "total_estimated_daily_waste_tons": {
+            "types": [
+              "number"
+            ]
+          },
+          "total_population": {
+            "types": [
+              "integer"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/scheduler/status": {
+      "shape": {
+        "fields": {
+          "active": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "enabled": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "is_idle": {
+            "types": [
+              "boolean"
+            ]
+          },
+          "reason": {
+            "types": [
+              "string"
+            ]
+          },
+          "running_now": {
+            "types": [
+              "boolean"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/seasonal-factors": {
+      "shape": {
+        "fields": {
+          "active_perturbations": {
+            "items": {
+              "types": [
+                "unknown"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "current_factors": {
+            "types": [
+              "null"
+            ]
+          },
+          "current_month": {
+            "types": [
+              "null"
+            ]
+          },
+          "current_sim_day": {
+            "types": [
+              "null"
+            ]
+          },
+          "factors_by_month": {
+            "fields": {
+              "1": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "10": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "11": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "12": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "2": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "3": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "4": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "5": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "6": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "7": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "8": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "9": {
+                "fields": {
+                  "concrete": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "metal_scrap": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "mixed_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "paper_cardboard": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "plastic": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "wood_waste": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/status": {
+      "shape": {
+        "fields": {
+          "clock": {
+            "fields": {
+              "activity_factor": {
+                "types": [
+                  "number"
+                ]
+              },
+              "sim_day": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "sim_hour": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "total_cycles": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "demand_points": {
+            "types": [
+              "integer"
+            ]
+          },
+          "demand_status": {
+            "items": {
+              "fields": {
+                "capacity_tons": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "current_demand_tons": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "deadline": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "id": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "location": {
+                  "types": [
+                    "object"
+                  ]
+                },
+                "material_type": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "name": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "preferred_materials": {
+                  "types": [
+                    "array"
+                  ]
+                },
+                "priority": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "utilization_rate": {
+                  "types": [
+                    "number"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "fleet_status": {
+            "fields": {
+              "available": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "avg_distance_to_depot_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "depot": {
+                "fields": {
+                  "lat": {
+                    "types": [
+                      "number"
+                    ]
+                  },
+                  "lon": {
+                    "types": [
+                      "number"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "en_route": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "loading": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "timestamp": {
+                "types": [
+                  "string"
+                ]
+              },
+              "total_distance_km": {
+                "types": [
+                  "number"
+                ]
+              },
+              "total_vehicles": {
+                "types": [
+                  "integer"
+                ]
+              },
+              "utilization_rate": {
+                "types": [
+                  "number"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "supply_points": {
+            "types": [
+              "integer"
+            ]
+          },
+          "supply_status": {
+            "items": {
+              "fields": {
+                "agent_id": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "location": {
+                  "types": [
+                    "object"
+                  ]
+                },
+                "material_type": {
+                  "types": [
+                    "string"
+                  ]
+                },
+                "stock_tons": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "timestamp": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "types": [
+              "array"
+            ]
+          },
+          "system_status": {
+            "fields": {
+              "config": {
+                "fields": {
+                  "n_demand_points": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_supply_points": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "n_vehicles": {
+                    "types": [
+                      "integer"
+                    ]
+                  },
+                  "seed": {
+                    "types": [
+                      "integer"
+                    ]
+                  }
+                },
+                "types": [
+                  "object"
+                ]
+              },
+              "initialized_at": {
+                "types": [
+                  "string"
+                ]
+              },
+              "last_optimization": {
+                "types": [
+                  "null"
+                ]
+              },
+              "status": {
+                "types": [
+                  "string"
+                ]
+              },
+              "total_optimizations": {
+                "types": [
+                  "integer"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    },
+    "GET /api/supply-points": {
+      "shape": {
+        "items": {
+          "fields": {
+            "agent_id": {
+              "types": [
+                "string"
+              ]
+            },
+            "location": {
+              "fields": {
+                "lat": {
+                  "types": [
+                    "number"
+                  ]
+                },
+                "lon": {
+                  "types": [
+                    "number"
+                  ]
+                }
+              },
+              "types": [
+                "object"
+              ]
+            },
+            "material_type": {
+              "types": [
+                "string"
+              ]
+            },
+            "stock_tons": {
+              "types": [
+                "number"
+              ]
+            }
+          },
+          "types": [
+            "object"
+          ]
+        },
+        "types": [
+          "array"
+        ]
+      },
+      "status": 200
+    },
+    "GET /health": {
+      "shape": {
+        "fields": {
+          "data_mode": {
+            "types": [
+              "string"
+            ]
+          },
+          "environment": {
+            "types": [
+              "string"
+            ]
+          },
+          "features": {
+            "fields": {
+              "carbon_scenarios": {
+                "types": [
+                  "boolean"
+                ]
+              },
+              "real_sweden_facilities": {
+                "types": [
+                  "boolean"
+                ]
+              },
+              "scheduler_enabled": {
+                "types": [
+                  "boolean"
+                ]
+              },
+              "seasonal_factors": {
+                "types": [
+                  "boolean"
+                ]
+              },
+              "websocket_enabled": {
+                "types": [
+                  "boolean"
+                ]
+              }
+            },
+            "types": [
+              "object"
+            ]
+          },
+          "status": {
+            "types": [
+              "string"
+            ]
+          },
+          "timestamp": {
+            "types": [
+              "string"
+            ]
+          }
+        },
+        "types": [
+          "object"
+        ]
+      },
+      "status": 200
+    }
+  },
+  "fixture": {
+    "admin_token_configured": true,
+    "days": 14
+  },
+  "generated_by": "scripts/gen_payload_shapes.py",
+  "max_depth": 3,
+  "schema_version": 1
+}
