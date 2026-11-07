@@ -152,6 +152,13 @@ jobs:
         # 故意改 API 时: python scripts/gen_http_contract.py --write + 在 PR 里说明。
         python scripts/gen_http_contract.py
 
+    - name: Endpoint policy gate (iter #81)
+      run: |
+        # 端点策略: 自动发现 + 显式豁免登记册的 fail-closed 校验 (ADR-0013)。
+        # 每个 GET 端点必须「被采集」或「被显式豁免」, 不允许沉默的缺口;
+        # 陈旧豁免 / 非法豁免理由 / 缺说明 都会让这一步失败。
+        python scripts/endpoint_policy.py
+
     - name: HTTP payload shape gate (iter #80)
       run: |
         # 响应体运行时形状契约: 补上 ADR-0011 自己写下的已知边界

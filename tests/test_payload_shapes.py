@@ -58,7 +58,8 @@ _BASELINE_PATH = os.path.join(_REPO_ROOT, "tests", "http_api_payload_shapes.json
 _GENERATOR = os.path.join(_REPO_ROOT, "scripts", "gen_payload_shapes.py")
 
 # 基线规模下限 —— 防「有人为了让 CI 变绿而手工削掉一半基线」
-_MIN_ENDPOINTS = 40
+# iter #81: 端点清单改成**自动发现**(见 ADR-0013), 基线从 45 个涨到 100 个。
+_MIN_ENDPOINTS = 90
 _MIN_FIELDS = 400
 
 # 快照采集是子进程 (要独占 GL_DB_PATH + 独占 app import),
@@ -200,6 +201,23 @@ class TestPayloadShapesContract(unittest.TestCase):
             "GET /api/admin/db-stats",
         ):
             self.assertIn(required, keys, f"基线缺少关键端点 {required}")
+
+    def test_baseline_covers_majority_of_get_routes(self):
+        """iter #81: 基线必须覆盖**大部分** GET 端点。
+
+        手写清单时代这个比例是 45/119 = 38% —— 门禁只管了不到四成,
+        剩下的端点随便改都不会有人知道。现在自动发现把它拉到 100/119 = 84%。
+        这个断言防的是「有人把清单改回手写小集合」。
+        """
+        coverage = self.baseline.get("coverage")
+        self.assertIsNotNone(coverage, "基线里没有 coverage 段 (ADR-0013)")
+        total = coverage["total_get_routes"]
+        covered = coverage["covered"]
+        self.assertGreaterEqual(
+            covered / max(1, total),
+            0.75,
+            f"覆盖率只有 {covered}/{total} —— 是不是退回手写清单了?",
+        )
 
     def test_baseline_is_not_trivially_empty(self):
         """基线必须有真实内容(字段数下限), 不能是空壳。"""

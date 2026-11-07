@@ -93,59 +93,27 @@ ADMIN_TOKEN = "payload-shape-snapshot-token"
 
 # ---------------------------------------------------------------- 被冻结的端点
 # 选取原则:
-#   1. 只读 GET —— 快照过程不能有副作用
-#   2. 不打外网(天气 / 外部信号)、不调 LLM —— 否则门禁会随机红
-#   3. 覆盖客户真正会调的三类面:
-#      概览面(/api/dashboard-*) · 持久化分析面(/api/persistence/*) · 运维面(/api/admin/*)
-# 每个条目: (method, path, query_params)
-ENDPOINTS: List[Tuple[str, str, Dict[str, Any]]] = [
-    ("GET", "/health", {}),
-    ("GET", "/api/status", {}),
-    ("GET", "/api/dashboard-summary", {}),
-    ("GET", "/api/dashboard-top-summary", {}),
-    ("GET", "/api/fleet", {}),
-    ("GET", "/api/supply-points", {}),
-    ("GET", "/api/facilities", {}),
-    ("GET", "/api/materials", {}),
-    ("GET", "/api/regions", {}),
-    ("GET", "/api/seasonal-factors", {}),
-    ("GET", "/api/scheduler/status", {}),
-    ("GET", "/api/persistence/summary", {}),
-    ("GET", "/api/persistence/recent-cycles", {}),
-    ("GET", "/api/persistence/cycle-history", {}),
-    ("GET", "/api/persistence/forecast", {}),
-    ("GET", "/api/persistence/efficiency-metrics", {}),
-    ("GET", "/api/persistence/cycle-duration-stats", {}),
-    ("GET", "/api/persistence/fleet-utilization-summary", {}),
-    ("GET", "/api/persistence/kpi-timeseries", {}),
-    ("GET", "/api/persistence/top-suppliers", {}),
-    ("GET", "/api/persistence/top-vehicles", {}),
-    ("GET", "/api/persistence/carbon-savings", {}),
-    ("GET", "/api/persistence/demand-aggregates", {}),
-    ("GET", "/api/persistence/material-aggregates", {}),
-    ("GET", "/api/persistence/anomaly-summary", {}),
-    ("GET", "/api/persistence/anomalous-cycles", {}),
-    ("GET", "/api/persistence/cycle-kpi-summary", {}),
-    ("GET", "/api/persistence/llm-cost-timeseries", {}),
-    ("GET", "/api/persistence/llm-decision-targets", {}),
-    ("GET", "/api/persistence/forecast-confidence", {}),
-    ("GET", "/api/persistence/perturbation-impact", {}),
-    ("GET", "/api/persistence/match-distance-stats", {}),
-    ("GET", "/api/persistence/cycle-detail/ci-fixture-cycle-001", {}),
-    ("GET", "/api/persistence/compare-cycles", {"cycle_id_a": "ci-fixture-cycle-001", "cycle_id_b": "ci-fixture-cycle-002"}),
-    # 运维 / 客户诊断面 —— 都需要 admin token
-    ("GET", "/api/admin/auth/status", {}),
-    ("GET", "/api/admin/db-stats", {}),
-    ("GET", "/api/admin/db-info", {}),
-    ("GET", "/api/admin/runtime-config", {}),
-    ("GET", "/api/admin/runtime-config/overrides", {}),
-    ("GET", "/api/admin/llm-stats", {}),
-    ("GET", "/api/admin/perf-stats", {}),
-    ("GET", "/api/admin/persistence/cache", {}),
-    ("GET", "/api/admin/db-maintenance/recommendation", {}),
-    ("GET", "/api/admin/db-maintenance/log", {}),
-    ("GET", "/api/admin/seasonal-perturbations", {}),
-]
+# ---------------------------------------------------------------- 端点清单
+#
+# iter #81 (ADR-0013): 这里**不再手写端点清单**。
+#
+# 原来是一份手写的 45 条列表 —— 那份清单是 fail-open 的:
+# 新加一个端点 → 没人想起来把它加进清单 → 门禁照常绿 → 客户那边照样炸。
+# 「守住下限」只能证明「该保的还在保」, 不能证明「新增的也在保」。
+#
+# 现在改成: **从 FastAPI 路由表自动发现全部 GET 端点**,
+# 采不到的必须在 `scripts/endpoint_policy.py` 的 EXEMPTIONS 里**显式登记**
+# 并写明机器可读的豁免理由 —— 豁免从「沉默的缺口」变成「评审能看见的一行登记」。
+#
+# 参数绑定(path 参数 / 必填 query / 成本封顶 / 避开外网)也统一在那里。
+#
+# sys.path 显式补 scripts/ 目录 —— 直接跑脚本时 Python 会自动把它放进
+# sys.path[0], 但被别的模块 import 时不会, 不补就会 ImportError。
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from endpoint_policy import build_request, classify, validate  # noqa: E402
 
 
 # ---------------------------------------------------------------- 形状计算
@@ -292,6 +260,95 @@ def _diff_node(path: str, before: Dict[str, Any], after: Dict[str, Any],
         _diff_node(f"{path}[]", before_items, after_items, breaking, compatible)
 
 
+def diff_coverage(baseline: Dict[str, Any], current: Dict[str, Any]
+                  ) -> Tuple[List[str], List[str]]:
+    """比对两份快照的**覆盖范围** → (破坏性变更, 兼容性变更)。
+
+    这是 iter #81 / ADR-0013 的核心: 光比「已采集端点的形状」不够 ——
+    还得盯住「**哪些端点根本没被采集**」。
+
+    为什么这是**破坏性**的:
+    一个端点从「被采集」变成「被豁免」, 意味着**客户可见的响应体从今往后
+    不再有任何契约保护** —— 它可以随时被人改掉而门禁不报。
+    这跟「字段被删」是同一等级的事故: 客户照样炸, 只是更安静。
+
+    而「新增端点被采集」是**兼容**的: 覆盖面变大, 是好事。
+    """
+    breaking: List[str] = []
+    compatible: List[str] = []
+
+    old_cov = baseline.get("coverage") or {}
+    new_cov = current.get("coverage") or {}
+
+    old_exempt = old_cov.get("exempted_routes") or {}
+    new_exempt = new_cov.get("exempted_routes") or {}
+
+    old_eps = set(baseline.get("endpoints") or {})
+    new_eps = set(current.get("endpoints") or {})
+
+    # 端点从「被采集」变成「被豁免」 → 🔴 客户可见的契约消失了
+    for key in sorted(old_eps & set(new_exempt)):
+        reason = new_exempt[key].get("reason", "?")
+        breaking.append(
+            f"{key}: 端点被**豁免**了 (reason={reason}) —— "
+            f"它的响应体从此不再有任何契约保护"
+        )
+
+    # 端点从「被豁免」变成「被采集」 → 🟡 覆盖面变大, 好事
+    for key in sorted(set(old_exempt) & new_eps):
+        compatible.append(f"{key}: 端点从豁免变为被采集 (覆盖面变大)")
+
+    # 豁免理由变了 → 🟡 只是提示, 但值得让人知道
+    for key in sorted(set(old_exempt) & set(new_exempt)):
+        old_reason = old_exempt[key].get("reason", "?")
+        new_reason = new_exempt[key].get("reason", "?")
+        if old_reason != new_reason:
+            compatible.append(
+                f"{key}: 豁免理由变了 {old_reason} → {new_reason}"
+            )
+
+    # 豁免集合里出现了基线里没有的新条目 → 🟡 新增豁免(必须是有意的)
+    for key in sorted(set(new_exempt) - set(old_exempt)):
+        if key not in old_eps:
+            compatible.append(
+                f"{key}: 新增豁免 (reason={new_exempt[key].get('reason', '?')}) "
+                f"—— 这个端点没有契约保护"
+            )
+
+    # 覆盖率数字变化 → 提示
+    old_total = old_cov.get("total_get_routes")
+    new_total = new_cov.get("total_get_routes")
+    if old_total != new_total:
+        compatible.append(
+            f"GET 端点总数 {old_total} → {new_total}"
+        )
+
+    # ---- 基线与当前采集集合的差集 → 🔴 ----
+    #
+    # 「新增端点 = 兼容(黄)」这个判断, 在**自动发现**的世界里是错的。
+    #
+    # 手写清单时代: 新端点不在清单里 → 门禁根本看不见它 → 黄。
+    # 自动发现时代: 新端点**会被采到**, 但只要基线里还没有它,
+    # 「基线 → 当前」的 diff 每次都报「新增端点(黄)」→ 门禁**永远绿**。
+    # 而这个端点已经在生产上被客户调了 —— 它的响应体却**没有任何契约**。
+    # 这跟 ADR-0012 解决的「schema 层看不见响应体」是同一类事故, 只是更安静。
+    #
+    # 所以在自动发现下, 新端点必须**强制冻结**: 红灯 → 跑 --write → 写进基线。
+    # 这不是「破坏性变更」意义上的红, 而是「你欠了一份契约」意义上的红。
+    #
+    # 注意要**排除**「本来就在基线的豁免表里」的端点 ——
+    # 那种端点是从豁免变成被采集(保护变强了), 属于黄。
+    newly_unfrozen = new_eps - old_eps - set(old_exempt)
+    for key in sorted(newly_unfrozen):
+        breaking.append(
+            f"{key}: 新端点还没冻结进基线 —— 自动发现已经采到它了, "
+            f"但基线里没有, 所以它的响应体暂时**没有任何契约保护**。"
+            f"跑 python scripts/gen_payload_shapes.py --write 并在 PR 里说明。"
+        )
+
+    return breaking, compatible
+
+
 def diff_shapes(baseline: Dict[str, Any], current: Dict[str, Any]
                 ) -> Tuple[List[str], List[str]]:
     """比对两份快照 → (破坏性变更列表, 兼容性变更列表)。"""
@@ -332,7 +389,12 @@ def _seed_fixture(db_path: Path) -> None:
 
 
 def collect_shapes() -> Dict[str, Any]:
-    """真起一次服务, 把每个端点的响应压成形状。"""
+    """真起一次服务, 把每个端点的响应压成形状。
+
+    端点集合来自**自动发现**(FastAPI 路由表), 不是手写清单 (iter #81 / ADR-0013)。
+    采不到的端点必须在 endpoint_policy.EXEMPTIONS 里显式登记豁免 ——
+    少了登记就直接报错退出(fail-closed), 绝不沉默地跳过。
+    """
     tmp_dir = Path(tempfile.mkdtemp(prefix="payload-shapes-"))
     db_path = tmp_dir / "snapshot.db"
     try:
@@ -343,13 +405,25 @@ def collect_shapes() -> Dict[str, Any]:
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
 
+        # ---- 自动发现 + fail-closed 校验 ----
+        classification = classify(backend_main.app)
+        errors = validate(classification)
+        if errors:
+            raise SystemExit(
+                "端点策略校验失败(fail-closed) ——  refusing to collect:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+                + "\n\n修 scripts/endpoint_policy.py 里的 PARAM_BINDINGS / EXEMPTIONS。"
+            )
+
         endpoints: Dict[str, Any] = {}
         with TestClient(backend_main.app) as client:
-            for method, path, params in ENDPOINTS:
-                key = f"{method} {path}"
+            for template in classification["covered"]:
+                real_path, params = build_request(template)
+                key = f"GET {template}"
                 # admin 端点需要 token; 非 admin 端点带这个 header 也无害
                 response = client.request(
-                    method, path, params=params, headers={"X-Admin-Token": ADMIN_TOKEN}
+                    "GET", real_path, params=params,
+                    headers={"X-Admin-Token": ADMIN_TOKEN},
                 )
                 if response.status_code != 200:
                     endpoints[key] = {
@@ -369,11 +443,22 @@ def collect_shapes() -> Dict[str, Any]:
                     "status": response.status_code,
                     "shape": shape_of(payload),
                 }
+
+        exempted = {
+            path: {"reason": entry.get("reason", ""), "note": entry.get("note", "")}
+            for path, entry in sorted(classification["exempted"].items())
+        }
         return {
             "generated_by": "scripts/gen_payload_shapes.py",
             "schema_version": SCHEMA_VERSION,
             "max_depth": MAX_DEPTH,
             "fixture": {"days": FIXTURE_DAYS, "admin_token_configured": True},
+            "coverage": {
+                "total_get_routes": classification["total_get_routes"],
+                "covered": len(classification["covered"]),
+                "exempted": len(exempted),
+                "exempted_routes": exempted,
+            },
             "endpoints": endpoints,
         }
     finally:
@@ -420,11 +505,17 @@ def main() -> int:
 
     if args.write:
         write_baseline(current)
+        cov = current.get("coverage") or {}
         print(f"✅ 基线已刷新: {BASELINE_PATH.relative_to(_REPO_ROOT)} "
-              f"({len(current['endpoints'])} 个端点)")
+              f"({len(current['endpoints'])} 个端点, "
+              f"覆盖 {cov.get('covered')}/{cov.get('total_get_routes')} 个 GET 端点, "
+              f"{cov.get('exempted')} 个显式豁免)")
         return 0
 
     breaking, compatible = diff_shapes(load_baseline(), current)
+    cov_breaking, cov_compatible = diff_coverage(load_baseline(), current)
+    breaking = breaking + cov_breaking
+    compatible = compatible + cov_compatible
     _print_report(breaking, compatible)
     if breaking:
         print("\n如果这是**故意**的变更，请跑：")
