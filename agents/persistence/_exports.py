@@ -18,12 +18,22 @@ class ExportMixin(PersistenceBase, SharedQueryMixin):
         """
         Export cycle history as CSV string (iter #11 + iter #19 metadata)。
 
-        Columns (15):
+        Columns (20):
             cycle_id, sim_day, sim_hour, wall_timestamp, activity_factor,
-            n_supply_offers, n_demand_requests, n_matches, n_routes,
+            n_supply_offers, n_demand_requests, n_matches,
             total_tons, total_cost_sek, total_co2_kg, total_distance_km,
             n_vehicles_used, n_vehicles_available, fleet_utilization_pct,
-            solver_status, wall_duration_ms, seasonal_factor_avg, seasonal_month
+            solver_status, wall_duration_ms, seasonal_factor_avg, seasonal_month,
+            n_routes
+
+        iter #82 (ADR-0014): 补上 ``n_routes``。
+            之前这个 ``columns`` 列表是**手写**的, 漏了 ``n_routes``
+            (它来自 get_cycle_history() 里的一个子查询), 而 DictWriter 的
+            ``extrasaction="ignore"`` 会把多出来的键**静默丢掉** ——
+            于是 CSV 导出比 JSON/Parquet/NDJSON 少一列, 客户换个格式下载
+            同一张表就少一列, 而且**不报错**。
+            现在四个格式的列集合与顺序完全一致, 并由
+            ``scripts/gen_export_contracts.py`` 的跨格式一致性门禁守着。
 
         Args (iter #19):
             include_metadata: 是否在 CSV 顶部加 metadata header (生成时间 + row count)
@@ -44,7 +54,7 @@ class ExportMixin(PersistenceBase, SharedQueryMixin):
             "n_matches", "total_tons", "total_cost_sek", "total_co2_kg",
             "total_distance_km", "n_vehicles_used", "n_vehicles_available",
             "fleet_utilization_pct", "solver_status", "wall_duration_ms",
-            "seasonal_factor_avg", "seasonal_month",
+            "seasonal_factor_avg", "seasonal_month", "n_routes",
         ]
         buf = io.StringIO()
         if include_metadata:

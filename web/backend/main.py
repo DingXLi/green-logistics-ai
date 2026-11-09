@@ -7491,26 +7491,37 @@ async def export_db_data(
     limit = max(1, min(50000, limit))
 
     # 拿 rows
+    #
+    # iter #82 (ADR-0014): supplies / matches / routes 改用 **export_*_rows()**
+    # (直接返 list of dicts), 不再走「导 CSV 再 parse 回来」这条路。
+    #
+    # 为什么: CSV 往返会把**所有值变成字符串** —— 于是
+    # ``db-export?table=supplies&fmt=parquet`` 给客户的
+    # ``available_tons`` 列类型是 string 而不是 double,
+    # 客户 ``df['available_tons'].sum()`` 得到的是 ``'10.012.5'`` 而不是 ``22.5``。
+    # **静默算错, 而且不报错** —— 正是 ADR-0012 立下的那条原则要防的东西。
+    #
+    # ``export_*_rows()`` 是 iter #27 就加好的(注释里写得很清楚:
+    # 「避免 CSV parsing round-trip — 直接返 list of dicts」), 只是这个端点
+    # 一直没切过去。现在切了, 而且列名/列序跟对应的 CSV 导出**完全一致**
+    # (由 ``scripts/gen_export_contracts.py`` 的跨格式一致性门禁守着)。
     rows: List[Dict[str, Any]]
     if table == "cycles":
         rows = coordinator.persistence.get_cycle_history(limit=limit)
     elif table == "supplies":
-        # 用 export_supplies_csv 然后 parse (最简单)
-        csv_str = coordinator.persistence.export_supplies_csv(limit=limit)
-        rows = _csv_to_rows(csv_str)
+        rows = coordinator.persistence.export_supplies_rows(limit=limit)
     elif table == "matches":
-        csv_str = coordinator.persistence.export_matches_csv(limit=limit)
-        rows = _csv_to_rows(csv_str)
+        rows = coordinator.persistence.export_matches_rows(limit=limit)
     elif table == "routes":
-        csv_str = coordinator.persistence.export_routes_csv(limit=limit)
-        rows = _csv_to_rows(csv_str)
+        rows = coordinator.persistence.export_routes_rows(limit=limit)
     else:  # llm_decisions
         rows = coordinator.persistence.get_llm_decisions(
             limit=limit,
             sim_day_min=since_sim_day,
         )
 
-    # since_sim_day filter (CSV 解析后 sim_day 是字符串)
+    # since_sim_day filter
+    # (iter #82: sim_day 现在是**整数**(不再被 CSV 往返变成字符串))
     if since_sim_day is not None and table != "llm_decisions":
         filtered = []
         for r in rows:
@@ -7527,16 +7538,17 @@ async def export_db_data(
 
     # format dispatch (iter #19 加 gzip 选项)
     if fmt == "csv":
-        if table == "llm_decisions":
-            # llm_decisions 没 CSV export, 返回 placeholder
-            content = "id,note\nllm_decisions,format=csv+not implemented yet\n"
-            if gzip:
-                return _maybe_gzip(content.encode("utf-8"), True, "llm_decisions.csv")
-            return FastAPIResponse(
-                content=content,
-                media_type="text/csv; charset=utf-8",
-                headers={"Content-Disposition": "attachment; filename=\"llm_decisions.csv\""},
-            )
+        # iter #82 (ADR-0014): llm_decisions 的 CSV **不再返回 placeholder**。
+        #
+        # 原来这里写死了一个假 CSV:
+        #     "id,note\nllm_decisions,format=csv+not implemented yet\n"
+        # 它的列是 ``id,note`` —— 而 llm_decisions 真正的列有 14 个。
+        # 客户下载这个 CSV 拿到的是**假契约**: 跟同表的 json/parquet/ndjson
+        # 导出列完全对不上, 而且 ``_rows_to_csv(rows)`` 本来就能直接把
+        # get_llm_decisions() 返回的 dict 列表写成 CSV —— 根本不需要 placeholder。
+        #
+        # 这条就是被「跨格式一致性门禁」抓出来的: 它发现同一张表在 csv 和
+        # json 两种格式下列集合不一样(少了 13 列, 多了 1 列)。
         csv_out = _rows_to_csv(rows)
         filename = f"green_logistics_{table}_{limit}.csv"
         if gzip:

@@ -168,6 +168,17 @@ jobs:
         # 故意改响应体结构时: python scripts/gen_payload_shapes.py --write + 在 PR 里说明。
         python scripts/gen_payload_shapes.py
 
+    - name: Export column contract gate (iter #82)
+      run: |
+        # 导出列契约: 补上 ADR-0013 留下的欠条 —— 那 14 个导出端点当时被豁免,
+        # 备注写着「字段契约是列名」, 但列名从来没被冻过。
+        # **列被删 / 列被改名 / CSV 列顺序变了 / 有序格式中间插了一列 /
+        #   Parquet 列类型变了** —— 任何一条都会让这一步失败; 末尾新增列只打印。
+        # 另有一层**不需要基线**的结构不变量: 同一张表在不同导出格式下,
+        # 列集合必须一致 (客户换个格式下载就少列/多列)。
+        # 故意改导出列时: python scripts/gen_export_contracts.py --write + 在 PR 里说明。
+        python scripts/gen_export_contracts.py
+
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12'
       uses: codecov/codecov-action@v4

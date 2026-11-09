@@ -1,0 +1,1100 @@
+{
+  "coverage": {
+    "covered": 38,
+    "db_export_surfaces": 20,
+    "total_export_routes": 18
+  },
+  "endpoints": {
+    "GET /api/admin/db-export?table=cycles&fmt=csv": {
+      "columns": [
+        "cycle_id",
+        "sim_day",
+        "sim_hour",
+        "wall_timestamp",
+        "activity_factor",
+        "n_supply_offers",
+        "n_demand_requests",
+        "n_matches",
+        "total_tons",
+        "total_cost_sek",
+        "total_co2_kg",
+        "total_distance_km",
+        "n_vehicles_used",
+        "n_vehicles_available",
+        "fleet_utilization_pct",
+        "solver_status",
+        "wall_duration_ms",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "n_routes"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/admin/db-export?table=cycles&fmt=json": {
+      "format": "json",
+      "keys": [
+        "activity_factor",
+        "cycle_id",
+        "fleet_utilization_pct",
+        "n_demand_requests",
+        "n_matches",
+        "n_routes",
+        "n_supply_offers",
+        "n_vehicles_available",
+        "n_vehicles_used",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "sim_day",
+        "sim_hour",
+        "solver_status",
+        "total_co2_kg",
+        "total_cost_sek",
+        "total_distance_km",
+        "total_tons",
+        "wall_duration_ms",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/admin/db-export?table=cycles&fmt=ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "activity_factor",
+        "cycle_id",
+        "fleet_utilization_pct",
+        "n_demand_requests",
+        "n_matches",
+        "n_routes",
+        "n_supply_offers",
+        "n_vehicles_available",
+        "n_vehicles_used",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "sim_day",
+        "sim_hour",
+        "solver_status",
+        "total_co2_kg",
+        "total_cost_sek",
+        "total_distance_km",
+        "total_tons",
+        "wall_duration_ms",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/admin/db-export?table=cycles&fmt=parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        },
+        {
+          "name": "sim_hour",
+          "type": "integer"
+        },
+        {
+          "name": "wall_timestamp",
+          "type": "string"
+        },
+        {
+          "name": "activity_factor",
+          "type": "number"
+        },
+        {
+          "name": "n_supply_offers",
+          "type": "integer"
+        },
+        {
+          "name": "n_demand_requests",
+          "type": "integer"
+        },
+        {
+          "name": "n_matches",
+          "type": "integer"
+        },
+        {
+          "name": "total_tons",
+          "type": "number"
+        },
+        {
+          "name": "total_cost_sek",
+          "type": "number"
+        },
+        {
+          "name": "total_co2_kg",
+          "type": "number"
+        },
+        {
+          "name": "total_distance_km",
+          "type": "number"
+        },
+        {
+          "name": "n_vehicles_used",
+          "type": "integer"
+        },
+        {
+          "name": "n_vehicles_available",
+          "type": "integer"
+        },
+        {
+          "name": "fleet_utilization_pct",
+          "type": "number"
+        },
+        {
+          "name": "solver_status",
+          "type": "string"
+        },
+        {
+          "name": "wall_duration_ms",
+          "type": "integer"
+        },
+        {
+          "name": "seasonal_factor_avg",
+          "type": "number"
+        },
+        {
+          "name": "seasonal_month",
+          "type": "integer"
+        },
+        {
+          "name": "n_routes",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/admin/db-export?table=llm_decisions&fmt=csv": {
+      "columns": [
+        "id",
+        "cycle_id",
+        "sim_day",
+        "sim_hour",
+        "decision_type",
+        "target_id",
+        "target_type",
+        "multiplier",
+        "trend",
+        "confidence",
+        "reason",
+        "source",
+        "raw_json",
+        "wall_timestamp"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "llm_decisions"
+    },
+    "GET /api/admin/db-export?table=llm_decisions&fmt=json": {
+      "format": "json",
+      "keys": [
+        "confidence",
+        "cycle_id",
+        "decision_type",
+        "id",
+        "multiplier",
+        "raw_json",
+        "reason",
+        "sim_day",
+        "sim_hour",
+        "source",
+        "target_id",
+        "target_type",
+        "trend",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "llm_decisions"
+    },
+    "GET /api/admin/db-export?table=llm_decisions&fmt=ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "confidence",
+        "cycle_id",
+        "decision_type",
+        "id",
+        "multiplier",
+        "raw_json",
+        "reason",
+        "sim_day",
+        "sim_hour",
+        "source",
+        "target_id",
+        "target_type",
+        "trend",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "llm_decisions"
+    },
+    "GET /api/admin/db-export?table=llm_decisions&fmt=parquet": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        },
+        {
+          "name": "sim_hour",
+          "type": "integer"
+        },
+        {
+          "name": "decision_type",
+          "type": "string"
+        },
+        {
+          "name": "target_id",
+          "type": "string"
+        },
+        {
+          "name": "target_type",
+          "type": "string"
+        },
+        {
+          "name": "multiplier",
+          "type": "number"
+        },
+        {
+          "name": "trend",
+          "type": "string"
+        },
+        {
+          "name": "confidence",
+          "type": "number"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "raw_json",
+          "type": "string"
+        },
+        {
+          "name": "wall_timestamp",
+          "type": "string"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "llm_decisions"
+    },
+    "GET /api/admin/db-export?table=matches&fmt=csv": {
+      "columns": [
+        "cycle_id",
+        "supply_id",
+        "demand_id",
+        "material_type",
+        "tons",
+        "distance_km",
+        "estimated_profit_sek",
+        "sim_day"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/admin/db-export?table=matches&fmt=json": {
+      "format": "json",
+      "keys": [
+        "cycle_id",
+        "demand_id",
+        "distance_km",
+        "estimated_profit_sek",
+        "material_type",
+        "sim_day",
+        "supply_id",
+        "tons"
+      ],
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/admin/db-export?table=matches&fmt=ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "cycle_id",
+        "demand_id",
+        "distance_km",
+        "estimated_profit_sek",
+        "material_type",
+        "sim_day",
+        "supply_id",
+        "tons"
+      ],
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/admin/db-export?table=matches&fmt=parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "supply_id",
+          "type": "string"
+        },
+        {
+          "name": "demand_id",
+          "type": "string"
+        },
+        {
+          "name": "material_type",
+          "type": "string"
+        },
+        {
+          "name": "tons",
+          "type": "number"
+        },
+        {
+          "name": "distance_km",
+          "type": "number"
+        },
+        {
+          "name": "estimated_profit_sek",
+          "type": "number"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/admin/db-export?table=routes&fmt=csv": {
+      "columns": [
+        "cycle_id",
+        "vehicle_id",
+        "distance_km",
+        "duration_hours",
+        "cost_sek",
+        "co2_kg",
+        "stops_count",
+        "sim_day"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/admin/db-export?table=routes&fmt=json": {
+      "format": "json",
+      "keys": [
+        "co2_kg",
+        "cost_sek",
+        "cycle_id",
+        "distance_km",
+        "duration_hours",
+        "sim_day",
+        "stops_count",
+        "vehicle_id"
+      ],
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/admin/db-export?table=routes&fmt=ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "co2_kg",
+        "cost_sek",
+        "cycle_id",
+        "distance_km",
+        "duration_hours",
+        "sim_day",
+        "stops_count",
+        "vehicle_id"
+      ],
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/admin/db-export?table=routes&fmt=parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "vehicle_id",
+          "type": "string"
+        },
+        {
+          "name": "distance_km",
+          "type": "number"
+        },
+        {
+          "name": "duration_hours",
+          "type": "number"
+        },
+        {
+          "name": "cost_sek",
+          "type": "number"
+        },
+        {
+          "name": "co2_kg",
+          "type": "number"
+        },
+        {
+          "name": "stops_count",
+          "type": "integer"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/admin/db-export?table=supplies&fmt=csv": {
+      "columns": [
+        "cycle_id",
+        "supply_id",
+        "material_type",
+        "location_lat",
+        "location_lon",
+        "available_tons",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/admin/db-export?table=supplies&fmt=json": {
+      "format": "json",
+      "keys": [
+        "available_tons",
+        "cycle_id",
+        "location_lat",
+        "location_lon",
+        "material_type",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour",
+        "supply_id"
+      ],
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/admin/db-export?table=supplies&fmt=ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "available_tons",
+        "cycle_id",
+        "location_lat",
+        "location_lon",
+        "material_type",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour",
+        "supply_id"
+      ],
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/admin/db-export?table=supplies&fmt=parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "supply_id",
+          "type": "string"
+        },
+        {
+          "name": "material_type",
+          "type": "string"
+        },
+        {
+          "name": "location_lat",
+          "type": "number"
+        },
+        {
+          "name": "location_lon",
+          "type": "number"
+        },
+        {
+          "name": "available_tons",
+          "type": "number"
+        },
+        {
+          "name": "moisture_percent",
+          "type": "number"
+        },
+        {
+          "name": "quality_score",
+          "type": "number"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        },
+        {
+          "name": "sim_hour",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/persistence/export/cycle-detail/{cycle_id}.csv": {
+      "format": "csv",
+      "sections": {
+        "cycle_metadata": [
+          "cycle_id",
+          "sim_day",
+          "sim_hour",
+          "wall_timestamp",
+          "activity_factor",
+          "n_supply_offers",
+          "n_demand_requests",
+          "n_matches",
+          "total_tons",
+          "total_cost_sek",
+          "total_co2_kg",
+          "total_distance_km",
+          "n_vehicles_used",
+          "n_vehicles_available",
+          "fleet_utilization_pct",
+          "solver_status",
+          "wall_duration_ms",
+          "seasonal_factor_avg",
+          "seasonal_month",
+          "base_seasonal_factor_avg",
+          "perturbation_count",
+          "perturbation_total_multiplier"
+        ],
+        "demand_requests": [
+          "demand_id",
+          "name",
+          "location_lat",
+          "location_lon",
+          "material_type",
+          "required_tons",
+          "priority",
+          "deadline"
+        ],
+        "matches": [
+          "supply_id",
+          "demand_id",
+          "material_type",
+          "tons",
+          "distance_km",
+          "estimated_profit_sek"
+        ],
+        "routes": [
+          "vehicle_id",
+          "distance_km",
+          "duration_hours",
+          "cost_sek",
+          "co2_kg",
+          "stops_count"
+        ],
+        "supply_offers": [
+          "supply_id",
+          "material_type",
+          "location_lat",
+          "location_lon",
+          "available_tons",
+          "moisture_percent",
+          "quality_score",
+          "base_seasonal_multiplier",
+          "seasonal_multiplier",
+          "perturbation_applied"
+        ]
+      },
+      "status": 200,
+      "table": "{cycle_id}"
+    },
+    "GET /api/persistence/export/cycles.csv": {
+      "columns": [
+        "cycle_id",
+        "sim_day",
+        "sim_hour",
+        "wall_timestamp",
+        "activity_factor",
+        "n_supply_offers",
+        "n_demand_requests",
+        "n_matches",
+        "total_tons",
+        "total_cost_sek",
+        "total_co2_kg",
+        "total_distance_km",
+        "n_vehicles_used",
+        "n_vehicles_available",
+        "fleet_utilization_pct",
+        "solver_status",
+        "wall_duration_ms",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "n_routes"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/persistence/export/cycles.json": {
+      "format": "json",
+      "keys": [
+        "activity_factor",
+        "cycle_id",
+        "fleet_utilization_pct",
+        "n_demand_requests",
+        "n_matches",
+        "n_routes",
+        "n_supply_offers",
+        "n_vehicles_available",
+        "n_vehicles_used",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "sim_day",
+        "sim_hour",
+        "solver_status",
+        "total_co2_kg",
+        "total_cost_sek",
+        "total_distance_km",
+        "total_tons",
+        "wall_duration_ms",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/persistence/export/cycles.ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "activity_factor",
+        "cycle_id",
+        "fleet_utilization_pct",
+        "n_demand_requests",
+        "n_matches",
+        "n_routes",
+        "n_supply_offers",
+        "n_vehicles_available",
+        "n_vehicles_used",
+        "seasonal_factor_avg",
+        "seasonal_month",
+        "sim_day",
+        "sim_hour",
+        "solver_status",
+        "total_co2_kg",
+        "total_cost_sek",
+        "total_distance_km",
+        "total_tons",
+        "wall_duration_ms",
+        "wall_timestamp"
+      ],
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/persistence/export/cycles.parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        },
+        {
+          "name": "sim_hour",
+          "type": "integer"
+        },
+        {
+          "name": "wall_timestamp",
+          "type": "string"
+        },
+        {
+          "name": "activity_factor",
+          "type": "number"
+        },
+        {
+          "name": "n_supply_offers",
+          "type": "integer"
+        },
+        {
+          "name": "n_demand_requests",
+          "type": "integer"
+        },
+        {
+          "name": "n_matches",
+          "type": "integer"
+        },
+        {
+          "name": "total_tons",
+          "type": "number"
+        },
+        {
+          "name": "total_cost_sek",
+          "type": "number"
+        },
+        {
+          "name": "total_co2_kg",
+          "type": "number"
+        },
+        {
+          "name": "total_distance_km",
+          "type": "number"
+        },
+        {
+          "name": "n_vehicles_used",
+          "type": "integer"
+        },
+        {
+          "name": "n_vehicles_available",
+          "type": "integer"
+        },
+        {
+          "name": "fleet_utilization_pct",
+          "type": "number"
+        },
+        {
+          "name": "solver_status",
+          "type": "string"
+        },
+        {
+          "name": "wall_duration_ms",
+          "type": "integer"
+        },
+        {
+          "name": "seasonal_factor_avg",
+          "type": "number"
+        },
+        {
+          "name": "seasonal_month",
+          "type": "integer"
+        },
+        {
+          "name": "n_routes",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "cycles"
+    },
+    "GET /api/persistence/export/matches.csv": {
+      "columns": [
+        "cycle_id",
+        "supply_id",
+        "demand_id",
+        "material_type",
+        "tons",
+        "distance_km",
+        "estimated_profit_sek",
+        "sim_day"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/persistence/export/matches.json": {
+      "format": "json",
+      "keys": [
+        "cycle_id",
+        "demand_id",
+        "distance_km",
+        "estimated_profit_sek",
+        "material_type",
+        "sim_day",
+        "supply_id",
+        "tons"
+      ],
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/persistence/export/matches.ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "cycle_id",
+        "demand_id",
+        "distance_km",
+        "estimated_profit_sek",
+        "material_type",
+        "sim_day",
+        "supply_id",
+        "tons"
+      ],
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/persistence/export/matches.parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "supply_id",
+          "type": "string"
+        },
+        {
+          "name": "demand_id",
+          "type": "string"
+        },
+        {
+          "name": "material_type",
+          "type": "string"
+        },
+        {
+          "name": "tons",
+          "type": "number"
+        },
+        {
+          "name": "distance_km",
+          "type": "number"
+        },
+        {
+          "name": "estimated_profit_sek",
+          "type": "number"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "matches"
+    },
+    "GET /api/persistence/export/perturbed-supplies.csv": {
+      "columns": [
+        "cycle_id",
+        "supply_id",
+        "material_type",
+        "location_lat",
+        "location_lon",
+        "available_tons",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour",
+        "base_seasonal_multiplier",
+        "seasonal_multiplier",
+        "perturbation_applied",
+        "multiplier_ratio",
+        "was_perturbed"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "perturbed-supplies"
+    },
+    "GET /api/persistence/export/routes.csv": {
+      "columns": [
+        "cycle_id",
+        "vehicle_id",
+        "distance_km",
+        "duration_hours",
+        "cost_sek",
+        "co2_kg",
+        "stops_count",
+        "sim_day"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/persistence/export/routes.json": {
+      "format": "json",
+      "keys": [
+        "co2_kg",
+        "cost_sek",
+        "cycle_id",
+        "distance_km",
+        "duration_hours",
+        "sim_day",
+        "stops_count",
+        "vehicle_id"
+      ],
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/persistence/export/routes.ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "co2_kg",
+        "cost_sek",
+        "cycle_id",
+        "distance_km",
+        "duration_hours",
+        "sim_day",
+        "stops_count",
+        "vehicle_id"
+      ],
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/persistence/export/routes.parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "vehicle_id",
+          "type": "string"
+        },
+        {
+          "name": "distance_km",
+          "type": "number"
+        },
+        {
+          "name": "duration_hours",
+          "type": "number"
+        },
+        {
+          "name": "cost_sek",
+          "type": "number"
+        },
+        {
+          "name": "co2_kg",
+          "type": "number"
+        },
+        {
+          "name": "stops_count",
+          "type": "integer"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "routes"
+    },
+    "GET /api/persistence/export/supplies.csv": {
+      "columns": [
+        "cycle_id",
+        "supply_id",
+        "material_type",
+        "location_lat",
+        "location_lon",
+        "available_tons",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour"
+      ],
+      "format": "csv",
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/persistence/export/supplies.json": {
+      "format": "json",
+      "keys": [
+        "available_tons",
+        "cycle_id",
+        "location_lat",
+        "location_lon",
+        "material_type",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour",
+        "supply_id"
+      ],
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/persistence/export/supplies.ndjson": {
+      "format": "ndjson",
+      "keys": [
+        "available_tons",
+        "cycle_id",
+        "location_lat",
+        "location_lon",
+        "material_type",
+        "moisture_percent",
+        "quality_score",
+        "sim_day",
+        "sim_hour",
+        "supply_id"
+      ],
+      "status": 200,
+      "table": "supplies"
+    },
+    "GET /api/persistence/export/supplies.parquet": {
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "string"
+        },
+        {
+          "name": "supply_id",
+          "type": "string"
+        },
+        {
+          "name": "material_type",
+          "type": "string"
+        },
+        {
+          "name": "location_lat",
+          "type": "number"
+        },
+        {
+          "name": "location_lon",
+          "type": "number"
+        },
+        {
+          "name": "available_tons",
+          "type": "number"
+        },
+        {
+          "name": "moisture_percent",
+          "type": "number"
+        },
+        {
+          "name": "quality_score",
+          "type": "number"
+        },
+        {
+          "name": "sim_day",
+          "type": "integer"
+        },
+        {
+          "name": "sim_hour",
+          "type": "integer"
+        }
+      ],
+      "format": "parquet",
+      "status": 200,
+      "table": "supplies"
+    }
+  },
+  "fixture": {
+    "days": 14,
+    "detail_rows": true
+  },
+  "generated_by": "scripts/gen_export_contracts.py",
+  "schema_version": 1
+}
