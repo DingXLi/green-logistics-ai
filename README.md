@@ -155,8 +155,12 @@ green-logistics-ai/
 │   │       ├── FacilitiesList.jsx
 │   │       ├── CycleHistory.jsx       # iter #11: past cycles + detail
 │   │       └── SchedulerControl.jsx   # iter #10
-│   └── backend/                   # FastAPI + WebSocket
-│       └── main.py                    # 1500+ lines, 30+ endpoints
+│   └── backend/                   # FastAPI + WebSocket (136 endpoints)
+│       ├── main.py                    # 4,720 lines: app wiring + cross-domain logic
+│       ├── _auth.py                   # admin token check + require_admin dependency
+│       ├── _export.py                 # CSV / Parquet / gzip codec helpers
+│       └── routers/
+│           └── persistence.py         # 3,571 lines: 82 /api/persistence/* endpoints
 ├── tests/                        # 250+ tests
 ├── requirements.txt              # Python dependencies
 ├── Dockerfile.backend            # Docker image
@@ -463,8 +467,12 @@ green-logistics-ai/
 │   │       ├── FacilitiesList.jsx
 │   │       ├── CycleHistory.jsx       # iter #11: 周期历史
 │   │       └── SchedulerControl.jsx   # iter #10
-│   └── backend/                   # FastAPI + WebSocket
-│       └── main.py                    # 1500+ 行, 30+ endpoints
+│   └── backend/                   # FastAPI + WebSocket（136 endpoints）
+│       ├── main.py                    # 4,720 行：app 装配 + 跳领域逻辑
+│       ├── _auth.py                   # admin token 校验 + require_admin 依赖
+│       ├── _export.py                 # CSV / Parquet / gzip 编解码 helper
+│       └── routers/
+│           └── persistence.py         # 3,571 行：82 个 /api/persistence/* 端点
 ├── tests/                        # 250+ 测试
 ├── requirements.txt              # Python 依赖
 ├── Dockerfile.backend            # Docker 镜像
@@ -505,10 +513,11 @@ docker run -p 8000:8000 green-logistics-backend
 ### 架构决策记录（ADR）
 
 所有「为什么不那么做」的决策都留了档（背景 / 备选 / 决策 / 代价）：
-[`docs/adr/`](docs/adr/README.md) —— 共 14 篇：多智能体编排、OR-Tools VRP 内核、
+[`docs/adr/`](docs/adr/README.md) —— 共 15 篇：多智能体编排、OR-Tools VRP 内核、
 LLM 配置单一来源、LLM 韧性与可观测、SQLite 持久化、CI 策略、前端与部署、
 Google GenAI SDK 迁移、持久化层拆包、公开 API 契约测试、HTTP API 契约测试、
-响应体运行时形状快照、端点自动发现与显式豁免登记册、导出端点列契约冻结。
+响应体运行时形状快照、端点自动发现与显式豁免登记册、导出端点列契约冻结、
+API 层拆包（main.py 8,303 → 4,720 行，公开 HTTP API 零变化）。
 
 ### 参考资料
 

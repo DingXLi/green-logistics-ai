@@ -148,7 +148,7 @@ class TestHelperBuilders:
     """_build_json_response + _build_ndjson_response helpers。"""
 
     def test_build_json_response(self):
-        from web.backend.main import _build_json_response
+        from web.backend.routers.persistence import _build_json_response
         rows = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
         resp = _build_json_response(rows, "test", 2)
         assert resp.status_code == 200
@@ -157,7 +157,7 @@ class TestHelperBuilders:
         assert "green_logistics_test_2.json" in resp.headers["content-disposition"]
 
     def test_build_ndjson_response(self):
-        from web.backend.main import _build_ndjson_response
+        from web.backend.routers.persistence import _build_ndjson_response
         rows = [{"a": 1}, {"a": 2}]
         resp = _build_ndjson_response(rows, "test", 2)
         assert resp.status_code == 200
@@ -169,14 +169,14 @@ class TestHelperBuilders:
         assert "application/x-ndjson" in resp.headers["content-type"]
 
     def test_build_json_empty(self):
-        from web.backend.main import _build_json_response
+        from web.backend.routers.persistence import _build_json_response
         resp = _build_json_response([], "test", 0)
         assert resp.status_code == 200
         data = json.loads(resp.body)
         assert data == []
 
     def test_build_ndjson_empty(self):
-        from web.backend.main import _build_ndjson_response
+        from web.backend.routers.persistence import _build_ndjson_response
         resp = _build_ndjson_response([], "test", 0)
         # Empty rows → empty string
         assert resp.body == b""
