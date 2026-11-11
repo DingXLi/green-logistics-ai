@@ -398,16 +398,8 @@ async def get_llm_cost_forecast(
     coordinator = _coordinator()
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    if horizon < 1 or horizon > 30:
-        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
-    if history_n < 2 or history_n > 90:
-        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
-    valid_methods = ("linear", "moving_average", "exponential_smoothing")
-    if method not in valid_methods:
-        raise HTTPException(
-            status_code=400,
-            detail=f"invalid method: {method!r}, valid: {list(valid_methods)}",
-        )
+    _validate_forecast_window(horizon, history_n)
+    _validate_forecast_method(method)
     if since_sim_day is not None and since_sim_day < 0:
         raise HTTPException(status_code=400, detail="since_sim_day must be >= 0")
     if until_sim_day is not None and until_sim_day < 0:
@@ -474,33 +466,19 @@ async def get_forecast(
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
 
-    if horizon < 1 or horizon > 30:
-        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
-    if history_n < 2 or history_n > 90:
-        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+    _validate_forecast_window(horizon, history_n)
+    _validate_forecast_method(method, allow_auto=True)
 
-    valid_methods = ("linear", "moving_average", "exponential_smoothing", "auto")
-    if method not in valid_methods:
-        raise HTTPException(
-            status_code=400,
-            detail=f"invalid method: {method!r}, valid: {list(valid_methods)}",
-        )
-
-    metrics_list = None
-    if metrics:
-        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
-        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
-        invalid = [m for m in metrics_list if m not in valid_metrics]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
-            )
+    metrics_list = _parse_forecast_metrics(metrics)
 
     # iter #35: method=auto → 使用各 metric 持久化的最佳 method
     if method == "auto":
-        # 没指定 metrics → 默认全部 metric
-        targets = metrics_list or list(valid_metrics)
+        # 没指定 metrics → 默认全部 metric。
+        # iter #84: 原来这里是 ``list(valid_metrics)`` —— valid_metrics 是 **set**,
+        # set 的迭代顺序跟 PYTHONHASHSEED 走, **每个进程可能不一样** →
+        # ``targets[0]`` 到底是哪个 metric 是**不确定的** → 同一次请求在两个进程里
+        # 可能自动选了不同的 method。改成 sorted() → 确定性。
+        targets = metrics_list or sorted(_VALID_FORECAST_METRICS)
         method = coordinator.persistence.get_best_method(targets[0]) or "linear"
         # 注: 只支持单一 method, 如果多 metric 有不同最佳 method, 只能取第一个
         # (这种情况推荐用 /api/persistence/forecast/multi 看对比, 或
@@ -519,6 +497,248 @@ async def get_forecast(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ---------------------------------------------------------------- forecast helpers
+#
+# iter #84: ``get_forecast_confidence`` 的圈复杂度是 **32** —— 全仓库第二高。
+# 这轮把它降到 10 以下。
+#
+# 拆分原则(和 ADR-0015 拆 router 包时同一条): **只搬代码, 不改行为**。
+# 复杂度是「门禁关心的东西」, 端点契约 (ADR-0011 / ADR-0012 / ADR-0014) 才是
+# 「客户关心的东西」 —— 后者必须一个字节都不变, 由那三层门禁当场证明。
+#
+# 为什么这些 helper 值得单独拎出来: 这个端点原来同时干了三件事 ——
+# (1) 解析并校验查询参数, (2) 跑多个预测方法并合成 ensemble,
+# (3) 把结果落库 (fire-and-forget)。三件事各自有各自的失败模式:
+# 参数错误要 400, numpy 缺失要 501, 落库失败**不能**影响返回。
+# 混在一个函数里, 「落库失败别把整个请求搞挂」这条业务规则就被埋在了
+# 第 180 行的一个 try/except 里 —— 拆分之后, 它变成了函数的**名字**。
+
+_VALID_FORECAST_METHODS = ("linear", "moving_average", "exponential_smoothing")
+_VALID_FORECAST_METHODS_WITH_AUTO = ("linear", "moving_average", "exponential_smoothing", "auto")
+_VALID_FORECAST_METRICS = ("cost_sek", "co2_kg", "util_pct", "matches")
+
+
+def _validate_forecast_window(horizon: int, history_n: int) -> None:
+    """校验 horizon / history_n 取值范围(四个 forecast 端点共用同一套规则)。
+
+    iter #84: 以前每个端点各写一遍 —— 四份**看起来一样**的校验代码,
+    其中 ``/forecast`` 那个曾经漏过一个分支。规则只留一份, 就不会再漂。
+    """
+    if horizon < 1 or horizon > 30:
+        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
+    if history_n < 2 or history_n > 90:
+        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+
+
+def _validate_forecast_method(method: str, allow_auto: bool = False) -> None:
+    """校验单个 ``method`` 参数(单方法端点用)。"""
+    valid = _VALID_FORECAST_METHODS_WITH_AUTO if allow_auto else _VALID_FORECAST_METHODS
+    if method not in valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid method: {method!r}, valid: {list(valid)}",
+        )
+
+
+def _parse_forecast_methods(methods: Optional[str]) -> List[str]:
+    """解析 ``methods`` 查询参数 → 方法列表(带白名单校验)。
+
+    空参数 = 用全部三种方法(原行为: 不传 methods 就跑全套)。
+    """
+    if not methods:
+        return list(_VALID_FORECAST_METHODS)
+    methods_list = [m.strip() for m in methods.split(",") if m.strip()]
+    invalid = [m for m in methods_list if m not in _VALID_FORECAST_METHODS]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid methods: {invalid}, valid: {list(_VALID_FORECAST_METHODS)}",
+        )
+    return methods_list
+
+
+def _parse_forecast_metrics(metrics: Optional[str]) -> Optional[List[str]]:
+    """解析 ``metrics`` 查询参数 → 指标列表(带白名单校验)。
+
+    返回 ``None`` = 不限定指标(交给持久化层决定跑哪些)。
+    """
+    if not metrics:
+        return None
+    metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+    invalid = [m for m in metrics_list if m not in _VALID_FORECAST_METRICS]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid metrics: {invalid}, valid: {sorted(_VALID_FORECAST_METRICS)}",
+        )
+    return metrics_list
+
+
+def _run_forecast_methods(coordinator: Any, horizon: int, history_n: int,
+                           metrics_list: Optional[List[str]],
+                           methods_list: List[str]
+                           ) -> Tuple[Dict[str, Dict[str, Any]], Optional[int], List[int]]:
+    """跑每个方法的预测 → ``(per_method_results, last_sim_day, forecast_sim_days)``。
+
+    iter #84: 三个返回值一起返回, 因为 ``/forecast`` 和 ``/forecast/multi`` **需要的东西一样** ——
+    后者只是额外要 ``last_sim_day`` / ``forecast_sim_days``。
+    早先两个端点各写一遍循环, 现在只有一份实现:
+    **第二个端点复用第一个端点拆出来的 helper, 一行都没抄。**
+    """
+    per_method_results: Dict[str, Dict[str, Any]] = {}
+    last_sim_day: Optional[int] = None
+    forecast_sim_days: List[int] = []
+    for method in methods_list:
+        r = coordinator.persistence.forecast_next_n_sim_days(
+            horizon=horizon,
+            history_n=history_n,
+            metrics=metrics_list,
+            method=method,
+        )
+        per_method_results[method] = r
+        last_sim_day = r.get("last_sim_day", last_sim_day)
+        forecast_sim_days = r.get("forecast_sim_days", forecast_sim_days)
+    return per_method_results, last_sim_day, forecast_sim_days
+
+
+def _per_method_quality(method_results: Dict[str, Dict[str, Any]], metric: str
+                         ) -> Dict[str, Dict[str, float]]:
+    """每个方法在某个 metric 上的质量分(R² / residual_std)。"""
+    quality: Dict[str, Dict[str, float]] = {}
+    for method, result in method_results.items():
+        metric_data = result.get("metrics", {}).get(metric, {})
+        quality[method] = {
+            "r_squared": metric_data.get("r_squared", 0.0),
+            "residual_std": metric_data.get("residual_std", 0.0),
+        }
+    return quality
+
+
+def _build_ensemble(forecast_by_method: Dict[str, List[Dict[str, Any]]],
+                    methods_list: List[str],
+                    sim_days: List[Any]) -> List[Dict[str, Any]]:
+    """把多个方法的预测合成 ensemble(均值 / 标准差 / 95% 区间 / 离散度)。
+
+    **离散度(dispersion_pct)是这个端点真正的价值**: 方法之间分歧越大,
+    说明这个预测越不可信 —— 客户据此决定要不要多囤一点货。
+    """
+    ensemble = []
+    for i, sim_day in enumerate(sim_days):
+        values = []
+        for method in methods_list:
+            points = forecast_by_method.get(method, [])
+            if i < len(points) and points[i].get("value") is not None:
+                values.append(float(points[i]["value"]))
+        if not values:
+            continue
+        mean_value = sum(values) / len(values)
+        if len(values) > 1:
+            std_value = (sum((v - mean_value) ** 2 for v in values) / (len(values) - 1)) ** 0.5
+        else:
+            std_value = 0.0
+        ci_half = 1.96 * std_value
+        dispersion = (std_value / abs(mean_value) * 100) if mean_value else 0.0
+        ensemble.append({
+            "sim_day": sim_day,
+            "mean": round(mean_value, 2),
+            "stddev": round(std_value, 2),
+            "lower_95": round(mean_value - ci_half, 2),
+            "upper_95": round(mean_value + ci_half, 2),
+            "dispersion_pct": round(dispersion, 2),
+            "n_methods": len(values),
+        })
+    return ensemble
+
+
+def _pick_best_method(methods_list: List[str],
+                      per_method_quality: Dict[str, Dict[str, float]]) -> str:
+    """选最佳方法: linear 看 R², 其余看 residual_std(越小越好)。
+
+    平手时按 ``methods_list`` 的顺序取第一个 —— **确定性**很重要:
+    同一份数据每次都该给出同一个 best_method, 否则客户端的偏好记录会飘。
+    """
+    best_method = methods_list[0]
+    best_score = -float("inf")
+    for method in methods_list:
+        quality = per_method_quality.get(method, {})
+        score = quality.get("r_squared", 0.0) if method == "linear" else -quality.get("residual_std", float("inf"))
+        if score > best_score:
+            best_method = method
+            best_score = score
+    return best_method
+
+
+def _build_metric_confidence(metric: str, method_results: Dict[str, Dict[str, Any]],
+                              methods_list: List[str]) -> Dict[str, Any]:
+    """单个 metric 的 confidence 结构(历史 + ensemble + 每方法质量 + 最佳方法)。"""
+    histories: List[List[Dict[str, Any]]] = [
+        result.get("metrics", {}).get(metric, {}).get("history", [])
+        for result in method_results.values()
+    ]
+    history: List[Dict[str, Any]] = next((h for h in histories if h), [])
+    forecast_by_method = {
+        method: result.get("metrics", {}).get(metric, {}).get("forecast", [])
+        for method, result in method_results.items()
+    }
+    sim_days = [p.get("sim_day") for p in next((v for v in forecast_by_method.values() if v), [])]
+    per_method_quality = _per_method_quality(method_results, metric)
+    ensemble = _build_ensemble(forecast_by_method, methods_list, sim_days)
+    best_method = _pick_best_method(methods_list, per_method_quality)
+    return {
+        "history": history,
+        "forecast": ensemble,
+        "per_method_quality": per_method_quality,
+        "best_method": best_method,
+        "n_methods": len(methods_list),
+    }
+
+
+def _save_method_prefs(coordinator: Any, confidence: Dict[str, Any], history_n: int) -> None:
+    """持久化每个 metric 的最佳方法(fire-and-forget)。
+
+    **落库失败不影响返回** —— 偏好记录是「锦上添花」, 不是客户要的东西。
+    """
+    for metric, conf in confidence.items():
+        best = conf["best_method"]
+        r2 = conf["per_method_quality"].get(best, {}).get("r_squared")
+        try:
+            coordinator.persistence.save_method_pref(
+                metric=metric,
+                method=best,
+                r_squared=r2,
+                history_n=history_n,
+            )
+        except Exception as e:
+            logger.debug(f"save_method_pref failed (ignore): {e}")
+
+
+def _record_forecast_predictions(coordinator: Any, method_results: Dict[str, Dict[str, Any]],
+                                 last_sim_day: int) -> None:
+    """记录预测值, 供之后的 calibration 回填实际值算 MAE / MAPE / RMSE。"""
+    for method, result in method_results.items():
+        for metric_key, metric_data in result.get("metrics", {}).items():
+            forecast_points = metric_data.get("forecast", [])
+            if not forecast_points:
+                continue
+            try:
+                coordinator.persistence.record_forecast_predictions(
+                    metric=metric_key,
+                    method=method,
+                    predictions=forecast_points,
+                    created_at_sim_day=int(last_sim_day),
+                )
+            except Exception as e:
+                logger.debug(f"record_forecast_predictions failed (ignore): {e}")
+
+
+def _backfill_forecast_actuals(coordinator: Any) -> None:
+    """回填历史预测的实际值(fire-and-forget)。"""
+    try:
+        coordinator.persistence.backfill_forecast_actuals()
+    except Exception as e:
+        logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+
+
 @router.get("/api/persistence/forecast-confidence")
 async def get_forecast_confidence(
     horizon: int = 7,
@@ -533,45 +753,22 @@ async def get_forecast_confidence(
     - ensemble mean + standard deviation + 95% interval
     - dispersion_pct (higher = methods disagree)
     - best_method (highest R² for linear / lowest residual_std otherwise)
+
+    iter #84: 复杂度 32 → 10 以下(拆成上面那组 helper)。**行为零变化** ——
+    响应体的字段名 / 类型 / 顺序由 ADR-0012 的形状快照冻着, 一个字节没动。
     """
     coordinator = _coordinator()
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
-    if horizon < 1 or horizon > 30:
-        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
-    if history_n < 2 or history_n > 90:
-        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
+    _validate_forecast_window(horizon, history_n)
 
-    valid_methods_all = ("linear", "moving_average", "exponential_smoothing")
-    methods_list = list(valid_methods_all)
-    if methods:
-        methods_list = [m.strip() for m in methods.split(",") if m.strip()]
-        invalid = [m for m in methods_list if m not in valid_methods_all]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid methods: {invalid}, valid: {list(valid_methods_all)}",
-            )
-    metrics_list = None
-    if metrics:
-        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
-        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
-        invalid = [m for m in metrics_list if m not in valid_metrics]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
-            )
+    methods_list = _parse_forecast_methods(methods)
+    metrics_list = _parse_forecast_metrics(metrics)
 
     try:
-        method_results: Dict[str, Dict[str, Any]] = {}
-        for method in methods_list:
-            method_results[method] = coordinator.persistence.forecast_next_n_sim_days(
-                horizon=horizon,
-                history_n=history_n,
-                metrics=metrics_list,
-                method=method,
-            )
+        method_results, _last_sim_day, _forecast_sim_days = _run_forecast_methods(
+            coordinator, horizon, history_n, metrics_list, methods_list
+        )
         if not method_results:
             return {"horizon": horizon, "history_n": history_n, "methods": [],
                     "last_sim_day": None, "forecast_sim_days": [],
@@ -581,107 +778,17 @@ async def get_forecast_confidence(
         metric_keys = list(first_result.get("metrics", {}).keys())
         confidence: Dict[str, Any] = {}
         for metric in metric_keys:
-            histories: List[List[Dict[str, Any]]] = [
-                result.get("metrics", {}).get(metric, {}).get("history", [])
-                for result in method_results.values()
-            ]
-            history: List[Dict[str, Any]] = next((h for h in histories if h), [])
-            forecast_by_method = {
-                method: result.get("metrics", {}).get(metric, {}).get("forecast", [])
-                for method, result in method_results.items()
-            }
-            sim_days = [p.get("sim_day") for p in next((v for v in forecast_by_method.values() if v), [])]
-            ensemble = []
-            per_method_quality = {}
-            for method, points in forecast_by_method.items():
-                metric_data = method_results[method].get("metrics", {}).get(metric, {})
-                r2 = metric_data.get("r_squared", 0.0)
-                residual = metric_data.get("residual_std", 0.0)
-                per_method_quality[method] = {
-                    "r_squared": r2,
-                    "residual_std": residual,
-                }
-            for i, sim_day in enumerate(sim_days):
-                values = []
-                for method in methods_list:
-                    points = forecast_by_method.get(method, [])
-                    if i < len(points) and points[i].get("value") is not None:
-                        values.append(float(points[i]["value"]))
-                if not values:
-                    continue
-                mean_value = sum(values) / len(values)
-                if len(values) > 1:
-                    std_value = (sum((v - mean_value) ** 2 for v in values) / (len(values) - 1)) ** 0.5
-                else:
-                    std_value = 0.0
-                ci_half = 1.96 * std_value
-                dispersion = (std_value / abs(mean_value) * 100) if mean_value else 0.0
-                ensemble.append({
-                    "sim_day": sim_day,
-                    "mean": round(mean_value, 2),
-                    "stddev": round(std_value, 2),
-                    "lower_95": round(mean_value - ci_half, 2),
-                    "upper_95": round(mean_value + ci_half, 2),
-                    "dispersion_pct": round(dispersion, 2),
-                    "n_methods": len(values),
-                })
-            # For non-linear methods, lower residual_std is the useful score; for
-            # linear, prefer R². Choose deterministically (method order on ties).
-            best_method = methods_list[0]
-            best_score = -float("inf")
-            for method in methods_list:
-                quality = per_method_quality.get(method, {})
-                score = quality.get("r_squared", 0.0) if method == "linear" else -quality.get("residual_std", float("inf"))
-                if score > best_score:
-                    best_method = method
-                    best_score = score
-            confidence[metric] = {
-                "history": history,
-                "forecast": ensemble,
-                "per_method_quality": per_method_quality,
-                "best_method": best_method,
-                "n_methods": len(methods_list),
-            }
+            confidence[metric] = _build_metric_confidence(metric, method_results, methods_list)
 
-        # iter #35: 持久化每个 metric 的最佳 method (fire-and-forget)
-        # 不抛异常, 失败只记 debug log — 不能因为 pref save 失败影响 forecast 返回
-        for metric, conf in confidence.items():
-            best = conf["best_method"]
-            r2 = conf["per_method_quality"].get(best, {}).get("r_squared")
-            try:
-                coordinator.persistence.save_method_pref(
-                    metric=metric,
-                    method=best,
-                    r_squared=r2,
-                    history_n=history_n,
-                )
-            except Exception as e:
-                logger.debug(f"save_method_pref failed (ignore): {e}")
+        _save_method_prefs(coordinator, confidence, history_n)
 
         # iter #42: record predictions for calibration (fire-and-forget)
         # Stores each method's predicted value at each forecast_sim_day.
         # Once that sim_day arrives in optimization_cycles, /api/persistence/forecast-calibration
         # backfills actual_value + error to compute MAE / MAPE / RMSE.
         last_sim_day = first_result.get("last_sim_day") or 0
-        for method, result in method_results.items():
-            for metric_key, metric_data in result.get("metrics", {}).items():
-                forecast_points = metric_data.get("forecast", [])
-                if not forecast_points:
-                    continue
-                try:
-                    coordinator.persistence.record_forecast_predictions(
-                        metric=metric_key,
-                        method=method,
-                        predictions=forecast_points,
-                        created_at_sim_day=int(last_sim_day),
-                    )
-                except Exception as e:
-                    logger.debug(f"record_forecast_predictions failed (ignore): {e}")
-        # Backfill actuals for past predictions (fire-and-forget)
-        try:
-            coordinator.persistence.backfill_forecast_actuals()
-        except Exception as e:
-            logger.debug(f"backfill_forecast_actuals failed (ignore): {e}")
+        _record_forecast_predictions(coordinator, method_results, last_sim_day)
+        _backfill_forecast_actuals(coordinator)
 
         return {
             "horizon": horizon,
@@ -862,6 +969,35 @@ async def get_forecast_calibration_trend(
     }
 
 
+def _parse_lead_time_buckets(lead_time_buckets: Optional[str]) -> Optional[List[Tuple[int, int]]]:
+    """解析 ``lead_time_buckets`` ("1-1,2-7,8-30") → ``[(lo, hi), ...]``。
+
+    iter #84: 从 ``get_prediction_accuracy_by_day`` 里搬出来的 —— 原来这个解析
+    循环**嵌在端点里**, 一眼看过去以为端点主体是「算准确率」, 其实有三分之一的
+    代码是在**解析字符串**。搬出来之后, 端点只剩业务逻辑。
+    """
+    if not lead_time_buckets:
+        return None
+    try:
+        parsed: List[Tuple[int, int]] = []
+        for token in lead_time_buckets.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            lo_s, hi_s = token.split("-", 1)
+            parsed.append((int(lo_s.strip()), int(hi_s.strip())))
+        return parsed
+    except (ValueError, AttributeError) as e:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"invalid lead_time_buckets format: {lead_time_buckets!r}. "
+                f"Expected comma-separated 'lo-hi' pairs (e.g. '1-1,2-7,8-30'). "
+                f"Error: {e}"
+            ),
+        )
+
+
 @router.get("/api/persistence/prediction-accuracy-by-day")
 async def get_prediction_accuracy_by_day(
     metric: Optional[str] = None,
@@ -924,25 +1060,7 @@ async def get_prediction_accuracy_by_day(
         )
 
     # Parse lead_time_buckets CSV into list of tuples
-    parsed_buckets: Optional[List[Tuple[int, int]]] = None
-    if lead_time_buckets:
-        try:
-            parsed_buckets = []
-            for token in lead_time_buckets.split(","):
-                token = token.strip()
-                if not token:
-                    continue
-                lo_s, hi_s = token.split("-", 1)
-                parsed_buckets.append((int(lo_s.strip()), int(hi_s.strip())))
-        except (ValueError, AttributeError) as e:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"invalid lead_time_buckets format: {lead_time_buckets!r}. "
-                    f"Expected comma-separated 'lo-hi' pairs (e.g. '1-1,2-7,8-30'). "
-                    f"Error: {e}"
-                ),
-            )
+    parsed_buckets = _parse_lead_time_buckets(lead_time_buckets)
 
     # Backfill any new actuals first
     try:
@@ -957,6 +1075,41 @@ async def get_prediction_accuracy_by_day(
         since_created_day=since_created_day,
         until_created_day=until_created_day,
     )
+
+
+def _build_metric_comparison(metric: str, per_method_results: Dict[str, Dict[str, Any]],
+                             methods_list: List[str],
+                             first_result: Dict[str, Any]) -> Dict[str, Any]:
+    """单个 metric 的多方法对比结构(历史 + 各方法预测 + 末值 + 变化率)。
+
+    ``change_from_mean_pct`` = 末值相对**历史均值**的变化率 ——
+    前端拿它做「这个方法比历史趋势高多少」的着色。
+    """
+    forecasts_per_method: Dict[str, List[Dict[str, Any]]] = {}
+    history_out: List[Dict[str, Any]] = []
+    for method in methods_list:
+        metric_data = per_method_results[method]["metrics"].get(metric, {})
+        if not history_out and metric_data.get("history"):
+            history_out = metric_data["history"]
+        forecasts_per_method[method] = metric_data.get("forecast", [])
+
+    final_values: Dict[str, float] = {}
+    range_pct: Dict[str, float] = {}
+    mean_history = first_result["metrics"][metric].get("mean_value", 0.0)
+    for method, fc_list in forecasts_per_method.items():
+        if not fc_list:
+            continue
+        last = fc_list[-1]["value"]
+        final_values[method] = last
+        if mean_history and mean_history != 0:
+            range_pct[method] = round((last - mean_history) / mean_history * 100, 2)
+
+    return {
+        "history": history_out,
+        "forecasts": forecasts_per_method,
+        "final_values": final_values,
+        "change_from_mean_pct": range_pct,
+    }
 
 
 @router.get("/api/persistence/forecast/multi")
@@ -1000,49 +1153,16 @@ async def get_forecast_multi(
     coordinator = _coordinator()
     if coordinator is None or coordinator.persistence is None:
         raise HTTPException(status_code=503, detail="Persistence not initialized")
+    _validate_forecast_window(horizon, history_n)
 
-    if horizon < 1 or horizon > 30:
-        raise HTTPException(status_code=400, detail=f"horizon must be 1-30, got {horizon}")
-    if history_n < 2 or history_n > 90:
-        raise HTTPException(status_code=400, detail=f"history_n must be 2-90, got {history_n}")
-
-    valid_methods_all = ("linear", "moving_average", "exponential_smoothing")
-    methods_list = list(valid_methods_all)
-    if methods:
-        methods_list = [m.strip() for m in methods.split(",") if m.strip()]
-        invalid = [m for m in methods_list if m not in valid_methods_all]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid methods: {invalid}, valid: {list(valid_methods_all)}",
-            )
-
-    metrics_list = None
-    if metrics:
-        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
-        valid_metrics = {"cost_sek", "co2_kg", "util_pct", "matches"}
-        invalid = [m for m in metrics_list if m not in valid_metrics]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid metrics: {invalid}, valid: {sorted(valid_metrics)}",
-            )
+    methods_list = _parse_forecast_methods(methods)
+    metrics_list = _parse_forecast_metrics(metrics)
 
     try:
         # Run each method
-        per_method_results: Dict[str, Dict[str, Any]] = {}
-        last_sim_day = None
-        forecast_sim_days: List[int] = []
-        for method in methods_list:
-            r = coordinator.persistence.forecast_next_n_sim_days(
-                horizon=horizon,
-                history_n=history_n,
-                metrics=metrics_list,
-                method=method,
-            )
-            per_method_results[method] = r
-            last_sim_day = r.get("last_sim_day", last_sim_day)
-            forecast_sim_days = r.get("forecast_sim_days", forecast_sim_days)
+        per_method_results, last_sim_day, forecast_sim_days = _run_forecast_methods(
+            coordinator, horizon, history_n, metrics_list, methods_list
+        )
 
         # Build comparison structure
         # Use first method's metric keys as canonical
@@ -1061,32 +1181,9 @@ async def get_forecast_multi(
 
         comparison: Dict[str, Any] = {}
         for metric in metric_keys:
-            forecasts_per_method: Dict[str, List[Dict[str, Any]]] = {}
-            history_out: List[Dict[str, Any]] = []
-            for method in methods_list:
-                metric_data = per_method_results[method]["metrics"].get(metric, {})
-                if not history_out and metric_data.get("history"):
-                    history_out = metric_data["history"]
-                forecasts_per_method[method] = metric_data.get("forecast", [])
-
-            # Compute final values + change %
-            final_values: Dict[str, float] = {}
-            range_pct: Dict[str, float] = {}
-            mean_history = first_result["metrics"][metric].get("mean_value", 0.0)
-            for method, fc_list in forecasts_per_method.items():
-                if not fc_list:
-                    continue
-                last = fc_list[-1]["value"]
-                final_values[method] = last
-                if mean_history and mean_history != 0:
-                    range_pct[method] = round((last - mean_history) / mean_history * 100, 2)
-
-            comparison[metric] = {
-                "history": history_out,
-                "forecasts": forecasts_per_method,
-                "final_values": final_values,
-                "change_from_mean_pct": range_pct,
-            }
+            comparison[metric] = _build_metric_comparison(
+                metric, per_method_results, methods_list, first_result
+            )
 
         return {
             "horizon": horizon,

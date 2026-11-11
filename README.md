@@ -311,11 +311,12 @@ docker run -p 8000:8000 green-logistics-backend
 ### Architecture Decision Records (ADR)
 
 Every non-obvious design choice is written down with its context, alternatives and cost —
-see [`docs/adr/`](docs/adr/README.md) (14 ADRs: multi-agent orchestration, OR-Tools VRP core,
+see [`docs/adr/`](docs/adr/README.md) (16 ADRs: multi-agent orchestration, OR-Tools VRP core,
 LLM config source of truth, LLM resilience + observability, SQLite persistence, CI strategy,
 frontend & deployment, Google GenAI SDK migration, persistence-layer package split,
 public-API contract test, HTTP-API contract test, HTTP response-shape snapshot,
-endpoint auto-discovery + explicit exemption registry, export column contract).
+endpoint auto-discovery + explicit exemption registry, export column contract,
+API-layer router split, cyclomatic-complexity ratchet gate).
 
 ### References
 
@@ -513,11 +514,12 @@ docker run -p 8000:8000 green-logistics-backend
 ### 架构决策记录（ADR）
 
 所有「为什么不那么做」的决策都留了档（背景 / 备选 / 决策 / 代价）：
-[`docs/adr/`](docs/adr/README.md) —— 共 15 篇：多智能体编排、OR-Tools VRP 内核、
+[`docs/adr/`](docs/adr/README.md) —— 共 16 篇：多智能体编排、OR-Tools VRP 内核、
 LLM 配置单一来源、LLM 韧性与可观测、SQLite 持久化、CI 策略、前端与部署、
 Google GenAI SDK 迁移、持久化层拆包、公开 API 契约测试、HTTP API 契约测试、
 响应体运行时形状快照、端点自动发现与显式豁免登记册、导出端点列契约冻结、
-API 层拆包（main.py 8,303 → 4,720 行，公开 HTTP API 零变化）。
+API 层拆包（main.py 8,303 → 4,720 行，公开 HTTP API 零变化）、
+圈复杂度棘轮门禁（lint 规则第一次有了牙齿，persistence router 模块全部降到阈值内）。
 
 ### 参考资料
 

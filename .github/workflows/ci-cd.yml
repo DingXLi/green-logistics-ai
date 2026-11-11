@@ -66,6 +66,15 @@ jobs:
           --no-strict-optional \
           --explicit-package-bases
 
+    - name: Complexity ratchet gate (iter #84)
+      run: |
+        # 圈复杂度棘轮 (ADR-0016): 已有的函数**不许变难**, 新函数必须 ≤ 10。
+        # 红灯条件: 某个函数复杂度比基线高 / 新函数超阈值 / 基线里的函数消失了。
+        # 现状: 486 个函数里还有 49 个超阈值 —— 这条门禁不是要一次还完,
+        # 是要让「还债」变成可测量的、可评审的日常 (债务只许降, 不许涨)。
+        # 故意改复杂时: python scripts/gen_complexity_baseline.py --write + 在 PR 里说明。
+        python scripts/gen_complexity_baseline.py
+
     - name: Security scan dependencies (iter #16)
       run: |
         # Try pip-audit (canonical), fall back to heuristic scanner in scripts/security_scan.sh

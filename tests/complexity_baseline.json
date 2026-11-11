@@ -1,0 +1,2158 @@
+{
+  "functions": {
+    "agents/clock.py::SimClock.__init__": {
+      "complexity": 1,
+      "lineno": 54
+    },
+    "agents/clock.py::SimClock.activity_factor": {
+      "complexity": 2,
+      "lineno": 64
+    },
+    "agents/clock.py::SimClock.advance_day": {
+      "complexity": 1,
+      "lineno": 75
+    },
+    "agents/clock.py::SimClock.advance_hours": {
+      "complexity": 2,
+      "lineno": 84
+    },
+    "agents/clock.py::SimClock.iso_now": {
+      "complexity": 1,
+      "lineno": 71
+    },
+    "agents/clock.py::SimClock.reset": {
+      "complexity": 1,
+      "lineno": 93
+    },
+    "agents/clock.py::SimClock.state": {
+      "complexity": 1,
+      "lineno": 98
+    },
+    "agents/clock.py::SimTime.__str__": {
+      "complexity": 1,
+      "lineno": 30
+    },
+    "agents/clock.py::SimTime.to_iso": {
+      "complexity": 1,
+      "lineno": 24
+    },
+    "agents/coordinator.py::MultiAgentCoordinator.__init__": {
+      "complexity": 2,
+      "lineno": 95
+    },
+    "agents/coordinator.py::MultiAgentCoordinator._bootstrap_world": {
+      "complexity": 2,
+      "lineno": 146
+    },
+    "agents/coordinator.py::MultiAgentCoordinator._build_vrp_inputs": {
+      "complexity": 7,
+      "lineno": 550
+    },
+    "agents/coordinator.py::MultiAgentCoordinator._compute_demand_multiplier": {
+      "complexity": 1,
+      "lineno": 529
+    },
+    "agents/coordinator.py::MultiAgentCoordinator._extract_kpi": {
+      "complexity": 1,
+      "lineno": 597
+    },
+    "agents/coordinator.py::MultiAgentCoordinator._per_demand_jitter": {
+      "complexity": 1,
+      "lineno": 543
+    },
+    "agents/coordinator.py::MultiAgentCoordinator.get_system_overview": {
+      "complexity": 2,
+      "lineno": 188
+    },
+    "agents/coordinator.py::MultiAgentCoordinator.register_supply_agent": {
+      "complexity": 1,
+      "lineno": 179
+    },
+    "agents/coordinator.py::MultiAgentCoordinator.run_optimization_cycle": {
+      "complexity": 31,
+      "lineno": 212
+    },
+    "agents/coordinator.py::MultiAgentCoordinator.simulate_day": {
+      "complexity": 2,
+      "lineno": 615
+    },
+    "agents/coordinator.py::_get_perturbed_seasonal": {
+      "complexity": 5,
+      "lineno": 46
+    },
+    "agents/coordinator.py::main": {
+      "complexity": 1,
+      "lineno": 633
+    },
+    "agents/llm_caller.py::_build_retry_decorator": {
+      "complexity": 1,
+      "lineno": 162
+    },
+    "agents/llm_caller.py::_classify_http_error": {
+      "complexity": 7,
+      "lineno": 132
+    },
+    "agents/llm_caller.py::_ensure_configured": {
+      "complexity": 2,
+      "lineno": 180
+    },
+    "agents/llm_caller.py::_get_client": {
+      "complexity": 2,
+      "lineno": 75
+    },
+    "agents/llm_caller.py::_reset_client_cache": {
+      "complexity": 1,
+      "lineno": 67
+    },
+    "agents/llm_caller.py::_safe_msg": {
+      "complexity": 1,
+      "lineno": 110
+    },
+    "agents/llm_caller.py::call_gemini": {
+      "complexity": 15,
+      "lineno": 191
+    },
+    "agents/llm_caller.py::call_gemini_safe": {
+      "complexity": 3,
+      "lineno": 316
+    },
+    "agents/llm_config.py::_load_yaml_settings": {
+      "complexity": 6,
+      "lineno": 37
+    },
+    "agents/llm_config.py::get_llm_config": {
+      "complexity": 10,
+      "lineno": 55
+    },
+    "agents/llm_config.py::reload": {
+      "complexity": 1,
+      "lineno": 105
+    },
+    "agents/llm_tracker.py::LLMCallRecord.to_dict": {
+      "complexity": 1,
+      "lineno": 61
+    },
+    "agents/llm_tracker.py::LLMTracker.__init__": {
+      "complexity": 1,
+      "lineno": 111
+    },
+    "agents/llm_tracker.py::LLMTracker._estimate_cost_usd": {
+      "complexity": 2,
+      "lineno": 123
+    },
+    "agents/llm_tracker.py::LLMTracker.get_recent": {
+      "complexity": 1,
+      "lineno": 218
+    },
+    "agents/llm_tracker.py::LLMTracker.get_stats": {
+      "complexity": 1,
+      "lineno": 200
+    },
+    "agents/llm_tracker.py::LLMTracker.record": {
+      "complexity": 4,
+      "lineno": 133
+    },
+    "agents/llm_tracker.py::LLMTracker.reset": {
+      "complexity": 1,
+      "lineno": 224
+    },
+    "agents/llm_tracker.py::_empty_stats_dict": {
+      "complexity": 1,
+      "lineno": 76
+    },
+    "agents/llm_tracker.py::get_llm_tracker": {
+      "complexity": 3,
+      "lineno": 246
+    },
+    "agents/logistics_agent.py::LogisticsAgent.__init__": {
+      "complexity": 1,
+      "lineno": 25
+    },
+    "agents/logistics_agent.py::LogisticsAgent._get_instruction": {
+      "complexity": 1,
+      "lineno": 57
+    },
+    "agents/logistics_agent.py::LogisticsAgent._initialize_vehicles": {
+      "complexity": 2,
+      "lineno": 40
+    },
+    "agents/logistics_agent.py::LogisticsAgent.assign_route": {
+      "complexity": 2,
+      "lineno": 138
+    },
+    "agents/logistics_agent.py::LogisticsAgent.calculate_route_cost": {
+      "complexity": 1,
+      "lineno": 168
+    },
+    "agents/logistics_agent.py::LogisticsAgent.get_fleet_status": {
+      "complexity": 1,
+      "lineno": 70
+    },
+    "agents/logistics_agent.py::LogisticsAgent.get_tools": {
+      "complexity": 1,
+      "lineno": 273
+    },
+    "agents/logistics_agent.py::LogisticsAgent.get_vehicle_details": {
+      "complexity": 3,
+      "lineno": 131
+    },
+    "agents/logistics_agent.py::LogisticsAgent.inject_fleet": {
+      "complexity": 1,
+      "lineno": 110
+    },
+    "agents/logistics_agent.py::LogisticsAgent.optimize_routes": {
+      "complexity": 8,
+      "lineno": 191
+    },
+    "agents/logistics_agent.py::LogisticsAgent.reset_vehicles_for_new_cycle": {
+      "complexity": 3,
+      "lineno": 118
+    },
+    "agents/market_agent.py::MarketAgent.__init__": {
+      "complexity": 1,
+      "lineno": 73
+    },
+    "agents/market_agent.py::MarketAgent._get_instruction": {
+      "complexity": 1,
+      "lineno": 130
+    },
+    "agents/market_agent.py::MarketAgent._initialize_demand_points": {
+      "complexity": 1,
+      "lineno": 101
+    },
+    "agents/market_agent.py::MarketAgent.calculate_profit": {
+      "complexity": 1,
+      "lineno": 214
+    },
+    "agents/market_agent.py::MarketAgent.get_demand_status": {
+      "complexity": 1,
+      "lineno": 143
+    },
+    "agents/market_agent.py::MarketAgent.get_material_price": {
+      "complexity": 1,
+      "lineno": 180
+    },
+    "agents/market_agent.py::MarketAgent.get_tools": {
+      "complexity": 1,
+      "lineno": 505
+    },
+    "agents/market_agent.py::MarketAgent.inject_demands": {
+      "complexity": 1,
+      "lineno": 172
+    },
+    "agents/market_agent.py::MarketAgent.match_supply_demand": {
+      "complexity": 14,
+      "lineno": 235
+    },
+    "agents/market_agent.py::MarketAgent.predict_demand": {
+      "complexity": 7,
+      "lineno": 383
+    },
+    "agents/market_agent.py::MarketAgent.record_price_update": {
+      "complexity": 3,
+      "lineno": 195
+    },
+    "agents/market_agent.py::_analyze_price_trend": {
+      "complexity": 5,
+      "lineno": 36
+    },
+    "agents/market_agent.py::_haversine_km": {
+      "complexity": 1,
+      "lineno": 22
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.forecast_next_n_sim_days": {
+      "complexity": 13,
+      "lineno": 233
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_efficiency_metrics": {
+      "complexity": 7,
+      "lineno": 423
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_fleet_timeseries": {
+      "complexity": 4,
+      "lineno": 81
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_kpi_timeseries": {
+      "complexity": 6,
+      "lineno": 13
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_seasonal_timeseries": {
+      "complexity": 2,
+      "lineno": 126
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_seasonal_timeseries_by_material": {
+      "complexity": 2,
+      "lineno": 166
+    },
+    "agents/persistence/_analytics.py::AnalyticsMixin.get_summary": {
+      "complexity": 3,
+      "lineno": 397
+    },
+    "agents/persistence/_anomalies.py::AnomalyMixin.detect_anomalous_cycles": {
+      "complexity": 14,
+      "lineno": 12
+    },
+    "agents/persistence/_anomalies.py::AnomalyMixin.get_anomaly_summary": {
+      "complexity": 10,
+      "lineno": 117
+    },
+    "agents/persistence/_base.py::PersistenceBase.__init__": {
+      "complexity": 1,
+      "lineno": 19
+    },
+    "agents/persistence/_base.py::PersistenceBase._cache_get": {
+      "complexity": 3,
+      "lineno": 40
+    },
+    "agents/persistence/_base.py::PersistenceBase._cache_key": {
+      "complexity": 1,
+      "lineno": 33
+    },
+    "agents/persistence/_base.py::PersistenceBase._cache_set": {
+      "complexity": 1,
+      "lineno": 51
+    },
+    "agents/persistence/_base.py::PersistenceBase._conn": {
+      "complexity": 3,
+      "lineno": 81
+    },
+    "agents/persistence/_base.py::PersistenceBase._init_schema": {
+      "complexity": 1,
+      "lineno": 95
+    },
+    "agents/persistence/_base.py::PersistenceBase._migrate_add_seasonal_columns": {
+      "complexity": 20,
+      "lineno": 101
+    },
+    "agents/persistence/_base.py::PersistenceBase.cache_clear": {
+      "complexity": 1,
+      "lineno": 59
+    },
+    "agents/persistence/_base.py::PersistenceBase.cache_stats": {
+      "complexity": 1,
+      "lineno": 65
+    },
+    "agents/persistence/_comparisons.py::ComparisonMixin.compare_cycles": {
+      "complexity": 10,
+      "lineno": 310
+    },
+    "agents/persistence/_comparisons.py::ComparisonMixin.compare_materials": {
+      "complexity": 17,
+      "lineno": 482
+    },
+    "agents/persistence/_comparisons.py::ComparisonMixin.compare_routes": {
+      "complexity": 13,
+      "lineno": 772
+    },
+    "agents/persistence/_comparisons.py::ComparisonMixin.cycle_trend_comparison": {
+      "complexity": 15,
+      "lineno": 932
+    },
+    "agents/persistence/_comparisons.py::ComparisonMixin.get_top_facilities_by_distance": {
+      "complexity": 26,
+      "lineno": 12
+    },
+    "agents/persistence/_config.py::ConfigMixin.clear_method_prefs": {
+      "complexity": 1,
+      "lineno": 196
+    },
+    "agents/persistence/_config.py::ConfigMixin.delete_method_pref": {
+      "complexity": 1,
+      "lineno": 187
+    },
+    "agents/persistence/_config.py::ConfigMixin.delete_runtime_config": {
+      "complexity": 1,
+      "lineno": 58
+    },
+    "agents/persistence/_config.py::ConfigMixin.get_best_method": {
+      "complexity": 1,
+      "lineno": 178
+    },
+    "agents/persistence/_config.py::ConfigMixin.get_method_prefs": {
+      "complexity": 1,
+      "lineno": 157
+    },
+    "agents/persistence/_config.py::ConfigMixin.list_runtime_config_overrides": {
+      "complexity": 4,
+      "lineno": 66
+    },
+    "agents/persistence/_config.py::ConfigMixin.load_runtime_config": {
+      "complexity": 4,
+      "lineno": 14
+    },
+    "agents/persistence/_config.py::ConfigMixin.save_method_pref": {
+      "complexity": 5,
+      "lineno": 90
+    },
+    "agents/persistence/_config.py::ConfigMixin.save_runtime_config": {
+      "complexity": 1,
+      "lineno": 36
+    },
+    "agents/persistence/_contract.py::SharedQueryMixin.get_cycle_detail": {
+      "complexity": 1,
+      "lineno": 18
+    },
+    "agents/persistence/_contract.py::SharedQueryMixin.get_cycle_history": {
+      "complexity": 1,
+      "lineno": 9
+    },
+    "agents/persistence/_contract.py::SharedQueryMixin.get_summary": {
+      "complexity": 1,
+      "lineno": 28
+    },
+    "agents/persistence/_cycles.py::CycleMixin.begin_cycle": {
+      "complexity": 1,
+      "lineno": 14
+    },
+    "agents/persistence/_cycles.py::CycleMixin.commit_cycle": {
+      "complexity": 1,
+      "lineno": 56
+    },
+    "agents/persistence/_cycles.py::CycleMixin.get_cycle_detail": {
+      "complexity": 11,
+      "lineno": 247
+    },
+    "agents/persistence/_cycles.py::CycleMixin.get_cycle_history": {
+      "complexity": 7,
+      "lineno": 182
+    },
+    "agents/persistence/_cycles.py::CycleMixin.get_monthly_efficiency_trend": {
+      "complexity": 2,
+      "lineno": 379
+    },
+    "agents/persistence/_cycles.py::CycleMixin.get_recent_cycles": {
+      "complexity": 1,
+      "lineno": 173
+    },
+    "agents/persistence/_cycles.py::CycleMixin.record_demand": {
+      "complexity": 1,
+      "lineno": 116
+    },
+    "agents/persistence/_cycles.py::CycleMixin.record_match": {
+      "complexity": 1,
+      "lineno": 137
+    },
+    "agents/persistence/_cycles.py::CycleMixin.record_route": {
+      "complexity": 1,
+      "lineno": 155
+    },
+    "agents/persistence/_cycles.py::CycleMixin.record_supply": {
+      "complexity": 1,
+      "lineno": 92
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_cycle_detail_csv": {
+      "complexity": 11,
+      "lineno": 288
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_cycles_csv": {
+      "complexity": 3,
+      "lineno": 16
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_cycles_rows": {
+      "complexity": 1,
+      "lineno": 418
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_matches_csv": {
+      "complexity": 3,
+      "lineno": 200
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_matches_rows": {
+      "complexity": 1,
+      "lineno": 439
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_perturbed_supplies_csv": {
+      "complexity": 5,
+      "lineno": 118
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_routes_csv": {
+      "complexity": 3,
+      "lineno": 243
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_routes_rows": {
+      "complexity": 1,
+      "lineno": 454
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_supplies_csv": {
+      "complexity": 3,
+      "lineno": 73
+    },
+    "agents/persistence/_exports.py::ExportMixin.export_supplies_rows": {
+      "complexity": 1,
+      "lineno": 423
+    },
+    "agents/persistence/_forecast_math.py::ForecastMathMixin._fit_exponential_smoothing": {
+      "complexity": 4,
+      "lineno": 60
+    },
+    "agents/persistence/_forecast_math.py::ForecastMathMixin._fit_linear": {
+      "complexity": 3,
+      "lineno": 12
+    },
+    "agents/persistence/_forecast_math.py::ForecastMathMixin._fit_moving_average": {
+      "complexity": 1,
+      "lineno": 43
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.backfill_forecast_actuals": {
+      "complexity": 6,
+      "lineno": 67
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.count_forecast_predictions": {
+      "complexity": 2,
+      "lineno": 201
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.get_forecast_calibration": {
+      "complexity": 6,
+      "lineno": 125
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.get_forecast_calibration_trend": {
+      "complexity": 6,
+      "lineno": 216
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.get_prediction_accuracy_by_day": {
+      "complexity": 12,
+      "lineno": 293
+    },
+    "agents/persistence/_forecasting.py::ForecastMixin.record_forecast_predictions": {
+      "complexity": 5,
+      "lineno": 12
+    },
+    "agents/persistence/_llm.py::LlmMixin.forecast_llm_cost": {
+      "complexity": 11,
+      "lineno": 311
+    },
+    "agents/persistence/_llm.py::LlmMixin.get_llm_cost_by_decision_type": {
+      "complexity": 4,
+      "lineno": 248
+    },
+    "agents/persistence/_llm.py::LlmMixin.get_llm_cost_timeseries": {
+      "complexity": 3,
+      "lineno": 156
+    },
+    "agents/persistence/_llm.py::LlmMixin.get_llm_decision_targets": {
+      "complexity": 2,
+      "lineno": 193
+    },
+    "agents/persistence/_llm.py::LlmMixin.get_llm_decisions": {
+      "complexity": 7,
+      "lineno": 92
+    },
+    "agents/persistence/_llm.py::LlmMixin.get_llm_timeseries": {
+      "complexity": 1,
+      "lineno": 134
+    },
+    "agents/persistence/_llm.py::LlmMixin.record_llm_decision": {
+      "complexity": 1,
+      "lineno": 13
+    },
+    "agents/persistence/_llm.py::LlmMixin.record_llm_decisions_batch": {
+      "complexity": 2,
+      "lineno": 52
+    },
+    "agents/persistence/_maintenance.py::MaintenanceMixin.get_maintenance_log": {
+      "complexity": 1,
+      "lineno": 181
+    },
+    "agents/persistence/_maintenance.py::MaintenanceMixin.should_auto_vacuum": {
+      "complexity": 10,
+      "lineno": 84
+    },
+    "agents/persistence/_maintenance.py::MaintenanceMixin.vacuum": {
+      "complexity": 3,
+      "lineno": 14
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.add_seasonal_perturbation": {
+      "complexity": 2,
+      "lineno": 12
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.clear_seasonal_perturbations": {
+      "complexity": 1,
+      "lineno": 176
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.deactivate_seasonal_perturbation": {
+      "complexity": 1,
+      "lineno": 167
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.delete_seasonal_perturbation": {
+      "complexity": 1,
+      "lineno": 158
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.get_active_perturbations": {
+      "complexity": 2,
+      "lineno": 130
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.get_perturbation_history": {
+      "complexity": 4,
+      "lineno": 80
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.get_perturbation_impact": {
+      "complexity": 5,
+      "lineno": 185
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.get_perturbation_impact_by_material": {
+      "complexity": 5,
+      "lineno": 279
+    },
+    "agents/persistence/_perturbation.py::PerturbationMixin.list_seasonal_perturbations": {
+      "complexity": 2,
+      "lineno": 64
+    },
+    "agents/persistence/_solver.py::SolverMixin.get_cycle_duration_by_problem_size": {
+      "complexity": 30,
+      "lineno": 13
+    },
+    "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_season": {
+      "complexity": 18,
+      "lineno": 458
+    },
+    "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_season_status": {
+      "complexity": 30,
+      "lineno": 922
+    },
+    "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_status": {
+      "complexity": 19,
+      "lineno": 678
+    },
+    "agents/persistence/_solver.py::SolverMixin.get_solver_duration_trend": {
+      "complexity": 14,
+      "lineno": 276
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_carbon_savings_summary": {
+      "complexity": 5,
+      "lineno": 823
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_by_hour_of_day": {
+      "complexity": 9,
+      "lineno": 731
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_material": {
+      "complexity": 2,
+      "lineno": 2895
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_period": {
+      "complexity": 28,
+      "lineno": 3091
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_region": {
+      "complexity": 22,
+      "lineno": 3508
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_season": {
+      "complexity": 9,
+      "lineno": 3369
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_crosstab": {
+      "complexity": 13,
+      "lineno": 2956
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cycle_duration_histogram": {
+      "complexity": 10,
+      "lineno": 456
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cycle_duration_stats": {
+      "complexity": 6,
+      "lineno": 367
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_cycle_kpi_summary": {
+      "complexity": 5,
+      "lineno": 3733
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_db_info": {
+      "complexity": 15,
+      "lineno": 171
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_db_stats": {
+      "complexity": 10,
+      "lineno": 117
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_demand_aggregates": {
+      "complexity": 5,
+      "lineno": 1613
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_fleet_utilization_summary": {
+      "complexity": 6,
+      "lineno": 278
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_match_distance_buckets": {
+      "complexity": 7,
+      "lineno": 613
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_match_distance_stats": {
+      "complexity": 2,
+      "lineno": 48
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_material_aggregates": {
+      "complexity": 3,
+      "lineno": 2711
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_material_supply_demand_balance": {
+      "complexity": 4,
+      "lineno": 2609
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_material_timeseries": {
+      "complexity": 27,
+      "lineno": 2375
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_supply_aggregates": {
+      "complexity": 4,
+      "lineno": 1532
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_supply_cohort_retention": {
+      "complexity": 8,
+      "lineno": 2791
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_top_cycles_by_efficiency": {
+      "complexity": 15,
+      "lineno": 1363
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_top_demands_by_fulfillment": {
+      "complexity": 13,
+      "lineno": 1712
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_top_materials_by_volume": {
+      "complexity": 31,
+      "lineno": 2064
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_top_routes_by_efficiency": {
+      "complexity": 20,
+      "lineno": 1884
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_top_suppliers_by_efficiency": {
+      "complexity": 13,
+      "lineno": 1215
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_vehicle_stats": {
+      "complexity": 3,
+      "lineno": 910
+    },
+    "agents/persistence/_stats.py::StatsMixin.get_vehicle_timeseries": {
+      "complexity": 25,
+      "lineno": 990
+    },
+    "agents/supply_agent.py::SupplyAgent.__init__": {
+      "complexity": 1,
+      "lineno": 24
+    },
+    "agents/supply_agent.py::SupplyAgent._get_instruction": {
+      "complexity": 1,
+      "lineno": 41
+    },
+    "agents/supply_agent.py::SupplyAgent.accumulate_stock": {
+      "complexity": 1,
+      "lineno": 285
+    },
+    "agents/supply_agent.py::SupplyAgent.consume_shipped": {
+      "complexity": 3,
+      "lineno": 306
+    },
+    "agents/supply_agent.py::SupplyAgent.get_current_stock": {
+      "complexity": 1,
+      "lineno": 54
+    },
+    "agents/supply_agent.py::SupplyAgent.get_tools": {
+      "complexity": 1,
+      "lineno": 322
+    },
+    "agents/supply_agent.py::SupplyAgent.predict_supply": {
+      "complexity": 5,
+      "lineno": 64
+    },
+    "agents/supply_agent.py::SupplyAgent.predict_supply_batch": {
+      "complexity": 8,
+      "lineno": 114
+    },
+    "agents/supply_agent.py::SupplyAgent.request_collection": {
+      "complexity": 3,
+      "lineno": 229
+    },
+    "agents/supply_agent.py::SupplyAgent.set_inventory": {
+      "complexity": 6,
+      "lineno": 265
+    },
+    "agents/supply_agent.py::SupplyAgent.update_stock": {
+      "complexity": 2,
+      "lineno": 254
+    },
+    "agents/world_builder.py::WorldBuilder.__init__": {
+      "complexity": 1,
+      "lineno": 71
+    },
+    "agents/world_builder.py::WorldBuilder.build": {
+      "complexity": 1,
+      "lineno": 228
+    },
+    "agents/world_builder.py::WorldBuilder.build_demand_points": {
+      "complexity": 8,
+      "lineno": 114
+    },
+    "agents/world_builder.py::WorldBuilder.build_fleet": {
+      "complexity": 2,
+      "lineno": 190
+    },
+    "agents/world_builder.py::WorldBuilder.build_supply_points": {
+      "complexity": 2,
+      "lineno": 77
+    },
+    "data/external_signals.py::_cache_path": {
+      "complexity": 1,
+      "lineno": 79
+    },
+    "data/external_signals.py::_extract_value": {
+      "complexity": 5,
+      "lineno": 127
+    },
+    "data/external_signals.py::_fetch_eurostat": {
+      "complexity": 4,
+      "lineno": 111
+    },
+    "data/external_signals.py::_latest_time_value": {
+      "complexity": 5,
+      "lineno": 140
+    },
+    "data/external_signals.py::_load_cache": {
+      "complexity": 5,
+      "lineno": 83
+    },
+    "data/external_signals.py::_save_cache": {
+      "complexity": 3,
+      "lineno": 96
+    },
+    "data/external_signals.py::business_confidence_multiplier": {
+      "complexity": 2,
+      "lineno": 337
+    },
+    "data/external_signals.py::construction_demand_multiplier": {
+      "complexity": 2,
+      "lineno": 256
+    },
+    "data/external_signals.py::get_business_confidence": {
+      "complexity": 5,
+      "lineno": 281
+    },
+    "data/external_signals.py::get_construction_index": {
+      "complexity": 5,
+      "lineno": 161
+    },
+    "data/external_signals.py::get_industrial_index": {
+      "complexity": 5,
+      "lineno": 212
+    },
+    "data/external_signals.py::industrial_supply_multiplier": {
+      "complexity": 2,
+      "lineno": 270
+    },
+    "data/osm_loader.py::OSMLoader.__init__": {
+      "complexity": 1,
+      "lineno": 43
+    },
+    "data/osm_loader.py::OSMLoader._get_road_distance": {
+      "complexity": 6,
+      "lineno": 128
+    },
+    "data/osm_loader.py::OSMLoader._haversine_distance": {
+      "complexity": 1,
+      "lineno": 161
+    },
+    "data/osm_loader.py::OSMLoader.add_node": {
+      "complexity": 1,
+      "lineno": 76
+    },
+    "data/osm_loader.py::OSMLoader.calculate_distance_matrix": {
+      "complexity": 9,
+      "lineno": 91
+    },
+    "data/osm_loader.py::OSMLoader.create_sample_nodes_sweden": {
+      "complexity": 2,
+      "lineno": 181
+    },
+    "data/osm_loader.py::OSMLoader.download_road_network": {
+      "complexity": 4,
+      "lineno": 48
+    },
+    "data/osm_loader.py::OSMLoader.export_nodes_geojson": {
+      "complexity": 4,
+      "lineno": 271
+    },
+    "data/osm_loader.py::OSMLoader.get_nearest_node_id": {
+      "complexity": 4,
+      "lineno": 81
+    },
+    "data/osm_loader.py::OSMRoadNetwork.__init__": {
+      "complexity": 1,
+      "lineno": 322
+    },
+    "data/osm_loader.py::OSMRoadNetwork._to_graph_coords": {
+      "complexity": 2,
+      "lineno": 415
+    },
+    "data/osm_loader.py::OSMRoadNetwork.get_distance_matrix": {
+      "complexity": 5,
+      "lineno": 460
+    },
+    "data/osm_loader.py::OSMRoadNetwork.is_loaded": {
+      "complexity": 1,
+      "lineno": 487
+    },
+    "data/osm_loader.py::OSMRoadNetwork.load_region": {
+      "complexity": 10,
+      "lineno": 331
+    },
+    "data/osm_loader.py::OSMRoadNetwork.shortest_path_distance": {
+      "complexity": 6,
+      "lineno": 422
+    },
+    "data/real_sweden_facilities.py::get_distance_matrix": {
+      "complexity": 11,
+      "lineno": 233
+    },
+    "data/real_sweden_facilities.py::get_facilities_by_city": {
+      "complexity": 1,
+      "lineno": 219
+    },
+    "data/real_sweden_facilities.py::get_facilities_by_type": {
+      "complexity": 1,
+      "lineno": 224
+    },
+    "data/real_sweden_facilities.py::get_facility_count": {
+      "complexity": 1,
+      "lineno": 229
+    },
+    "data/seasonal_adjuster.py::_lookup_factor": {
+      "complexity": 2,
+      "lineno": 90
+    },
+    "data/seasonal_adjuster.py::get_all_factors": {
+      "complexity": 3,
+      "lineno": 73
+    },
+    "data/seasonal_adjuster.py::get_demand_multiplier": {
+      "complexity": 1,
+      "lineno": 63
+    },
+    "data/seasonal_adjuster.py::get_supply_multiplier": {
+      "complexity": 1,
+      "lineno": 45
+    },
+    "data/seasonal_adjuster.py::sim_day_to_month": {
+      "complexity": 1,
+      "lineno": 31
+    },
+    "data/seasonal_perturbation.py::SeasonalPerturbation.is_active_at": {
+      "complexity": 2,
+      "lineno": 69
+    },
+    "data/seasonal_perturbation.py::SeasonalPerturbation.to_dict": {
+      "complexity": 1,
+      "lineno": 66
+    },
+    "data/seasonal_perturbation.py::apply_perturbations": {
+      "complexity": 7,
+      "lineno": 75
+    },
+    "data/seasonal_perturbation.py::validate_perturbation": {
+      "complexity": 7,
+      "lineno": 125
+    },
+    "data/swedish_waste_stats.py::get_baseline_demand_tons_per_day": {
+      "complexity": 6,
+      "lineno": 117
+    },
+    "data/swedish_waste_stats.py::get_realistic_range": {
+      "complexity": 1,
+      "lineno": 181
+    },
+    "data/weather_smhi.py::_cache_key": {
+      "complexity": 1,
+      "lineno": 47
+    },
+    "data/weather_smhi.py::_fetch_smhi_raw": {
+      "complexity": 1,
+      "lineno": 91
+    },
+    "data/weather_smhi.py::_http_get_json": {
+      "complexity": 1,
+      "lineno": 85
+    },
+    "data/weather_smhi.py::_load_cache": {
+      "complexity": 5,
+      "lineno": 53
+    },
+    "data/weather_smhi.py::_normalize_data": {
+      "complexity": 8,
+      "lineno": 140
+    },
+    "data/weather_smhi.py::_parse_forecast": {
+      "complexity": 6,
+      "lineno": 101
+    },
+    "data/weather_smhi.py::_save_cache": {
+      "complexity": 3,
+      "lineno": 66
+    },
+    "data/weather_smhi.py::_summarize": {
+      "complexity": 8,
+      "lineno": 165
+    },
+    "data/weather_smhi.py::get_forecast": {
+      "complexity": 6,
+      "lineno": 189
+    },
+    "data/weather_smhi.py::weather_demand_multiplier": {
+      "complexity": 8,
+      "lineno": 251
+    },
+    "data/weather_smhi.py::weather_supply_multiplier": {
+      "complexity": 5,
+      "lineno": 289
+    },
+    "optimization/real_distance.py::_cache_path": {
+      "complexity": 1,
+      "lineno": 67
+    },
+    "optimization/real_distance.py::_haversine_cache_path": {
+      "complexity": 1,
+      "lineno": 77
+    },
+    "optimization/real_distance.py::_haversine_km": {
+      "complexity": 1,
+      "lineno": 43
+    },
+    "optimization/real_distance.py::_meta_path": {
+      "complexity": 1,
+      "lineno": 72
+    },
+    "optimization/real_distance.py::_osmnx_available": {
+      "complexity": 3,
+      "lineno": 156
+    },
+    "optimization/real_distance.py::_save_cache": {
+      "complexity": 3,
+      "lineno": 144
+    },
+    "optimization/real_distance.py::_try_osm_matrix": {
+      "complexity": 23,
+      "lineno": 165
+    },
+    "optimization/real_distance.py::build_distance_matrix": {
+      "complexity": 9,
+      "lineno": 88
+    },
+    "optimization/real_distance.py::haversine_matrix": {
+      "complexity": 4,
+      "lineno": 52
+    },
+    "optimization/vrp_solver.py::VRPSolver.__init__": {
+      "complexity": 1,
+      "lineno": 63
+    },
+    "optimization/vrp_solver.py::VRPSolver._calculate_distance_matrix_haversine": {
+      "complexity": 4,
+      "lineno": 96
+    },
+    "optimization/vrp_solver.py::VRPSolver._calculate_distance_matrix_real": {
+      "complexity": 4,
+      "lineno": 115
+    },
+    "optimization/vrp_solver.py::VRPSolver._ensure_distance_matrix": {
+      "complexity": 3,
+      "lineno": 148
+    },
+    "optimization/vrp_solver.py::VRPSolver._extract_solution": {
+      "complexity": 4,
+      "lineno": 403
+    },
+    "optimization/vrp_solver.py::VRPSolver._haversine_distance": {
+      "complexity": 1,
+      "lineno": 169
+    },
+    "optimization/vrp_solver.py::VRPSolver._snapshot": {
+      "complexity": 1,
+      "lineno": 317
+    },
+    "optimization/vrp_solver.py::VRPSolver._solve_fallback": {
+      "complexity": 5,
+      "lineno": 506
+    },
+    "optimization/vrp_solver.py::VRPSolver.add_location": {
+      "complexity": 1,
+      "lineno": 78
+    },
+    "optimization/vrp_solver.py::VRPSolver.add_vehicle": {
+      "complexity": 1,
+      "lineno": 83
+    },
+    "optimization/vrp_solver.py::VRPSolver.distance_source": {
+      "complexity": 1,
+      "lineno": 164
+    },
+    "optimization/vrp_solver.py::VRPSolver.set_distance_matrix": {
+      "complexity": 2,
+      "lineno": 88
+    },
+    "optimization/vrp_solver.py::VRPSolver.solve": {
+      "complexity": 11,
+      "lineno": 184
+    },
+    "optimization/vrp_solver.py::VRPSolver.solve_pareto": {
+      "complexity": 4,
+      "lineno": 338
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.__init__": {
+      "complexity": 2,
+      "lineno": 69
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.export_to_json": {
+      "complexity": 6,
+      "lineno": 298
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.generate_daily_supply": {
+      "complexity": 5,
+      "lineno": 118
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.generate_demand_reading": {
+      "complexity": 2,
+      "lineno": 232
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.generate_fleet_snapshot": {
+      "complexity": 2,
+      "lineno": 266
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.generate_iot_telemetry": {
+      "complexity": 5,
+      "lineno": 168
+    },
+    "synthetic/data_generator.py::SyntheticDataGenerator.generate_supply_reading": {
+      "complexity": 2,
+      "lineno": 85
+    },
+    "synthetic/realistic_iot.py::build_vehicle_path": {
+      "complexity": 2,
+      "lineno": 108
+    },
+    "synthetic/realistic_iot.py::co2_emission_kg_per_km": {
+      "complexity": 2,
+      "lineno": 66
+    },
+    "synthetic/realistic_iot.py::fuel_liters_per_km": {
+      "complexity": 1,
+      "lineno": 89
+    },
+    "synthetic/realistic_iot.py::generate_realistic_telemetry": {
+      "complexity": 9,
+      "lineno": 150
+    },
+    "synthetic/realistic_iot.py::interpolate_position": {
+      "complexity": 1,
+      "lineno": 137
+    },
+    "synthetic/realistic_iot.py::speed_factor": {
+      "complexity": 2,
+      "lineno": 28
+    },
+    "web/backend/_auth.py::_check_admin_token": {
+      "complexity": 5,
+      "lineno": 51
+    },
+    "web/backend/_auth.py::_extract_admin_token": {
+      "complexity": 4,
+      "lineno": 30
+    },
+    "web/backend/_auth.py::_get_admin_token": {
+      "complexity": 1,
+      "lineno": 25
+    },
+    "web/backend/_auth.py::require_admin": {
+      "complexity": 2,
+      "lineno": 74
+    },
+    "web/backend/_export.py::_csv_to_rows": {
+      "complexity": 1,
+      "lineno": 26
+    },
+    "web/backend/_export.py::_maybe_gzip": {
+      "complexity": 2,
+      "lineno": 107
+    },
+    "web/backend/_export.py::_rows_to_csv": {
+      "complexity": 3,
+      "lineno": 39
+    },
+    "web/backend/_export.py::_rows_to_parquet_bytes": {
+      "complexity": 6,
+      "lineno": 58
+    },
+    "web/backend/main.py::BackgroundScheduler.__init__": {
+      "complexity": 1,
+      "lineno": 552
+    },
+    "web/backend/main.py::BackgroundScheduler._loop": {
+      "complexity": 10,
+      "lineno": 636
+    },
+    "web/backend/main.py::BackgroundScheduler._run_cycle_safe": {
+      "complexity": 12,
+      "lineno": 580
+    },
+    "web/backend/main.py::BackgroundScheduler.set_dry_run": {
+      "complexity": 2,
+      "lineno": 769
+    },
+    "web/backend/main.py::BackgroundScheduler.start": {
+      "complexity": 2,
+      "lineno": 712
+    },
+    "web/backend/main.py::BackgroundScheduler.status": {
+      "complexity": 4,
+      "lineno": 735
+    },
+    "web/backend/main.py::BackgroundScheduler.stop": {
+      "complexity": 6,
+      "lineno": 721
+    },
+    "web/backend/main.py::BatchOptimizeRequest._validate_scenarios": {
+      "complexity": 6,
+      "lineno": 924
+    },
+    "web/backend/main.py::WebSocketBroadcaster.__init__": {
+      "complexity": 1,
+      "lineno": 207
+    },
+    "web/backend/main.py::WebSocketBroadcaster._safe_send": {
+      "complexity": 3,
+      "lineno": 325
+    },
+    "web/backend/main.py::WebSocketBroadcaster.broadcast": {
+      "complexity": 7,
+      "lineno": 295
+    },
+    "web/backend/main.py::WebSocketBroadcaster.connect": {
+      "complexity": 5,
+      "lineno": 223
+    },
+    "web/backend/main.py::WebSocketBroadcaster.disconnect": {
+      "complexity": 2,
+      "lineno": 286
+    },
+    "web/backend/main.py::WebSocketBroadcaster.reset_stats": {
+      "complexity": 1,
+      "lineno": 365
+    },
+    "web/backend/main.py::WebSocketBroadcaster.stats": {
+      "complexity": 2,
+      "lineno": 331
+    },
+    "web/backend/main.py::_broadcast_cycle_update": {
+      "complexity": 11,
+      "lineno": 458
+    },
+    "web/backend/main.py::_check_simulation_subsystem": {
+      "complexity": 10,
+      "lineno": 1021
+    },
+    "web/backend/main.py::_check_weather_subsystem": {
+      "complexity": 12,
+      "lineno": 1107
+    },
+    "web/backend/main.py::_compute_sweet_spot_score": {
+      "complexity": 7,
+      "lineno": 2993
+    },
+    "web/backend/main.py::_get_protected_endpoints": {
+      "complexity": 7,
+      "lineno": 1835
+    },
+    "web/backend/main.py::_get_runtime_config": {
+      "complexity": 1,
+      "lineno": 2942
+    },
+    "web/backend/main.py::_get_ws_allowed_origins": {
+      "complexity": 1,
+      "lineno": 395
+    },
+    "web/backend/main.py::_get_ws_max_clients": {
+      "complexity": 3,
+      "lineno": 424
+    },
+    "web/backend/main.py::_get_ws_max_per_ip": {
+      "complexity": 3,
+      "lineno": 433
+    },
+    "web/backend/main.py::_mark_frontend_activity": {
+      "complexity": 1,
+      "lineno": 170
+    },
+    "web/backend/main.py::_parse_config_value": {
+      "complexity": 13,
+      "lineno": 3840
+    },
+    "web/backend/main.py::_reset_runtime_config": {
+      "complexity": 1,
+      "lineno": 2973
+    },
+    "web/backend/main.py::_run_batch_simulation": {
+      "complexity": 6,
+      "lineno": 4233
+    },
+    "web/backend/main.py::_seconds_since_frontend_activity": {
+      "complexity": 2,
+      "lineno": 182
+    },
+    "web/backend/main.py::_set_runtime_config": {
+      "complexity": 11,
+      "lineno": 2947
+    },
+    "web/backend/main.py::_type_name": {
+      "complexity": 7,
+      "lineno": 3823
+    },
+    "web/backend/main.py::add_seasonal_perturbation": {
+      "complexity": 4,
+      "lineno": 3488
+    },
+    "web/backend/main.py::apply_runtime_config_batch": {
+      "complexity": 16,
+      "lineno": 3711
+    },
+    "web/backend/main.py::clear_persistence_cache": {
+      "complexity": 2,
+      "lineno": 4150
+    },
+    "web/backend/main.py::deactivate_seasonal_perturbation": {
+      "complexity": 3,
+      "lineno": 3547
+    },
+    "web/backend/main.py::debug_llm": {
+      "complexity": 6,
+      "lineno": 1896
+    },
+    "web/backend/main.py::delete_seasonal_perturbation": {
+      "complexity": 3,
+      "lineno": 3527
+    },
+    "web/backend/main.py::export_db_data": {
+      "complexity": 24,
+      "lineno": 3870
+    },
+    "web/backend/main.py::frontend_activity_middleware": {
+      "complexity": 2,
+      "lineno": 135
+    },
+    "web/backend/main.py::get_auth_status": {
+      "complexity": 3,
+      "lineno": 1780
+    },
+    "web/backend/main.py::get_batch_simulation": {
+      "complexity": 2,
+      "lineno": 4418
+    },
+    "web/backend/main.py::get_carbon_scenarios": {
+      "complexity": 29,
+      "lineno": 2683
+    },
+    "web/backend/main.py::get_dashboard_summary": {
+      "complexity": 13,
+      "lineno": 1571
+    },
+    "web/backend/main.py::get_dashboard_top_summary": {
+      "complexity": 28,
+      "lineno": 1390
+    },
+    "web/backend/main.py::get_db_info": {
+      "complexity": 2,
+      "lineno": 4040
+    },
+    "web/backend/main.py::get_db_maintenance_log": {
+      "complexity": 3,
+      "lineno": 3612
+    },
+    "web/backend/main.py::get_db_maintenance_recommendation": {
+      "complexity": 2,
+      "lineno": 3583
+    },
+    "web/backend/main.py::get_db_stats": {
+      "complexity": 2,
+      "lineno": 4023
+    },
+    "web/backend/main.py::get_external_signals": {
+      "complexity": 3,
+      "lineno": 2140
+    },
+    "web/backend/main.py::get_facilities": {
+      "complexity": 5,
+      "lineno": 2034
+    },
+    "web/backend/main.py::get_facility_distance_matrix": {
+      "complexity": 4,
+      "lineno": 4447
+    },
+    "web/backend/main.py::get_fleet_snapshot": {
+      "complexity": 3,
+      "lineno": 3404
+    },
+    "web/backend/main.py::get_fleet_status": {
+      "complexity": 2,
+      "lineno": 1943
+    },
+    "web/backend/main.py::get_iot_telemetry": {
+      "complexity": 2,
+      "lineno": 3384
+    },
+    "web/backend/main.py::get_last_optimization": {
+      "complexity": 10,
+      "lineno": 2265
+    },
+    "web/backend/main.py::get_llm_stats": {
+      "complexity": 2,
+      "lineno": 4171
+    },
+    "web/backend/main.py::get_materials": {
+      "complexity": 5,
+      "lineno": 4496
+    },
+    "web/backend/main.py::get_pareto_front": {
+      "complexity": 15,
+      "lineno": 2501
+    },
+    "web/backend/main.py::get_perf_stats": {
+      "complexity": 3,
+      "lineno": 4062
+    },
+    "web/backend/main.py::get_persistence_cache_stats": {
+      "complexity": 2,
+      "lineno": 4135
+    },
+    "web/backend/main.py::get_regions": {
+      "complexity": 2,
+      "lineno": 4550
+    },
+    "web/backend/main.py::get_runtime_config": {
+      "complexity": 2,
+      "lineno": 3633
+    },
+    "web/backend/main.py::get_runtime_config_overrides": {
+      "complexity": 2,
+      "lineno": 3807
+    },
+    "web/backend/main.py::get_scheduler_status": {
+      "complexity": 2,
+      "lineno": 4609
+    },
+    "web/backend/main.py::get_seasonal_factors": {
+      "complexity": 4,
+      "lineno": 2089
+    },
+    "web/backend/main.py::get_supply_points": {
+      "complexity": 3,
+      "lineno": 1953
+    },
+    "web/backend/main.py::get_sweet_spot": {
+      "complexity": 8,
+      "lineno": 3084
+    },
+    "web/backend/main.py::get_system_status": {
+      "complexity": 2,
+      "lineno": 1933
+    },
+    "web/backend/main.py::get_weather": {
+      "complexity": 5,
+      "lineno": 2217
+    },
+    "web/backend/main.py::health_check": {
+      "complexity": 1,
+      "lineno": 986
+    },
+    "web/backend/main.py::health_check_deep": {
+      "complexity": 36,
+      "lineno": 1181
+    },
+    "web/backend/main.py::is_ws_origin_allowed": {
+      "complexity": 3,
+      "lineno": 400
+    },
+    "web/backend/main.py::list_batch_simulations": {
+      "complexity": 2,
+      "lineno": 4373
+    },
+    "web/backend/main.py::list_seasonal_perturbations": {
+      "complexity": 3,
+      "lineno": 3445
+    },
+    "web/backend/main.py::optimize_batch": {
+      "complexity": 17,
+      "lineno": 3199
+    },
+    "web/backend/main.py::perf_middleware": {
+      "complexity": 4,
+      "lineno": 97
+    },
+    "web/backend/main.py::post_db_maintenance": {
+      "complexity": 2,
+      "lineno": 3566
+    },
+    "web/backend/main.py::reset_llm_stats": {
+      "complexity": 1,
+      "lineno": 4199
+    },
+    "web/backend/main.py::reset_perf_stats": {
+      "complexity": 1,
+      "lineno": 4114
+    },
+    "web/backend/main.py::reset_runtime_config": {
+      "complexity": 3,
+      "lineno": 3785
+    },
+    "web/backend/main.py::root": {
+      "complexity": 1,
+      "lineno": 976
+    },
+    "web/backend/main.py::run_optimization": {
+      "complexity": 7,
+      "lineno": 1974
+    },
+    "web/backend/main.py::run_simulation": {
+      "complexity": 16,
+      "lineno": 2354
+    },
+    "web/backend/main.py::scheduler_control": {
+      "complexity": 11,
+      "lineno": 4635
+    },
+    "web/backend/main.py::shutdown_event": {
+      "complexity": 2,
+      "lineno": 885
+    },
+    "web/backend/main.py::start_batch_simulation": {
+      "complexity": 8,
+      "lineno": 4290
+    },
+    "web/backend/main.py::startup_event": {
+      "complexity": 10,
+      "lineno": 794
+    },
+    "web/backend/main.py::update_runtime_config": {
+      "complexity": 7,
+      "lineno": 3657
+    },
+    "web/backend/main.py::ws_cycle_updates": {
+      "complexity": 14,
+      "lineno": 1660
+    },
+    "web/backend/main.py::ws_stats": {
+      "complexity": 2,
+      "lineno": 1734
+    },
+    "web/backend/main.py::ws_stats_reset": {
+      "complexity": 1,
+      "lineno": 1756
+    },
+    "web/backend/routers/persistence.py::_backfill_forecast_actuals": {
+      "complexity": 3,
+      "lineno": 734
+    },
+    "web/backend/routers/persistence.py::_build_ensemble": {
+      "complexity": 6,
+      "lineno": 617
+    },
+    "web/backend/routers/persistence.py::_build_json_response": {
+      "complexity": 1,
+      "lineno": 1569
+    },
+    "web/backend/routers/persistence.py::_build_metric_comparison": {
+      "complexity": 6,
+      "lineno": 1080
+    },
+    "web/backend/routers/persistence.py::_build_metric_confidence": {
+      "complexity": 1,
+      "lineno": 671
+    },
+    "web/backend/routers/persistence.py::_build_ndjson_response": {
+      "complexity": 1,
+      "lineno": 1578
+    },
+    "web/backend/routers/persistence.py::_build_parquet_response": {
+      "complexity": 4,
+      "lineno": 1544
+    },
+    "web/backend/routers/persistence.py::_coordinator": {
+      "complexity": 2,
+      "lineno": 52
+    },
+    "web/backend/routers/persistence.py::_parse_forecast_methods": {
+      "complexity": 3,
+      "lineno": 543
+    },
+    "web/backend/routers/persistence.py::_parse_forecast_metrics": {
+      "complexity": 3,
+      "lineno": 560
+    },
+    "web/backend/routers/persistence.py::_parse_lead_time_buckets": {
+      "complexity": 6,
+      "lineno": 972
+    },
+    "web/backend/routers/persistence.py::_per_method_quality": {
+      "complexity": 2,
+      "lineno": 604
+    },
+    "web/backend/routers/persistence.py::_pick_best_method": {
+      "complexity": 3,
+      "lineno": 653
+    },
+    "web/backend/routers/persistence.py::_record_forecast_predictions": {
+      "complexity": 6,
+      "lineno": 715
+    },
+    "web/backend/routers/persistence.py::_run_forecast_methods": {
+      "complexity": 2,
+      "lineno": 577
+    },
+    "web/backend/routers/persistence.py::_save_method_prefs": {
+      "complexity": 4,
+      "lineno": 696
+    },
+    "web/backend/routers/persistence.py::_validate_forecast_method": {
+      "complexity": 2,
+      "lineno": 533
+    },
+    "web/backend/routers/persistence.py::_validate_forecast_window": {
+      "complexity": 3,
+      "lineno": 521
+    },
+    "web/backend/routers/persistence.py::clear_forecast_method_prefs": {
+      "complexity": 3,
+      "lineno": 826
+    },
+    "web/backend/routers/persistence.py::export_cycle_detail_csv": {
+      "complexity": 3,
+      "lineno": 1333
+    },
+    "web/backend/routers/persistence.py::export_cycles_csv": {
+      "complexity": 2,
+      "lineno": 1376
+    },
+    "web/backend/routers/persistence.py::export_cycles_json": {
+      "complexity": 2,
+      "lineno": 1640
+    },
+    "web/backend/routers/persistence.py::export_cycles_ndjson": {
+      "complexity": 2,
+      "lineno": 1684
+    },
+    "web/backend/routers/persistence.py::export_cycles_parquet": {
+      "complexity": 2,
+      "lineno": 1593
+    },
+    "web/backend/routers/persistence.py::export_matches_csv": {
+      "complexity": 2,
+      "lineno": 1437
+    },
+    "web/backend/routers/persistence.py::export_matches_json": {
+      "complexity": 2,
+      "lineno": 1662
+    },
+    "web/backend/routers/persistence.py::export_matches_ndjson": {
+      "complexity": 2,
+      "lineno": 1706
+    },
+    "web/backend/routers/persistence.py::export_matches_parquet": {
+      "complexity": 2,
+      "lineno": 1615
+    },
+    "web/backend/routers/persistence.py::export_perturbed_supplies_csv": {
+      "complexity": 2,
+      "lineno": 1468
+    },
+    "web/backend/routers/persistence.py::export_routes_csv": {
+      "complexity": 2,
+      "lineno": 1509
+    },
+    "web/backend/routers/persistence.py::export_routes_json": {
+      "complexity": 2,
+      "lineno": 1673
+    },
+    "web/backend/routers/persistence.py::export_routes_ndjson": {
+      "complexity": 2,
+      "lineno": 1717
+    },
+    "web/backend/routers/persistence.py::export_routes_parquet": {
+      "complexity": 2,
+      "lineno": 1626
+    },
+    "web/backend/routers/persistence.py::export_supplies_csv": {
+      "complexity": 2,
+      "lineno": 1406
+    },
+    "web/backend/routers/persistence.py::export_supplies_json": {
+      "complexity": 2,
+      "lineno": 1651
+    },
+    "web/backend/routers/persistence.py::export_supplies_ndjson": {
+      "complexity": 2,
+      "lineno": 1695
+    },
+    "web/backend/routers/persistence.py::export_supplies_parquet": {
+      "complexity": 2,
+      "lineno": 1604
+    },
+    "web/backend/routers/persistence.py::get_anomalous_cycles": {
+      "complexity": 4,
+      "lineno": 3567
+    },
+    "web/backend/routers/persistence.py::get_anomaly_summary": {
+      "complexity": 2,
+      "lineno": 3626
+    },
+    "web/backend/routers/persistence.py::get_carbon_savings": {
+      "complexity": 6,
+      "lineno": 2500
+    },
+    "web/backend/routers/persistence.py::get_cohort_by_hour": {
+      "complexity": 4,
+      "lineno": 2458
+    },
+    "web/backend/routers/persistence.py::get_cohort_retention_by_material": {
+      "complexity": 2,
+      "lineno": 3285
+    },
+    "web/backend/routers/persistence.py::get_cohort_retention_by_period": {
+      "complexity": 4,
+      "lineno": 3321
+    },
+    "web/backend/routers/persistence.py::get_cohort_retention_by_region": {
+      "complexity": 2,
+      "lineno": 3426
+    },
+    "web/backend/routers/persistence.py::get_cohort_retention_by_season": {
+      "complexity": 2,
+      "lineno": 3382
+    },
+    "web/backend/routers/persistence.py::get_cohort_retention_crosstab": {
+      "complexity": 4,
+      "lineno": 3470
+    },
+    "web/backend/routers/persistence.py::get_compare_cycles": {
+      "complexity": 4,
+      "lineno": 2991
+    },
+    "web/backend/routers/persistence.py::get_compare_materials": {
+      "complexity": 4,
+      "lineno": 3056
+    },
+    "web/backend/routers/persistence.py::get_compare_routes": {
+      "complexity": 3,
+      "lineno": 3098
+    },
+    "web/backend/routers/persistence.py::get_cycle_detail": {
+      "complexity": 5,
+      "lineno": 1287
+    },
+    "web/backend/routers/persistence.py::get_cycle_duration_by_problem_size": {
+      "complexity": 4,
+      "lineno": 2364
+    },
+    "web/backend/routers/persistence.py::get_cycle_duration_histogram": {
+      "complexity": 4,
+      "lineno": 2069
+    },
+    "web/backend/routers/persistence.py::get_cycle_duration_stats": {
+      "complexity": 4,
+      "lineno": 2027
+    },
+    "web/backend/routers/persistence.py::get_cycle_history": {
+      "complexity": 2,
+      "lineno": 1255
+    },
+    "web/backend/routers/persistence.py::get_cycle_kpi_summary": {
+      "complexity": 6,
+      "lineno": 3520
+    },
+    "web/backend/routers/persistence.py::get_cycle_trend_comparison": {
+      "complexity": 6,
+      "lineno": 1850
+    },
+    "web/backend/routers/persistence.py::get_demand_aggregates": {
+      "complexity": 2,
+      "lineno": 3130
+    },
+    "web/backend/routers/persistence.py::get_fleet_timeseries": {
+      "complexity": 2,
+      "lineno": 109
+    },
+    "web/backend/routers/persistence.py::get_fleet_utilization_summary": {
+      "complexity": 5,
+      "lineno": 1988
+    },
+    "web/backend/routers/persistence.py::get_forecast": {
+      "complexity": 6,
+      "lineno": 427
+    },
+    "web/backend/routers/persistence.py::get_forecast_calibration": {
+      "complexity": 6,
+      "lineno": 848
+    },
+    "web/backend/routers/persistence.py::get_forecast_calibration_trend": {
+      "complexity": 6,
+      "lineno": 913
+    },
+    "web/backend/routers/persistence.py::get_forecast_confidence": {
+      "complexity": 7,
+      "lineno": 743
+    },
+    "web/backend/routers/persistence.py::get_forecast_method_prefs": {
+      "complexity": 2,
+      "lineno": 808
+    },
+    "web/backend/routers/persistence.py::get_forecast_multi": {
+      "complexity": 7,
+      "lineno": 1116
+    },
+    "web/backend/routers/persistence.py::get_kpi_timeseries": {
+      "complexity": 4,
+      "lineno": 77
+    },
+    "web/backend/routers/persistence.py::get_llm_cost_by_type": {
+      "complexity": 5,
+      "lineno": 335
+    },
+    "web/backend/routers/persistence.py::get_llm_cost_forecast": {
+      "complexity": 8,
+      "lineno": 379
+    },
+    "web/backend/routers/persistence.py::get_llm_cost_timeseries": {
+      "complexity": 5,
+      "lineno": 246
+    },
+    "web/backend/routers/persistence.py::get_llm_decision_targets": {
+      "complexity": 2,
+      "lineno": 291
+    },
+    "web/backend/routers/persistence.py::get_match_distance_buckets": {
+      "complexity": 4,
+      "lineno": 2417
+    },
+    "web/backend/routers/persistence.py::get_match_distance_stats": {
+      "complexity": 2,
+      "lineno": 1728
+    },
+    "web/backend/routers/persistence.py::get_material_aggregates": {
+      "complexity": 2,
+      "lineno": 3169
+    },
+    "web/backend/routers/persistence.py::get_material_supply_demand_balance": {
+      "complexity": 5,
+      "lineno": 3202
+    },
+    "web/backend/routers/persistence.py::get_material_timeseries": {
+      "complexity": 4,
+      "lineno": 1904
+    },
+    "web/backend/routers/persistence.py::get_monthly_efficiency_trend": {
+      "complexity": 2,
+      "lineno": 1236
+    },
+    "web/backend/routers/persistence.py::get_persistence_efficiency_metrics": {
+      "complexity": 2,
+      "lineno": 1212
+    },
+    "web/backend/routers/persistence.py::get_persistence_summary": {
+      "complexity": 2,
+      "lineno": 1203
+    },
+    "web/backend/routers/persistence.py::get_perturbation_history": {
+      "complexity": 3,
+      "lineno": 1943
+    },
+    "web/backend/routers/persistence.py::get_perturbation_impact": {
+      "complexity": 3,
+      "lineno": 162
+    },
+    "web/backend/routers/persistence.py::get_perturbation_impact_by_material": {
+      "complexity": 3,
+      "lineno": 205
+    },
+    "web/backend/routers/persistence.py::get_prediction_accuracy_by_day": {
+      "complexity": 6,
+      "lineno": 1002
+    },
+    "web/backend/routers/persistence.py::get_recent_cycles": {
+      "complexity": 2,
+      "lineno": 68
+    },
+    "web/backend/routers/persistence.py::get_seasonal_timeseries": {
+      "complexity": 2,
+      "lineno": 126
+    },
+    "web/backend/routers/persistence.py::get_seasonal_timeseries_by_material": {
+      "complexity": 2,
+      "lineno": 138
+    },
+    "web/backend/routers/persistence.py::get_solver_duration_by_season": {
+      "complexity": 4,
+      "lineno": 2170
+    },
+    "web/backend/routers/persistence.py::get_solver_duration_by_season_status": {
+      "complexity": 4,
+      "lineno": 2293
+    },
+    "web/backend/routers/persistence.py::get_solver_duration_by_status": {
+      "complexity": 4,
+      "lineno": 2229
+    },
+    "web/backend/routers/persistence.py::get_solver_duration_trend": {
+      "complexity": 4,
+      "lineno": 2112
+    },
+    "web/backend/routers/persistence.py::get_supply_aggregates": {
+      "complexity": 2,
+      "lineno": 2744
+    },
+    "web/backend/routers/persistence.py::get_supply_cohort_retention": {
+      "complexity": 2,
+      "lineno": 3255
+    },
+    "web/backend/routers/persistence.py::get_top_cycles": {
+      "complexity": 4,
+      "lineno": 2686
+    },
+    "web/backend/routers/persistence.py::get_top_demands": {
+      "complexity": 4,
+      "lineno": 2774
+    },
+    "web/backend/routers/persistence.py::get_top_facilities": {
+      "complexity": 8,
+      "lineno": 2821
+    },
+    "web/backend/routers/persistence.py::get_top_materials": {
+      "complexity": 4,
+      "lineno": 2953
+    },
+    "web/backend/routers/persistence.py::get_top_routes": {
+      "complexity": 4,
+      "lineno": 2914
+    },
+    "web/backend/routers/persistence.py::get_top_suppliers": {
+      "complexity": 4,
+      "lineno": 2552
+    },
+    "web/backend/routers/persistence.py::get_top_vehicles": {
+      "complexity": 9,
+      "lineno": 2598
+    },
+    "web/backend/routers/persistence.py::get_vehicle_stats": {
+      "complexity": 3,
+      "lineno": 1746
+    },
+    "web/backend/routers/persistence.py::get_vehicle_timeseries": {
+      "complexity": 4,
+      "lineno": 1791
+    }
+  },
+  "generated_by": "scripts/gen_complexity_baseline.py",
+  "over_threshold": [
+    {
+      "complexity": 36,
+      "function": "web/backend/main.py::health_check_deep"
+    },
+    {
+      "complexity": 31,
+      "function": "agents/coordinator.py::MultiAgentCoordinator.run_optimization_cycle"
+    },
+    {
+      "complexity": 31,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_top_materials_by_volume"
+    },
+    {
+      "complexity": 30,
+      "function": "agents/persistence/_solver.py::SolverMixin.get_cycle_duration_by_problem_size"
+    },
+    {
+      "complexity": 30,
+      "function": "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_season_status"
+    },
+    {
+      "complexity": 29,
+      "function": "web/backend/main.py::get_carbon_scenarios"
+    },
+    {
+      "complexity": 28,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_period"
+    },
+    {
+      "complexity": 28,
+      "function": "web/backend/main.py::get_dashboard_top_summary"
+    },
+    {
+      "complexity": 27,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_material_timeseries"
+    },
+    {
+      "complexity": 26,
+      "function": "agents/persistence/_comparisons.py::ComparisonMixin.get_top_facilities_by_distance"
+    },
+    {
+      "complexity": 25,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_vehicle_timeseries"
+    },
+    {
+      "complexity": 24,
+      "function": "web/backend/main.py::export_db_data"
+    },
+    {
+      "complexity": 23,
+      "function": "optimization/real_distance.py::_try_osm_matrix"
+    },
+    {
+      "complexity": 22,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_by_region"
+    },
+    {
+      "complexity": 20,
+      "function": "agents/persistence/_base.py::PersistenceBase._migrate_add_seasonal_columns"
+    },
+    {
+      "complexity": 20,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_top_routes_by_efficiency"
+    },
+    {
+      "complexity": 19,
+      "function": "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_status"
+    },
+    {
+      "complexity": 18,
+      "function": "agents/persistence/_solver.py::SolverMixin.get_solver_duration_by_season"
+    },
+    {
+      "complexity": 17,
+      "function": "agents/persistence/_comparisons.py::ComparisonMixin.compare_materials"
+    },
+    {
+      "complexity": 17,
+      "function": "web/backend/main.py::optimize_batch"
+    },
+    {
+      "complexity": 16,
+      "function": "web/backend/main.py::apply_runtime_config_batch"
+    },
+    {
+      "complexity": 16,
+      "function": "web/backend/main.py::run_simulation"
+    },
+    {
+      "complexity": 15,
+      "function": "agents/llm_caller.py::call_gemini"
+    },
+    {
+      "complexity": 15,
+      "function": "agents/persistence/_comparisons.py::ComparisonMixin.cycle_trend_comparison"
+    },
+    {
+      "complexity": 15,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_db_info"
+    },
+    {
+      "complexity": 15,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_top_cycles_by_efficiency"
+    },
+    {
+      "complexity": 15,
+      "function": "web/backend/main.py::get_pareto_front"
+    },
+    {
+      "complexity": 14,
+      "function": "agents/market_agent.py::MarketAgent.match_supply_demand"
+    },
+    {
+      "complexity": 14,
+      "function": "agents/persistence/_anomalies.py::AnomalyMixin.detect_anomalous_cycles"
+    },
+    {
+      "complexity": 14,
+      "function": "agents/persistence/_solver.py::SolverMixin.get_solver_duration_trend"
+    },
+    {
+      "complexity": 14,
+      "function": "web/backend/main.py::ws_cycle_updates"
+    },
+    {
+      "complexity": 13,
+      "function": "agents/persistence/_analytics.py::AnalyticsMixin.forecast_next_n_sim_days"
+    },
+    {
+      "complexity": 13,
+      "function": "agents/persistence/_comparisons.py::ComparisonMixin.compare_routes"
+    },
+    {
+      "complexity": 13,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_cohort_retention_crosstab"
+    },
+    {
+      "complexity": 13,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_top_demands_by_fulfillment"
+    },
+    {
+      "complexity": 13,
+      "function": "agents/persistence/_stats.py::StatsMixin.get_top_suppliers_by_efficiency"
+    },
+    {
+      "complexity": 13,
+      "function": "web/backend/main.py::_parse_config_value"
+    },
+    {
+      "complexity": 13,
+      "function": "web/backend/main.py::get_dashboard_summary"
+    },
+    {
+      "complexity": 12,
+      "function": "agents/persistence/_forecasting.py::ForecastMixin.get_prediction_accuracy_by_day"
+    },
+    {
+      "complexity": 12,
+      "function": "web/backend/main.py::BackgroundScheduler._run_cycle_safe"
+    },
+    {
+      "complexity": 12,
+      "function": "web/backend/main.py::_check_weather_subsystem"
+    },
+    {
+      "complexity": 11,
+      "function": "agents/persistence/_cycles.py::CycleMixin.get_cycle_detail"
+    },
+    {
+      "complexity": 11,
+      "function": "agents/persistence/_exports.py::ExportMixin.export_cycle_detail_csv"
+    },
+    {
+      "complexity": 11,
+      "function": "agents/persistence/_llm.py::LlmMixin.forecast_llm_cost"
+    },
+    {
+      "complexity": 11,
+      "function": "data/real_sweden_facilities.py::get_distance_matrix"
+    },
+    {
+      "complexity": 11,
+      "function": "optimization/vrp_solver.py::VRPSolver.solve"
+    },
+    {
+      "complexity": 11,
+      "function": "web/backend/main.py::_broadcast_cycle_update"
+    },
+    {
+      "complexity": 11,
+      "function": "web/backend/main.py::_set_runtime_config"
+    },
+    {
+      "complexity": 11,
+      "function": "web/backend/main.py::scheduler_control"
+    }
+  ],
+  "scan_paths": [
+    "agents",
+    "optimization",
+    "synthetic",
+    "data",
+    "web/backend"
+  ],
+  "schema_version": 1,
+  "skipped_block_graphs": 17,
+  "threshold": 10,
+  "total_functions": 486
+}

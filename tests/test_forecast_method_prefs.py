@@ -16,6 +16,46 @@ import tempfile
 import pytest
 
 
+def _live_persistence():
+    """拿到**当前** coordinator 的 persistence —— 必须在 TestClient 起完服务之后取。
+
+    iter #84 (门禁上线第一天就抓到的真 bug)
+    ----------------------------------------
+    ``main.py`` 的 ``startup_event`` 里有这么两行::
+
+        global coordinator, data_generator
+        coordinator = MultiAgentCoordinator(config=world_config, db_path=db_path)
+
+    也就是说 —— **每次起 TestClient, coordinator 都会被整个换掉**,
+    换成一个绑在 ``GL_DB_PATH`` (默认 ``data/simulation.db``) 上的新实例。
+
+    而这些测试原来的写法是::
+
+        if backend_main.coordinator and backend_main.coordinator.persistence:
+            backend_main.coordinator.persistence.save_method_pref(...)   # ← 写在**旧** coordinator 上
+        with TestClient(backend_main.app) as client:                    # ← startup 把 coordinator 换掉了
+            resp = client.get(...)
+
+    于是那行 setup 写进了一个**没人会读的 DB**: 请求打到的 persistence 是
+    startup 新建的那个, 不是测试刚才写过的那个。
+
+    为什么以前没被发现? 因为**全量跑的时候恰好是对的**: 全量跑时,
+    上一个跑过的测试留下的 ambient coordinator 绑的就是 ``data/simulation.db``
+    —— 跟 startup 新建的那个**指向同一个文件**, 看起来一切正常。
+    一旦单独跑这个文件 (或换个测试顺序), ambient coordinator 绑的是别的文件,
+    setup 就静默丢了 —— 测试变成「看运气」。
+
+    **CI 的绿灯是运气, 不是证据。** 这类测试比没有测试更危险:
+    它看起来在验证「pref 被读到了」, 实际验证的是「ambient 状态碰巧对了」。
+
+    修法: setup 一律放进 ``with TestClient(...)`` **里面**, 并在块内重新读
+    ``backend_main.coordinator`` —— 也就是**端点真正会用的那个** coordinator。
+    """
+    from web.backend import main as backend_main
+    coordinator = backend_main.coordinator
+    return coordinator.persistence if coordinator else None
+
+
 # ============================================
 # Persistence layer unit tests
 # ============================================
@@ -155,11 +195,11 @@ class TestForecastMethodAuto:
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
 
-        # 确保 prefs 为空
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            backend_main.coordinator.persistence.clear_method_prefs()
-
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                persistence.clear_method_prefs()
             resp = client.get("/api/persistence/forecast?method=auto&metrics=cost_sek")
         assert resp.status_code == 200
         data = resp.json()
@@ -171,13 +211,14 @@ class TestForecastMethodAuto:
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
 
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            # 强制持久化 co2_kg → moving_average
-            backend_main.coordinator.persistence.save_method_pref(
-                "co2_kg", "moving_average", r_squared=0.75
-            )
-
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                # 强制持久化 co2_kg → moving_average
+                persistence.save_method_pref(
+                    "co2_kg", "moving_average", r_squared=0.75
+                )
             resp = client.get("/api/persistence/forecast?method=auto&metrics=co2_kg")
         assert resp.status_code == 200
         data = resp.json()
@@ -204,10 +245,11 @@ class TestForecastConfidenceAutoPersist:
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
 
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            backend_main.coordinator.persistence.clear_method_prefs()
-
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                persistence.clear_method_prefs()
             resp = client.get("/api/persistence/forecast-confidence?metrics=cost_sek,co2_kg&horizon=3")
         assert resp.status_code == 200
         data = resp.json()
@@ -216,9 +258,9 @@ class TestForecastConfidenceAutoPersist:
         assert "co2_kg" in data["confidence"]
         assert "best_method" in data["confidence"]["cost_sek"]
 
-        # 持久化检查
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            prefs = backend_main.coordinator.persistence.get_method_prefs()
+        # 持久化检查(读的是**同一个** persistence —— 端点写进去的那个)
+        if persistence:
+            prefs = persistence.get_method_prefs()
             metrics_persisted = [p["metric"] for p in prefs]
             assert "cost_sek" in metrics_persisted
             assert "co2_kg" in metrics_persisted
@@ -255,12 +297,14 @@ class TestForecastMethodPrefsEndpoints:
         monkeypatch.delenv("GL_ADMIN_TOKEN", raising=False)
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            backend_main.coordinator.persistence.clear_method_prefs()
-            backend_main.coordinator.persistence.save_method_pref(
-                "cost_sek", "linear", r_squared=0.85, history_n=14
-            )
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                persistence.clear_method_prefs()
+                persistence.save_method_pref(
+                    "cost_sek", "linear", r_squared=0.85, history_n=14
+                )
             resp = client.get("/api/persistence/forecast-method-prefs")
         assert resp.status_code == 200
         data = resp.json()
@@ -279,11 +323,13 @@ class TestForecastMethodPrefsEndpoints:
         monkeypatch.delenv("GL_ADMIN_TOKEN", raising=False)
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            backend_main.coordinator.persistence.save_method_pref(
-                "cost_sek", "linear", r_squared=0.85
-            )
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                persistence.save_method_pref(
+                    "cost_sek", "linear", r_squared=0.85
+                )
             resp = client.delete("/api/persistence/forecast-method-prefs")
         assert resp.status_code == 200
         data = resp.json()
@@ -294,11 +340,13 @@ class TestForecastMethodPrefsEndpoints:
         monkeypatch.delenv("GL_ADMIN_TOKEN", raising=False)
         from fastapi.testclient import TestClient
         from web.backend import main as backend_main
-        if backend_main.coordinator and backend_main.coordinator.persistence:
-            backend_main.coordinator.persistence.save_method_pref(
-                "cost_sek", "linear", r_squared=0.85
-            )
         with TestClient(backend_main.app) as client:
+            # iter #84: setup 必须在服务起来之后 —— startup 会换掉 coordinator
+            persistence = _live_persistence()
+            if persistence:
+                persistence.save_method_pref(
+                    "cost_sek", "linear", r_squared=0.85
+                )
             resp = client.delete(
                 "/api/persistence/forecast-method-prefs?metric=cost_sek"
             )
