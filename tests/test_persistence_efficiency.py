@@ -177,27 +177,36 @@ class TestGetEfficiencyMetrics:
 class TestEfficiencyMetricsAPI:
     """Test /api/persistence/efficiency-metrics endpoint."""
 
-    def test_endpoint_503_when_no_persistence(self, monkeypatch):
-        """No persistence → 503."""
-        from fastapi.testclient import TestClient
+    def test_endpoint_503_when_no_persistence(self):
+        """No coordinator.persistence → 503。
 
-        # 让 coordinator.persistence = None
-        monkeypatch.setenv("GL_DB_PATH", "/tmp/_no_exist.db")
-        # 通过 monkeypatch coordinator
+        iter #85 (ADR-0017) 修: 这个测试**原来没有**装 fake coordinator,
+        只设了 ``GL_DB_PATH`` 环境变量 —— 但 ``TestClient(app)`` 不以 context
+        manager 方式进入时**不会触发 lifespan**, 也就是 ``startup_event`` 根本
+        没跑 → 那个环境变量从头到尾没被任何人读过。
+
+        于是端点读到的是**上一轮遗留的 ambient coordinator**:
+          - 上一轮留了个真 coordinator(且 DB 已被 unlink) → 500
+            (sqlite3.OperationalError: no such table: optimization_cycles)
+          - 上一轮留了个 persistence=None 的 fake      → 503 (蒙对)
+        → 结果取决于「谁先跑」= **顺序依赖**。ADR-0017 的门禁在 seed 202/303
+        下抓到了它(seed 101 恰好蒙对, 所以以前一直是绿的)。
+
+        修法: 跟本文件里另外两个兄弟测试(第 338 行 / 第 463 行)一样 ——
+        **自己装一个 persistence=None 的 fake coordinator**, 断言精确的 503。
+        """
+        from fastapi.testclient import TestClient
         from web.backend import main as backend_main
 
-        # Save original
         orig_coord = backend_main.coordinator
-
-        # 不容易 simulate no persistence — skip if can't mock
-        # 这里只验证 endpoint 存在,500/503 都 OK
         try:
+            class FakeCoord:
+                persistence = None
+            backend_main.coordinator = FakeCoord()
+
             client = TestClient(backend_main.app)
             r = client.get("/api/persistence/efficiency-metrics")
-            # 200 + 503 都可能 (取决于 global state)
-            assert r.status_code in (200, 503)
-            if r.status_code == 503:
-                assert "not initialized" in r.text.lower() or "not available" in r.text.lower()
+            assert r.status_code == 503
         finally:
             backend_main.coordinator = orig_coord
 
