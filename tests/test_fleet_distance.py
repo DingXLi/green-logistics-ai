@@ -42,15 +42,19 @@ def test_fleet_total_distance_accumulates_after_run():
     from web.backend.main import app
 
     with TestClient(app) as client:
-        # 跑一次 optimization
-        r = client.post("/api/optimize", json={"run_simulation": False})
-        if r.status_code == 200:
-            # 再查 fleet 状态
-            r2 = client.get("/api/fleet")
-            data = r2.json()
-            # 如果匹配成功, total_distance_km 应该 > 0
-            # (可能 no_match, 所以用 >= 0 而不是 > 0)
-            assert data["total_distance_km"] >= 0.0
+        # 跑一次 optimization (use_real_roads=False → 不打 OSM, 快很多)
+        r = client.post("/api/optimize", json={"run_simulation": False,
+                                                "use_real_roads": False})
+        # iter #86 (ADR-0018): 原来整段包在 ``if r.status_code == 200:`` 里 ——
+        # 端点一挂, 这条测试**一条断言都不执行**还照样绿。现在先精确断 200。
+        assert r.status_code == 200
+        # 再查 fleet 状态
+        r2 = client.get("/api/fleet")
+        assert r2.status_code == 200
+        data = r2.json()
+        # 如果匹配成功, total_distance_km 应该 > 0
+        # (可能 no_match, 所以用 >= 0 而不是 > 0)
+        assert data["total_distance_km"] >= 0.0
 
 
 def test_fleet_status_fields_consistent():

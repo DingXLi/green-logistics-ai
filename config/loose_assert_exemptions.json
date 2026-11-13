@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "_comment": "松断言豁免登记册 (ADR-0018)。key = path::function::规范化后的断言源码。每条豁免必须写清 reason(封闭枚举) + note(人话: 客户少了哪层保护, 换来了什么)。空的登记册 = 仓库里一条松断言都没有。",
+  "exemptions": []
+}

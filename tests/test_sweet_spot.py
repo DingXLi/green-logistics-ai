@@ -14,11 +14,12 @@ Tests cover:
    - weight_cost only → matches cost-opt scenario
    - weight_co2 only → matches CO2-opt scenario
 """
-import os
 import sys
 from pathlib import Path
 
 import pytest
+
+from fake_world import build_fake_coordinator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -194,57 +195,14 @@ def sweet_spot_env(monkeypatch):
 
     We don't spin up a real coordinator — we mock the relevant methods so the
     endpoint runs the compute_sweet_spot_score logic on synthetic data.
+
+    iter #86 (ADR-0018): fake 世界搬到了 ``tests/fake_world.py`` ——
+    和 /api/optimize/carbon-scenarios 共用同一份语义, 免得两处 fake
+    字段悄悄对不上, 端点行为变得不确定。
     """
     from web.backend import main as backend_main
 
-    class _FakeMarketAgent:
-        demand_points = [
-            {
-                "id": "D1",
-                "name": "Demand 1",
-                "current_demand_tons": 10.0,
-                "preferred_materials": ["concrete"],
-                "location": {"lat": 57.72, "lon": 12.94},
-                "material_type": "concrete",
-            },
-        ]
-
-        async def match_supply_demand(self, supply_offers, demand_requests):
-            return {"matches": [{
-                "supply_id": "SUP1",
-                "demand_id": "D1",
-                "tons": 5.0,
-            }]}
-
-    class _FakeSupply:
-        agent_id = "SUP1"
-        material_type = "concrete"
-        daily_capacity = 10.0
-        location = {"lat": 57.72, "lon": 12.94}
-
-    class _FakeSupplyAgent:
-        def __init__(self):
-            pass
-
-    class _FakeLogisticsAgent:
-        depot_location = {"lat": 57.72, "lon": 12.94}
-        vehicles = [
-            {
-                "vehicle_id": "V1",
-                "status": "available",
-                "capacity_tons": 20.0,
-                "co2_emission_rate": 0.85,
-            },
-        ]
-
-    class _FakeCoordinator:
-        def __init__(self):
-            self.market_agent = _FakeMarketAgent()
-            self.supply_agents = {"SUP1": _FakeSupply()}
-            self.logistics_agent = _FakeLogisticsAgent()
-
-    fake_coord = _FakeCoordinator()
-    monkeypatch.setattr(backend_main, "coordinator", fake_coord)
+    monkeypatch.setattr(backend_main, "coordinator", build_fake_coordinator())
     return backend_main
 
 
@@ -282,12 +240,16 @@ def test_sweet_spot_endpoint_validates_time_limit(sweet_spot_env):
 def test_sweet_spot_endpoint_happy_path(sweet_spot_env):
     """Endpoint should return 200 with sweet_spot + scenarios structure."""
     client = TestClient(sweet_spot_env.app)
-    # Validate input passes; either 200 (happy) or 400 (validator ok, gets 400 due to fake data) is acceptable here
     resp = client.get("/api/optimize/sweet-spot?weight_cost=0.5&weight_co2=0.5&time_limit_seconds=2&use_real_roads=false")
-    # 400 is also acceptable here — happens when get_carbon_scenarios is called internally
-    # and fails because the fake coordinator lacks required state. The endpoint layer validation
-    # already passed.
-    assert resp.status_code in (200, 400, 500)
+    # iter #86 (ADR-0018): 原来写的是 ``in (200, 400, 500)`` —— 三种结果都算过,
+    # 端点整个 500 了测试也一样绿。fake 世界下端点**确定**返回 200, 现在锁死它。
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "sweet_spot" in data
+    assert "scenarios" in data
+    assert isinstance(data["scenarios"], list)
+    assert len(data["scenarios"]) > 0
+    assert data["sweet_spot"]["carbon_price_sek_per_kg"] is not None
 
 
 def test_sweet_spot_endpoint_response_schema(sweet_spot_env, monkeypatch):

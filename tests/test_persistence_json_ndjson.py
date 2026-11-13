@@ -102,37 +102,40 @@ class TestNdjsonEndpoints:
 
     def test_cycles_ndjson_each_line_is_valid_json(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/cycles.ndjson?limit=10")
-        if resp.status_code == 200 and resp.text:
-            lines = [l for l in resp.text.split("\n") if l]
-            for line in lines:
-                parsed = json.loads(line)
-                assert isinstance(parsed, dict)
-                assert "cycle_id" in parsed
+        # iter #86 (ADR-0018): 原来整段包在 ``if resp.status_code == 200 and resp.text:`` 里 ——
+        # 端点一挂, 这条测试**一条断言都不执行**还照样绿。现在先精确断 200, 再无条件断每行。
+        assert resp.status_code == 200
+        lines = [l for l in resp.text.split("\n") if l]
+        assert lines, "ndjson 不能是空的"
+        for line in lines:
+            parsed = json.loads(line)
+            assert isinstance(parsed, dict)
+            assert "cycle_id" in parsed
 
     def test_supplies_ndjson_each_line_is_valid_json(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/supplies.ndjson?limit=10")
-        if resp.status_code == 200 and resp.text:
-            lines = [l for l in resp.text.split("\n") if l]
-            for line in lines:
-                parsed = json.loads(line)
-                assert "supply_id" in parsed
+        assert resp.status_code == 200
+        lines = [l for l in resp.text.split("\n") if l]
+        for line in lines:
+            parsed = json.loads(line)
+            assert "supply_id" in parsed
 
     def test_matches_ndjson_each_line_is_valid_json(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/matches.ndjson?limit=10")
-        if resp.status_code == 200 and resp.text:
-            lines = [l for l in resp.text.split("\n") if l]
-            for line in lines:
-                parsed = json.loads(line)
-                assert "supply_id" in parsed
-                assert "demand_id" in parsed
+        assert resp.status_code == 200
+        lines = [l for l in resp.text.split("\n") if l]
+        for line in lines:
+            parsed = json.loads(line)
+            assert "supply_id" in parsed
+            assert "demand_id" in parsed
 
     def test_routes_ndjson_each_line_is_valid_json(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/routes.ndjson?limit=10")
-        if resp.status_code == 200 and resp.text:
-            lines = [l for l in resp.text.split("\n") if l]
-            for line in lines:
-                parsed = json.loads(line)
-                assert "vehicle_id" in parsed
+        assert resp.status_code == 200
+        lines = [l for l in resp.text.split("\n") if l]
+        for line in lines:
+            parsed = json.loads(line)
+            assert "vehicle_id" in parsed
 
     def test_ndjson_attachment_header(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/cycles.ndjson?limit=5")

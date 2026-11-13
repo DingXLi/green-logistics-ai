@@ -82,13 +82,15 @@ class TestPersistenceParquetEndpoints:
 
     def test_supplies_parquet_valid_bytes(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/supplies.parquet")
-        if resp.status_code == 200:
-            assert resp.content[:4] == b"PAR1"
-            table = self._parse_parquet(resp.content)
-            # supplies schema (10 cols)
-            assert "supply_id" in table.column_names
-            assert "material_type" in table.column_names
-            assert "available_tons" in table.column_names
+        # iter #86 (ADR-0018): 原来整段包在 ``if resp.status_code == 200:`` 里 ——
+        # 端点一挂, 这条测试**一条断言都不执行**还照样绿。现在先精确断 200, 再无条件断内容。
+        assert resp.status_code == 200
+        assert resp.content[:4] == b"PAR1"
+        table = self._parse_parquet(resp.content)
+        # supplies schema (10 cols)
+        assert "supply_id" in table.column_names
+        assert "material_type" in table.column_names
+        assert "available_tons" in table.column_names
 
     def test_matches_parquet_returns_200(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/matches.parquet")
@@ -98,13 +100,13 @@ class TestPersistenceParquetEndpoints:
 
     def test_matches_parquet_valid_bytes(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/matches.parquet")
-        if resp.status_code == 200:
-            assert resp.content[:4] == b"PAR1"
-            table = self._parse_parquet(resp.content)
-            # matches schema (8 cols)
-            assert "supply_id" in table.column_names
-            assert "demand_id" in table.column_names
-            assert "distance_km" in table.column_names
+        assert resp.status_code == 200
+        assert resp.content[:4] == b"PAR1"
+        table = self._parse_parquet(resp.content)
+        # matches schema (8 cols)
+        assert "supply_id" in table.column_names
+        assert "demand_id" in table.column_names
+        assert "distance_km" in table.column_names
 
     def test_routes_parquet_returns_200(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/routes.parquet")
@@ -114,13 +116,13 @@ class TestPersistenceParquetEndpoints:
 
     def test_routes_parquet_valid_bytes(self, client_with_cycles):
         resp = client_with_cycles.get("/api/persistence/export/routes.parquet")
-        if resp.status_code == 200:
-            assert resp.content[:4] == b"PAR1"
-            table = self._parse_parquet(resp.content)
-            # routes schema (8 cols)
-            assert "vehicle_id" in table.column_names
-            assert "distance_km" in table.column_names
-            assert "stops_count" in table.column_names
+        assert resp.status_code == 200
+        assert resp.content[:4] == b"PAR1"
+        table = self._parse_parquet(resp.content)
+        # routes schema (8 cols)
+        assert "vehicle_id" in table.column_names
+        assert "distance_km" in table.column_names
+        assert "stops_count" in table.column_names
 
 
 # ============================================
@@ -150,10 +152,13 @@ class TestPersistenceParquetParams:
         resp = client_with_cycles.get(
             "/api/persistence/export/cycles.parquet?limit=-5"
         )
-        # FastAPI validates int param > 0 normally; negative may 422
-        # But our internal max(1, min(...)) would also clamp
-        # We accept either 200 (clamped) or 422 (Pydantic validation)
-        assert resp.status_code in (200, 422)
+        # 端点自己 clamp(``limit = max(1, min(10000, limit))``), 没有 FastAPI 的
+        # Query(gt=0) 约束 → 负数也走 200, 不是 422。
+        # iter #86 (ADR-0018): 原来写的是 ``in (200, 422)`` —— 两种结果都算过,
+        # 端点整个 500 了测试也一样绿。现在锁死唯一正确的那个。
+        assert resp.status_code == 200
+        # limit=-5 → clamp 到 1 → 文件名里带 1
+        assert "1" in resp.headers["content-disposition"]
 
 
 # ============================================
@@ -167,34 +172,36 @@ class TestParquetCsvConsistency:
         """cycles.parquet 与 cycles.csv 列应该一致。"""
         csv_resp = client_with_cycles.get("/api/persistence/export/cycles.csv")
         parquet_resp = client_with_cycles.get("/api/persistence/export/cycles.parquet")
-        if csv_resp.status_code == 200 and parquet_resp.status_code == 200:
-            csv_lines = [
-                l for l in csv_resp.text.split("\n") if l and not l.startswith("#")
-            ]
-            csv_cols = set(csv_lines[0].split(","))
-            table = pq.read_table(io.BytesIO(parquet_resp.content))
-            parquet_cols = set(table.column_names)
-            # Parquet might have subset of CSV cols (or same)
-            # but core KPI cols should match
-            common = csv_cols & parquet_cols
-            assert "cycle_id" in common
-            assert "sim_day" in common
-            assert "total_cost_sek" in common
+        assert csv_resp.status_code == 200
+        assert parquet_resp.status_code == 200
+        csv_lines = [
+            l for l in csv_resp.text.split("\n") if l and not l.startswith("#")
+        ]
+        csv_cols = set(csv_lines[0].split(","))
+        table = pq.read_table(io.BytesIO(parquet_resp.content))
+        parquet_cols = set(table.column_names)
+        # Parquet might have subset of CSV cols (or same)
+        # but core KPI cols should match
+        common = csv_cols & parquet_cols
+        assert "cycle_id" in common
+        assert "sim_day" in common
+        assert "total_cost_sek" in common
 
     def test_supplies_columns_match_csv(self, client_with_cycles):
         csv_resp = client_with_cycles.get("/api/persistence/export/supplies.csv")
         parquet_resp = client_with_cycles.get("/api/persistence/export/supplies.parquet")
-        if csv_resp.status_code == 200 and parquet_resp.status_code == 200:
-            csv_lines = [
-                l for l in csv_resp.text.split("\n") if l and not l.startswith("#")
-            ]
-            csv_cols = set(csv_lines[0].split(","))
-            table = pq.read_table(io.BytesIO(parquet_resp.content))
-            parquet_cols = set(table.column_names)
-            common = csv_cols & parquet_cols
-            assert "supply_id" in common
-            assert "material_type" in common
-            assert "available_tons" in common
+        assert csv_resp.status_code == 200
+        assert parquet_resp.status_code == 200
+        csv_lines = [
+            l for l in csv_resp.text.split("\n") if l and not l.startswith("#")
+        ]
+        csv_cols = set(csv_lines[0].split(","))
+        table = pq.read_table(io.BytesIO(parquet_resp.content))
+        parquet_cols = set(table.column_names)
+        common = csv_cols & parquet_cols
+        assert "supply_id" in common
+        assert "material_type" in common
+        assert "available_tons" in common
 
 
 # ============================================

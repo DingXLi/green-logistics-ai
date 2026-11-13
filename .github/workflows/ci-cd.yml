@@ -75,6 +75,16 @@ jobs:
         # 故意改复杂时: python scripts/gen_complexity_baseline.py --write + 在 PR 里说明。
         python scripts/gen_complexity_baseline.py
 
+    - name: Loose assertion gate (iter #86)
+      run: |
+        # 松断言门禁 (ADR-0018): 一个断言同时接受多个结果 = 没有断言。
+        # 红灯条件: 出现「同时接受多个状态码」的断言 / 断言写在「看结果再决定要不要断言」
+        # 的守卫里 / 登记册有陈旧豁免 / 一个文件都没扫到 (fail-closed)。
+        # 背景: ADR-0017 的顺序门禁上线当天抓到的 bug, 根因之一就是
+        #       `assert resp.status_code in (200, 503)` —— 端点整个挂掉测试照样绿。
+        # 故意写松断言时: 这一步会红。
+        python scripts/loose_assert_lint.py
+
     - name: Security scan dependencies (iter #16)
       run: |
         # Try pip-audit (canonical), fall back to heuristic scanner in scripts/security_scan.sh
