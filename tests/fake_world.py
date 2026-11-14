@@ -24,7 +24,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class FakeMarketAgent:
@@ -88,3 +88,78 @@ class FakeCoordinator:
 def build_fake_coordinator() -> FakeCoordinator:
     """造一个可预测的 coordinator(每个测试文件共用同一份语义)。"""
     return FakeCoordinator()
+
+
+# ==============================================================
+# iter #87 (ADR-0019): 持久化端点的 coordinator 注入
+# ==============================================================
+#
+# 背景: ``/api/persistence/*`` 这 82 个端点全部先查全局 ``coordinator.persistence``,
+# 拿不到就 ``raise HTTPException(503)``。而端点测试用 ``TestClient(app)``(不走
+# lifespan → 不跑 startup_event)→ 全局 coordinator 永远是 None → **端点必然 503**。
+#
+# 以前这些测试的写法是 ``self.assertIn(resp.status_code, (200, 503))`` ——
+# 「要么成功, 要么服务不可用, 我都行」。翻译成人话: **端点整个挂掉, 测试照样绿**。
+# 75 条这样的断言, 一条都没证明过任何事 (ADR-0018 要消灭的正是这一类, 但它
+# 只认 ``assert`` 语句, 看不见 unittest 方言 —— 详见 ADR-0019)。
+#
+# 现在: **把真持久化接进去, 断言精确到唯一结果**。
+
+
+class PersistenceCoordinator:
+    """最小 coordinator —— 只带 persistence, 够 ``/api/persistence/*`` 用。
+
+    刻意不继承也不模仿 MultiAgentCoordinator: 这些端点只碰 ``.persistence``,
+    端点面窄 → fake 面也窄 → 端点行为完全确定。
+    """
+
+    def __init__(self, persistence: Any) -> None:
+        self.persistence = persistence
+
+
+class PersistenceCoordinatorMixin:
+    """给 ``unittest.TestCase`` 用的 mixin: 把 app 的全局 coordinator 接上真持久化。
+
+    用法::
+
+        class TestXEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
+            def setUp(self):
+                self.install_persistence_coordinator()
+                ...
+
+    退出时自动还原旧 coordinator(``addCleanup``)→ 不污染别的测试,
+    也就不会破坏 ADR-0017 的「测试顺序无关性」。
+
+    注意: **不要**用 ``with TestClient(app) as client:`` —— 那会走 lifespan →
+    startup_event 把全局 coordinator 整个换掉(ADR-0017 的老坑)。
+    """
+
+    def install_persistence_coordinator(self, db_path: Optional[str] = None) -> Any:
+        """接上一个指向临时 SQLite 的真 Persistence, 返回该 Persistence 实例。"""
+        import os
+        import shutil
+        import tempfile
+
+        try:
+            from agents.persistence import Persistence
+            import web.backend.main as backend_main
+        except Exception as e:  # pragma: no cover - 环境不具备时跳过, 不报错
+            self.skipTest(f"web.backend.main / agents.persistence not importable: {e}")
+
+        tmpdir = None
+        if db_path is None:
+            tmpdir = tempfile.mkdtemp(prefix="fde-persist-")
+            db_path = os.path.join(tmpdir, "test.db")
+
+        persistence = Persistence(db_path=db_path)
+
+        old = getattr(backend_main, "coordinator", None)
+        backend_main.coordinator = PersistenceCoordinator(persistence)
+
+        def _restore() -> None:
+            backend_main.coordinator = old
+            if tmpdir is not None:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+        self.addCleanup(_restore)
+        return persistence

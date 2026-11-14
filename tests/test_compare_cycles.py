@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -185,10 +186,11 @@ class TestCompareCyclesPersistence(unittest.TestCase):
         self.assertEqual(b['perturbation_count'], 1)
 
 
-class TestCompareCyclesEndpoint(unittest.TestCase):
+class TestCompareCyclesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/compare-cycles endpoint behavior."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app
             from fastapi.testclient import TestClient
@@ -209,13 +211,12 @@ class TestCompareCyclesEndpoint(unittest.TestCase):
         resp = self._request(
             "/api/persistence/compare-cycles?cycle_id_a=OPT0001&cycle_id_b=OPT0002"
         )
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn('cycle_a', data)
-            self.assertIn('cycle_b', data)
-            self.assertIn('differences', data)
-            self.assertIn('winner', data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn('cycle_a', data)
+        self.assertIn('cycle_b', data)
+        self.assertIn('differences', data)
+        self.assertIn('winner', data)
 
     def test_endpoint_same_cycle_returns_4xx(self):
         resp = self._request(

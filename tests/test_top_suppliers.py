@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -177,8 +178,11 @@ class TestTopSuppliersPersistence(unittest.TestCase):
             pass
 
 
-class TestTopSuppliersEndpoint(unittest.TestCase):
+class TestTopSuppliersEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-suppliers FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -186,13 +190,12 @@ class TestTopSuppliersEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-suppliers")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("direction", data)
-            self.assertIn("top_suppliers", data)
-            self.assertIsInstance(data["top_suppliers"], list)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("direction", data)
+        self.assertIn("top_suppliers", data)
+        self.assertIsInstance(data["top_suppliers"], list)
 
     def test_endpoint_with_metric(self):
         from fastapi.testclient import TestClient
@@ -200,11 +203,10 @@ class TestTopSuppliersEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-suppliers?metric=cost_per_ton&limit=5")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "cost_per_ton")
-            self.assertEqual(data["direction"], "lower_is_better")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "cost_per_ton")
+        self.assertEqual(data["direction"], "lower_is_better")
 
     def test_endpoint_invalid_metric(self):
         # iter #55: invalid metric returns 400 (if persistence ready) or 503 (if not)
@@ -213,7 +215,7 @@ class TestTopSuppliersEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-suppliers?metric=bogus_metric")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_with_material_filter(self):
         from fastapi.testclient import TestClient
@@ -221,14 +223,17 @@ class TestTopSuppliersEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-suppliers?material_type=concrete&limit=10")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":
     unittest.main()
 
-class TestTopVehiclesEndpoint(unittest.TestCase):
+class TestTopVehiclesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-vehicles FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -236,13 +241,12 @@ class TestTopVehiclesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-vehicles")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("direction", data)
-            self.assertIn("top_vehicles", data)
-            self.assertIsInstance(data["top_vehicles"], list)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("direction", data)
+        self.assertIn("top_vehicles", data)
+        self.assertIsInstance(data["top_vehicles"], list)
 
     def test_endpoint_with_metric(self):
         from fastapi.testclient import TestClient
@@ -250,11 +254,10 @@ class TestTopVehiclesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-vehicles?metric=co2_per_km&limit=5")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "co2_per_km")
-            self.assertEqual(data["direction"], "lower_is_better")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "co2_per_km")
+        self.assertEqual(data["direction"], "lower_is_better")
 
     def test_endpoint_invalid_metric(self):
         from fastapi.testclient import TestClient
@@ -262,7 +265,7 @@ class TestTopVehiclesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-vehicles?metric=bogus_metric")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_utilization_metric(self):
         from fastapi.testclient import TestClient
@@ -270,8 +273,7 @@ class TestTopVehiclesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/top-vehicles?metric=utilization")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "utilization")
-            self.assertEqual(data["direction"], "higher_is_better")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "utilization")
+        self.assertEqual(data["direction"], "higher_is_better")

@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -210,10 +211,11 @@ class TestPersistenceCache(unittest.TestCase):
         self.assertEqual(self.p.cache_stats()["n_entries"], 0)
 
 
-class TestPersistenceCacheAdmin(unittest.TestCase):
+class TestPersistenceCacheAdmin(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/admin/persistence/cache endpoint (iter #61)"""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend import main as backend_main
             from agents.persistence import Persistence
@@ -259,13 +261,13 @@ class TestPersistenceCacheAdmin(unittest.TestCase):
         """GET /api/admin/persistence/cache returns n_entries + ttl."""
         with self.TestClient(self.backend_main.app) as client:
             resp = client.get("/api/admin/persistence/cache")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_cache_clear_endpoint(self):
         """POST /api/admin/persistence/cache/clear returns count cleared."""
         with self.TestClient(self.backend_main.app) as client:
             resp = client.post("/api/admin/persistence/cache/clear")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

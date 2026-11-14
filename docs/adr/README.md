@@ -34,6 +34,7 @@ FDE 的工作现场反复被问的一句话就是「为什么这么设计，而�
 | [0016](0016-complexity-ratchet-gate.md) | 复杂度棘轮门禁 | 把 `--exit-zero` 的装饰性 lint 规则变成 CI 常驻不变量（只许降不许涨），还掉 persistence router 全部超阈值端点，当天抓到 2 个真 bug | 已接受 |
 | [0017](0017-test-order-independence-gate.md) | 测试顺序无关性门禁 | 把「CI 绿灯」从运气变成证据：AST 圈定写 ambient 单例的嫌疑队列 + 可复现 seed 扰动，当天抓到 1 个真顺序依赖 | 已接受 |
 | [0018](0018-loose-assertion-gate.md) | 松断言门禁 | 让「一条断言只证明一件事」成为 CI 常驻不变量：3 条 AST 规则（多值状态码 / or 链 / 条件断言）+ 4 条 fail-closed 不变量，存量 11 + 25 条全部改精确 | 已接受 |
+| [0019](0019-assertion-dialect-coverage-gate.md) | 断言方言覆盖门禁 | **门禁自己的自我修正**：ADR-0018 只认 `assert` 语句，对 28% 的 unittest 断言完全失明 → 78 条松断言从眼皮底下溜过去。升级为双方言 + 「视野自证」（出现看不懂的方言就判红）+ 新增 R4 多值守卫，存量 78 条全部改精确（造依赖，不许愿） | 已接受 |
 
 ---
 

@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -195,11 +196,12 @@ class TestTopCyclesPersistence(unittest.TestCase):
         self.assertEqual(result["n_cycles_returned"], 4)
 
 
-class TestTopCyclesEndpoint(unittest.TestCase):
+class TestTopCyclesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-cycles endpoint behavior."""
 
     def setUp(self):
         # Try to import the FastAPI app; if unavailable, skip endpoint tests
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -212,23 +214,22 @@ class TestTopCyclesEndpoint(unittest.TestCase):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-cycles?metric=invalid_metric")
         # When persistence is initialized, expect 400; when not, expect 503
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_default_metric(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-cycles")
         # Either OK (persistence ready) or 503 (no lifespan in TestClient)
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("top_cycles", data)
-            self.assertEqual(data["metric"], "co2_per_ton")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("top_cycles", data)
+        self.assertEqual(data["metric"], "co2_per_ton")
 
     def test_endpoint_limit_param(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-cycles?limit=5")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

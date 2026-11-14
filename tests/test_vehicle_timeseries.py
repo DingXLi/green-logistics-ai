@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -211,10 +212,11 @@ class TestVehicleTimeseriesPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestVehicleTimeseriesEndpoint(unittest.TestCase):
+class TestVehicleTimeseriesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/vehicle-timeseries endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -226,36 +228,35 @@ class TestVehicleTimeseriesEndpoint(unittest.TestCase):
     def test_endpoint_default(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/vehicle-timeseries")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("timeseries", data)
-            self.assertIn("per_vehicle_summary", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("timeseries", data)
+        self.assertIn("per_vehicle_summary", data)
 
     def test_endpoint_metric(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/vehicle-timeseries?metric=cost_per_km")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_vehicle_filter(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/vehicle-timeseries?vehicle_id=VEH_A")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_sim_day_window(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/vehicle-timeseries?since_sim_day=1&until_sim_day=5")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_invalid_metric_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/vehicle-timeseries?metric=invalid")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

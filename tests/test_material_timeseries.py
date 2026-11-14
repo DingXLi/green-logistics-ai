@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -204,10 +205,11 @@ class TestMaterialTimeseriesPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestMaterialTimeseriesEndpoint(unittest.TestCase):
+class TestMaterialTimeseriesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/material-timeseries endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -219,36 +221,35 @@ class TestMaterialTimeseriesEndpoint(unittest.TestCase):
     def test_endpoint_default(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/material-timeseries")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("timeseries", data)
-            self.assertIn("per_material_summary", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("timeseries", data)
+        self.assertIn("per_material_summary", data)
 
     def test_endpoint_material_filter(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/material-timeseries?material_type=concrete")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_metric(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/material-timeseries?metric=n_matches")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_sim_day_window(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/material-timeseries?since_sim_day=1&until_sim_day=5")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_invalid_metric_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/material-timeseries?metric=invalid")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

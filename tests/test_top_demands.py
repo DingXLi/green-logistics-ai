@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -262,10 +263,11 @@ class TestTopDemandsPersistence(unittest.TestCase):
         self.assertEqual(result["n_demands_returned"], 5)
 
 
-class TestTopDemandsEndpoint(unittest.TestCase):
+class TestTopDemandsEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-demands endpoint behavior."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -277,21 +279,20 @@ class TestTopDemandsEndpoint(unittest.TestCase):
     def test_endpoint_invalid_metric_returns_4xx(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-demands?metric=invalid")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_default_metric(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-demands")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "fulfillment_rate")
-            self.assertIn("top_demands", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "fulfillment_rate")
+        self.assertIn("top_demands", data)
 
     def test_endpoint_limit_param(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-demands?limit=5")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

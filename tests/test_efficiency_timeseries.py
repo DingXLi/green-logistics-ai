@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -139,8 +140,11 @@ class TestEfficiencyTimeseriesPersistence(unittest.TestCase):
         self.assertEqual(ts[0]["sim_day"], 2)
 
 
-class TestEfficiencyTimeseriesEndpoint(unittest.TestCase):
+class TestEfficiencyTimeseriesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/kpi-timeseries returns iter #52 efficiency fields."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_includes_efficiency_fields(self):
         from fastapi.testclient import TestClient
@@ -148,15 +152,14 @@ class TestEfficiencyTimeseriesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/kpi-timeseries")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, list) and len(data) > 0:
-                first = data[0]
-                # Should have iter #52 fields
-                self.assertIn("cost_per_ton_sek", first)
-                self.assertIn("co2_per_ton_kg", first)
-                self.assertIn("supply_demand_ratio", first)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        if isinstance(data, list) and len(data) > 0:
+            first = data[0]
+            # Should have iter #52 fields
+            self.assertIn("cost_per_ton_sek", first)
+            self.assertIn("co2_per_ton_kg", first)
+            self.assertIn("supply_demand_ratio", first)
 
     def test_endpoint_invalid_range(self):
         from fastapi.testclient import TestClient
@@ -165,7 +168,7 @@ class TestEfficiencyTimeseriesEndpoint(unittest.TestCase):
         client = TestClient(app)
         resp = client.get("/api/persistence/kpi-timeseries?since_sim_day=10&until_sim_day=5")
         # 400 invalid range, or 503 if no coordinator
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

@@ -75,15 +75,26 @@ jobs:
         # 故意改复杂时: python scripts/gen_complexity_baseline.py --write + 在 PR 里说明。
         python scripts/gen_complexity_baseline.py
 
-    - name: Loose assertion gate (iter #86)
+    - name: Loose assertion gate (iter #86 / iter #87)
       run: |
         # 松断言门禁 (ADR-0018): 一个断言同时接受多个结果 = 没有断言。
+        # iter #87 (ADR-0019): 门禁升级为「两种方言 + 视野自证」——
+        #   · 读得懂 unittest 的 self.assertX(...) (之前只认 assert 语句,
+        #     对 28% 的断言完全失明 → 78 条松断言从眼皮底下溜过去)
+        #   · 视野自证: 出现门禁看不懂的断言方言 → 红 (fail-closed 第四代)
+        #   · 新增 R4 MULTI_STATUS_GUARD: 守卫本身在蒙 (if x in (200, 503))
         # 红灯条件: 出现「同时接受多个状态码」的断言 / 断言写在「看结果再决定要不要断言」
-        # 的守卫里 / 登记册有陈旧豁免 / 一个文件都没扫到 (fail-closed)。
+        # 的守卫里 / 登记册有陈旧豁免 / 一个文件都没扫到 / 有不认识的方言 (fail-closed)。
         # 背景: ADR-0017 的顺序门禁上线当天抓到的 bug, 根因之一就是
         #       `assert resp.status_code in (200, 503)` —— 端点整个挂掉测试照样绿。
         # 故意写松断言时: 这一步会红。
         python scripts/loose_assert_lint.py
+
+    - name: Loose assertion gate selftest (iter #87)
+      run: |
+        # 门禁自己的自测 —— 「一个只报绿的门禁没有价值」。
+        # 这条用例同时是 ADR-0019 的验收线: tests/ 里一条松断言都不许剩。
+        python -m pytest selftest/test_loose_assert_selftest.py -q
 
     - name: Security scan dependencies (iter #16)
       run: |

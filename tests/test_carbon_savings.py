@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -139,8 +140,11 @@ class TestCarbonSavingsPersistence(unittest.TestCase):
             pass
 
 
-class TestCarbonSavingsEndpoint(unittest.TestCase):
+class TestCarbonSavingsEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/carbon-savings FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -148,15 +152,14 @@ class TestCarbonSavingsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/carbon-savings")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("n_cycles", data)
-            self.assertIn("actual_co2_kg", data)
-            self.assertIn("baseline_co2_kg", data)
-            self.assertIn("savings_co2_kg", data)
-            self.assertIn("savings_pct", data)
-            self.assertIn("available_factors", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("n_cycles", data)
+        self.assertIn("actual_co2_kg", data)
+        self.assertIn("baseline_co2_kg", data)
+        self.assertIn("savings_co2_kg", data)
+        self.assertIn("savings_pct", data)
+        self.assertIn("available_factors", data)
 
     def test_endpoint_with_factor(self):
         from fastapi.testclient import TestClient
@@ -164,11 +167,10 @@ class TestCarbonSavingsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/carbon-savings?baseline_factor_key=truck_heavy")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["baseline_factor_key"], "truck_heavy")
-            self.assertEqual(data["baseline_factor_kg_per_ton_km"], 0.062)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["baseline_factor_key"], "truck_heavy")
+        self.assertEqual(data["baseline_factor_kg_per_ton_km"], 0.062)
 
     def test_endpoint_invalid_factor(self):
         from fastapi.testclient import TestClient
@@ -176,7 +178,7 @@ class TestCarbonSavingsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/carbon-savings?baseline_factor_key=bogus")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_invalid_range(self):
         from fastapi.testclient import TestClient
@@ -184,7 +186,7 @@ class TestCarbonSavingsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/carbon-savings?since_sim_day=10&until_sim_day=5")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

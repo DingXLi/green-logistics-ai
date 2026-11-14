@@ -11,6 +11,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -337,10 +338,11 @@ class TestTopFacilitiesPersistence(unittest.TestCase):
         self.assertEqual(result["n_facilities_returned"], 1)
 
 
-class TestTopFacilitiesEndpoint(unittest.TestCase):
+class TestTopFacilitiesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-facilities endpoint behavior."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app
             from fastapi.testclient import TestClient
@@ -352,26 +354,24 @@ class TestTopFacilitiesEndpoint(unittest.TestCase):
     def test_endpoint_default_metric(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-facilities")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "avg_distance")
-            self.assertIn("top_facilities", data)
-            self.assertIn("filter", data)
-            self.assertIn("n_facilities_evaluated", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "avg_distance")
+        self.assertIn("top_facilities", data)
+        self.assertIn("filter", data)
+        self.assertIn("n_facilities_evaluated", data)
 
     def test_endpoint_invalid_metric_returns_4xx(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-facilities?metric=invalid_metric")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_city_filter(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-facilities?city=Göteborg")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["filter"]["city"], "Göteborg")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["filter"]["city"], "Göteborg")
 
     def test_endpoint_facility_ids_csv(self):
         client = self.TestClient(self.app)
@@ -379,31 +379,30 @@ class TestTopFacilitiesEndpoint(unittest.TestCase):
             "/api/persistence/top-facilities"
             "?facility_ids=GBG_RENOVA_SYA,GBG_STENA"
         )
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(
-                set(data["filter"]["facility_ids"]),
-                {"GBG_RENOVA_SYA", "GBG_STENA"},
-            )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(
+            set(data["filter"]["facility_ids"]),
+            {"GBG_RENOVA_SYA", "GBG_STENA"},
+        )
 
     def test_endpoint_invalid_sim_day_window(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/top-facilities?since_sim_day=20&until_sim_day=10"
         )
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_empty_facility_ids(self):
         """Empty facility_ids=,, should 400."""
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-facilities?facility_ids=,,")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_limit_param(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/top-facilities?limit=5")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

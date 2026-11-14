@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -161,8 +162,11 @@ class TestDemandAggregatesPersistence(unittest.TestCase):
         self.assertEqual(dem0["last_sim_day"], 3)
 
 
-class TestDemandAggregatesEndpoint(unittest.TestCase):
+class TestDemandAggregatesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/demand-aggregates FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -171,18 +175,17 @@ class TestDemandAggregatesEndpoint(unittest.TestCase):
         client = TestClient(app)
         resp = client.get("/api/persistence/demand-aggregates")
         # Either 200 (coordinator ready) or 503 (coordinator not initialized)
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIsInstance(data, list)
-            # If we have data, fields should be present
-            if len(data) > 0:
-                first = data[0]
-                self.assertIn("demand_id", first)
-                self.assertIn("material_type", first)
-                self.assertIn("total_required_tons", first)
-                self.assertIn("fulfillment_rate", first)
-                self.assertIn("n_cycles_with_demand", first)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIsInstance(data, list)
+        # If we have data, fields should be present
+        if len(data) > 0:
+            first = data[0]
+            self.assertIn("demand_id", first)
+            self.assertIn("material_type", first)
+            self.assertIn("total_required_tons", first)
+            self.assertIn("fulfillment_rate", first)
+            self.assertIn("n_cycles_with_demand", first)
 
     def test_endpoint_filter_by_demand_id(self):
         from fastapi.testclient import TestClient
@@ -191,7 +194,7 @@ class TestDemandAggregatesEndpoint(unittest.TestCase):
         client = TestClient(app)
         resp = client.get("/api/persistence/demand-aggregates?demand_id=NONEXISTENT")
         # 200 with empty list, OR 503 if coordinator not initialized
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_filter_by_material_type(self):
         from fastapi.testclient import TestClient
@@ -199,7 +202,7 @@ class TestDemandAggregatesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/demand-aggregates?material_type=concrete&limit=10")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_limit_validation(self):
         # limit > 500 应该 clamp 到 500 (or 503 if no coordinator)
@@ -208,7 +211,7 @@ class TestDemandAggregatesEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/demand-aggregates?limit=999")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

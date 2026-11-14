@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -288,10 +289,11 @@ class TestCompareMaterialsPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestCompareMaterialsEndpoint(unittest.TestCase):
+class TestCompareMaterialsEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/compare-materials endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -304,25 +306,24 @@ class TestCompareMaterialsEndpoint(unittest.TestCase):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("material_a", data)
-            self.assertIn("material_b", data)
-            self.assertIn("differences", data)
-            self.assertIn("winner", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("material_a", data)
+        self.assertIn("material_b", data)
+        self.assertIn("differences", data)
+        self.assertIn("winner", data)
 
     def test_endpoint_with_window(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/compare-materials?material_a=concrete&material_b=metal_scrap&since_sim_day=1&until_sim_day=3")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_missing_params(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/compare-materials")
         # FastAPI should return 422 for missing required params
-        self.assertIn(resp.status_code, (422, 503))
+        self.assertEqual(resp.status_code, 422)
 
 
 if __name__ == "__main__":

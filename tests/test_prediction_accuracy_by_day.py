@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -215,10 +216,11 @@ class TestPredictionAccuracyByDay(unittest.TestCase):
         self.assertAlmostEqual(day1_bias, (10 + 50 + (-5)) / 3, places=4)
 
 
-class TestPredictionAccuracyEndpoint(unittest.TestCase):
+class TestPredictionAccuracyEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/prediction-accuracy-by-day endpoint behavior."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -232,35 +234,33 @@ class TestPredictionAccuracyEndpoint(unittest.TestCase):
         resp = client.get(
             "/api/persistence/prediction-accuracy-by-day?metric=invalid"
         )
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_default(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/prediction-accuracy-by-day")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("by_day", data)
-            self.assertIn("overall", data)
-            self.assertIn("lead_time_buckets", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("by_day", data)
+        self.assertIn("overall", data)
+        self.assertIn("lead_time_buckets", data)
 
     def test_endpoint_invalid_buckets_format(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/prediction-accuracy-by-day?lead_time_buckets=abc"
         )
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_valid_buckets_csv(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/prediction-accuracy-by-day?lead_time_buckets=1-1,2-7,8-30"
         )
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            labels = [b["label"] for b in data["lead_time_buckets"]]
-            self.assertEqual(labels, ["1-1d", "2-7d", "8-30d"])
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        labels = [b["label"] for b in data["lead_time_buckets"]]
+        self.assertEqual(labels, ["1-1d", "2-7d", "8-30d"])
 
 
 if __name__ == "__main__":

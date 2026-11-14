@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -213,10 +214,11 @@ class TestTopRoutesPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestTopRoutesEndpoint(unittest.TestCase):
+class TestTopRoutesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/top-routes endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir="/tmp")
         self.tmp.close()
         self.db_path = self.tmp.name
@@ -278,39 +280,37 @@ class TestTopRoutesEndpoint(unittest.TestCase):
         client = self._build_client()
         resp = client.get("/api/persistence/top-routes")
         # Either OK (persistence ready) or 503 (no lifespan in TestClient)
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("metric", data)
-            self.assertIn("top_routes", data)
-            self.assertEqual(data["metric"], "co2_per_km")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("metric", data)
+        self.assertIn("top_routes", data)
+        self.assertEqual(data["metric"], "co2_per_km")
 
     def test_endpoint_metric_query(self):
         client = self._build_client()
         resp = client.get(
             "/api/persistence/top-routes?metric=distance&limit=1")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertEqual(data["metric"], "distance")
-            self.assertLessEqual(len(data["top_routes"]), 1)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["metric"], "distance")
+        self.assertLessEqual(len(data["top_routes"]), 1)
 
     def test_endpoint_vehicle_filter(self):
         client = self._build_client()
         resp = client.get("/api/persistence/top-routes?vehicle_id=VEH_X")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_sim_day_window(self):
         client = self._build_client()
         resp = client.get(
             "/api/persistence/top-routes?since_sim_day=2&until_sim_day=2")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_invalid_metric_returns_4xx(self):
         client = self._build_client()
         resp = client.get("/api/persistence/top-routes?metric=invalid_metric")
         # 400 if persistence is ready, 503 if not initialized
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

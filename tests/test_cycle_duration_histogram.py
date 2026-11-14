@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -171,10 +172,11 @@ class TestCycleDurationHistogramPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestCycleDurationHistogramEndpoint(unittest.TestCase):
+class TestCycleDurationHistogramEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/cycle-duration-histogram endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -186,25 +188,24 @@ class TestCycleDurationHistogramEndpoint(unittest.TestCase):
     def test_endpoint_default(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/cycle-duration-histogram")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("buckets", data)
-            self.assertIn("stats", data)
-            self.assertEqual(data["n_buckets"], 8)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("buckets", data)
+        self.assertIn("stats", data)
+        self.assertEqual(data["n_buckets"], 8)
 
     def test_endpoint_with_window(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/cycle-duration-histogram?since_sim_day=1&until_sim_day=10")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_invalid_window_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/cycle-duration-histogram?since_sim_day=10&until_sim_day=1")
         # since > until should return 400
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

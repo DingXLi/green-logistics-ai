@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -231,8 +232,11 @@ class TestMatchDistanceBucketsPersistence(unittest.TestCase):
         self.assertIsNotNone(result["p95_distance_km"])
 
 
-class TestCycleDurationStatsEndpoint(unittest.TestCase):
+class TestCycleDurationStatsEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/cycle-duration-stats FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -240,12 +244,11 @@ class TestCycleDurationStatsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/cycle-duration-stats")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("n_cycles", data)
-            self.assertIn("mean_ms", data)
-            self.assertIn("slow_cycles_count", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("n_cycles", data)
+        self.assertIn("mean_ms", data)
+        self.assertIn("slow_cycles_count", data)
 
     def test_endpoint_invalid_range(self):
         from fastapi.testclient import TestClient
@@ -253,11 +256,14 @@ class TestCycleDurationStatsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/cycle-duration-stats?since_sim_day=10&until_sim_day=5")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
-class TestMatchDistanceBucketsEndpoint(unittest.TestCase):
+class TestMatchDistanceBucketsEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/match-distance-buckets FastAPI endpoint."""
+
+    def setUp(self):
+        self.install_persistence_coordinator()
 
     def test_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
@@ -265,13 +271,12 @@ class TestMatchDistanceBucketsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/match-distance-buckets")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("buckets", data)
-            self.assertIn("total_matches", data)
-            self.assertIsInstance(data["buckets"], list)
-            self.assertEqual(len(data["buckets"]), 8)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("buckets", data)
+        self.assertIn("total_matches", data)
+        self.assertIsInstance(data["buckets"], list)
+        self.assertEqual(len(data["buckets"]), 8)
 
     def test_endpoint_invalid_range(self):
         from fastapi.testclient import TestClient
@@ -279,16 +284,17 @@ class TestMatchDistanceBucketsEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/match-distance-buckets?since_sim_day=10&until_sim_day=5")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":
     unittest.main()
 
-class TestCohortByHourEndpoint(unittest.TestCase):
+class TestCohortByHourEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """Persistence.get_cohort_by_hour_of_day() + endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir="/tmp")
         self.tmp.close()
         self.db_path = self.tmp.name
@@ -360,8 +366,7 @@ class TestCohortByHourEndpoint(unittest.TestCase):
 
         client = TestClient(app)
         resp = client.get("/api/persistence/cohort-by-hour")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("hour_buckets", data)
-            self.assertIsInstance(data["hour_buckets"], list)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("hour_buckets", data)
+        self.assertIsInstance(data["hour_buckets"], list)

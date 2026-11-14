@@ -82,11 +82,11 @@ class TestAdminSimulateBatch(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
 
     def test_post_validates_days_string(self):
-        """Non-integer days rejected (422 from FastAPI or 400 from our check)."""
+        """Non-integer days rejected by FastAPI's int coercion → 422."""
         self._setup_mock_coordinator()
         with self._client() as client:
             resp = client.post("/api/admin/simulate/batch?days=abc")
-        self.assertIn(resp.status_code, (400, 422))
+        self.assertEqual(resp.status_code, 422)
 
     def test_post_dry_run_param(self):
         self._setup_mock_coordinator()
@@ -171,8 +171,8 @@ class TestAdminSimulateBatchAuth(unittest.TestCase):
         with patch.dict(os.environ, {"GL_ADMIN_TOKEN": "test-secret-123"}):
             with self.TestClient(self.app) as client:
                 resp = client.post("/api/admin/simulate/batch?days=1")
-            # Either 401 (auth enforced) or 200 if test setUp env didn't propagate
-            self.assertIn(resp.status_code, (401, 200))
+            # 鉴权在请求时读 GL_ADMIN_TOKEN → 缺 token 必须 401(精确)
+            self.assertEqual(resp.status_code, 401)
 
     def test_post_with_correct_token(self):
         """With correct X-Admin-Token, request should pass auth."""
@@ -182,9 +182,8 @@ class TestAdminSimulateBatchAuth(unittest.TestCase):
                     "/api/admin/simulate/batch?days=1",
                     headers={"X-Admin-Token": "test-secret-456"},
                 )
-            # If auth worked, response is 200; if env didn't propagate,
-            # 401 is acceptable (test infra dependent)
-            self.assertIn(resp.status_code, (200, 401, 503))
+            # 带对 token → 必须 200(以前是「200/401/503 都行」= 什么都没证明)
+            self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

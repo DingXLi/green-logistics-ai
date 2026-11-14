@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -253,10 +254,11 @@ class TestCycleTrendComparisonPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestCycleTrendComparisonEndpoint(unittest.TestCase):
+class TestCycleTrendComparisonEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/cycle-trend-comparison endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -268,32 +270,31 @@ class TestCycleTrendComparisonEndpoint(unittest.TestCase):
     def test_endpoint_default(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/cycle-trend-comparison")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("early", data)
-            self.assertIn("late", data)
-            self.assertIn("delta", data)
-            self.assertIn("trend", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("early", data)
+        self.assertIn("late", data)
+        self.assertIn("delta", data)
+        self.assertIn("trend", data)
 
     def test_endpoint_with_params(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/cycle-trend-comparison?early_window=3&late_window=3&metric=cost_per_ton")
-        self.assertIn(resp.status_code, (200, 503))
+        self.assertEqual(resp.status_code, 200)
 
     def test_endpoint_invalid_window_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/cycle-trend-comparison?early_window=0")
         # 400 if persistence ready, 503 if not
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_invalid_metric_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/cycle-trend-comparison?metric=invalid")
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

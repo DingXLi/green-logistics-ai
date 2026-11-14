@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from fake_world import PersistenceCoordinatorMixin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -208,10 +209,11 @@ class TestCompareRoutesPersistence(unittest.TestCase):
         self.assertEqual(r1, r2)
 
 
-class TestCompareRoutesEndpoint(unittest.TestCase):
+class TestCompareRoutesEndpoint(PersistenceCoordinatorMixin, unittest.TestCase):
     """/api/persistence/compare-routes endpoint."""
 
     def setUp(self):
+        self.install_persistence_coordinator()
         try:
             from web.backend.main import app  # noqa: F401
             from fastapi.testclient import TestClient
@@ -224,26 +226,25 @@ class TestCompareRoutesEndpoint(unittest.TestCase):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/compare-routes?route_id_a=1&route_id_b=2")
-        self.assertIn(resp.status_code, (200, 503))
-        if resp.status_code == 200:
-            data = resp.json()
-            self.assertIn("route_a", data)
-            self.assertIn("route_b", data)
-            self.assertIn("differences", data)
-            self.assertIn("winner", data)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("route_a", data)
+        self.assertIn("route_b", data)
+        self.assertIn("differences", data)
+        self.assertIn("winner", data)
 
     def test_endpoint_same_route_returns_400(self):
         client = self.TestClient(self.app)
         resp = client.get(
             "/api/persistence/compare-routes?route_id_a=1&route_id_b=1")
         # Should return 400 (same route_id) or 503 (no persistence)
-        self.assertIn(resp.status_code, (400, 503))
+        self.assertEqual(resp.status_code, 400)
 
     def test_endpoint_missing_params(self):
         client = self.TestClient(self.app)
         resp = client.get("/api/persistence/compare-routes")
         # 422 for missing required params
-        self.assertIn(resp.status_code, (422, 503))
+        self.assertEqual(resp.status_code, 422)
 
 
 if __name__ == "__main__":
