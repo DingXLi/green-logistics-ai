@@ -311,13 +311,14 @@ docker run -p 8000:8000 green-logistics-backend
 ### Architecture Decision Records (ADR)
 
 Every non-obvious design choice is written down with its context, alternatives and cost —
-see [`docs/adr/`](docs/adr/README.md) (19 ADRs: multi-agent orchestration, OR-Tools VRP core,
+see [`docs/adr/`](docs/adr/README.md) (20 ADRs: multi-agent orchestration, OR-Tools VRP core,
 LLM config source of truth, LLM resilience + observability, SQLite persistence, CI strategy,
 frontend & deployment, Google GenAI SDK migration, persistence-layer package split,
 public-API contract test, HTTP-API contract test, HTTP response-shape snapshot,
 endpoint auto-discovery + explicit exemption registry, export column contract,
 API-layer router split, cyclomatic-complexity ratchet gate,
-test-order independence gate, loose-assertion gate, assertion-dialect coverage gate).
+test-order independence gate, loose-assertion gate, assertion-dialect coverage gate,
+gate-vision census).
 
 ### References
 
@@ -524,7 +525,10 @@ API 层拆包（main.py 8,303 → 4,720 行，公开 HTTP API 零变化）、
 测试顺序无关性门禁（让「CI 绿灯」从运气变成证据）、
 松断言门禁（让「一条断言只证明一件事」成为 CI 常驻不变量：存量 11 + 25 条全部改精确）、
 断言方言覆盖门禁（门禁自己的自我修正：只认 assert 语句 → 对 28% 的 unittest 断言失明，
-78 条松断言从眼皮底下溜过去；升级为双方言 + 视野自证，存量 78 条全部改精确）。
+78 条松断言从眼皮底下溜过去；升级为双方言 + 视野自证，存量 78 条全部改精确）、
+门禁视野普查（把「覆盖面 = 价值上限」推广到全仓库：复杂度棘轮一直只看得见 42/62 = 67.7%
+的生产代码，「新函数必须 ≤ 10」对另外 27.9% 根本不成立，而没有任何东西会发现；
+扫描范围从门禁自己的源码里读 + 视野百分比实算 + 镜像声明可验证 + 有意收窄的视野登记在案）。
 
 ### 参考资料
 

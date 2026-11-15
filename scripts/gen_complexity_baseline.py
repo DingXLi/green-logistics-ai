@@ -101,7 +101,14 @@ THRESHOLD = 10
 
 # 扫描范围: 与 CI lint job 的 flake8 目标完全一致
 # (少扫一个目录 = 那个目录的复杂度债根本不在门禁视野里)
-SCAN_PATHS = ["agents", "optimization", "synthetic", "data", "web/backend"]
+#
+# iter #88 (ADR-0020): 原来只扫 5 个目录 = 只看得见 42/62 = 67.7% 的生产代码,
+# 剩下的 27.9% (整个 scripts/ + debug_script.py) 对棘轮**完全不存在**。
+# 「新函数必须 ≤ 10」这句话, 对那 27.9% 根本不成立。
+# 现在补上, 并且由 scripts/gate_vision_census.py 持续测量并卡死。
+# 「与 CI lint job 完全一致」这句话不再靠注释承诺 —— 由 ADR-0020 的镜像校验验证。
+SCAN_PATHS = ["agents", "optimization", "synthetic", "data", "web/backend",
+               "scripts", "debug_script.py"]
 
 
 # ---------------------------------------------------------------- 复杂度采集

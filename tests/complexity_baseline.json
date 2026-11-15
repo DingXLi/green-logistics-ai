@@ -1004,6 +1004,30 @@
       "complexity": 5,
       "lineno": 289
     },
+    "debug_script.py::check_env": {
+      "complexity": 4,
+      "lineno": 28
+    },
+    "debug_script.py::main": {
+      "complexity": 5,
+      "lineno": 216
+    },
+    "debug_script.py::run_full_diagnostic": {
+      "complexity": 3,
+      "lineno": 179
+    },
+    "debug_script.py::test_agents": {
+      "complexity": 4,
+      "lineno": 53
+    },
+    "debug_script.py::test_api_connection": {
+      "complexity": 3,
+      "lineno": 151
+    },
+    "debug_script.py::test_vrp": {
+      "complexity": 6,
+      "lineno": 96
+    },
     "optimization/real_distance.py::_cache_path": {
       "complexity": 1,
       "lineno": 67
@@ -1095,6 +1119,802 @@
     "optimization/vrp_solver.py::VRPSolver.solve_pareto": {
       "complexity": 4,
       "lineno": 338
+    },
+    "scripts/data_quality.py::check_demand_variation": {
+      "complexity": 5,
+      "lineno": 253
+    },
+    "scripts/data_quality.py::check_kpi_variation": {
+      "complexity": 7,
+      "lineno": 70
+    },
+    "scripts/data_quality.py::check_llm_decisions": {
+      "complexity": 5,
+      "lineno": 169
+    },
+    "scripts/data_quality.py::check_match_coverage": {
+      "complexity": 3,
+      "lineno": 215
+    },
+    "scripts/data_quality.py::check_material_distribution": {
+      "complexity": 3,
+      "lineno": 237
+    },
+    "scripts/data_quality.py::check_schema_completeness": {
+      "complexity": 6,
+      "lineno": 35
+    },
+    "scripts/data_quality.py::check_solver_health": {
+      "complexity": 6,
+      "lineno": 118
+    },
+    "scripts/data_quality.py::check_temporal_diversity": {
+      "complexity": 5,
+      "lineno": 144
+    },
+    "scripts/data_quality.py::main": {
+      "complexity": 1,
+      "lineno": 375
+    },
+    "scripts/data_quality.py::run_quality": {
+      "complexity": 10,
+      "lineno": 294
+    },
+    "scripts/endpoint_policy.py::build_report": {
+      "complexity": 2,
+      "lineno": 345
+    },
+    "scripts/endpoint_policy.py::build_request": {
+      "complexity": 2,
+      "lineno": 289
+    },
+    "scripts/endpoint_policy.py::classify": {
+      "complexity": 6,
+      "lineno": 242
+    },
+    "scripts/endpoint_policy.py::discover_get_routes": {
+      "complexity": 4,
+      "lineno": 224
+    },
+    "scripts/endpoint_policy.py::get_app": {
+      "complexity": 1,
+      "lineno": 218
+    },
+    "scripts/endpoint_policy.py::main": {
+      "complexity": 4,
+      "lineno": 361
+    },
+    "scripts/endpoint_policy.py::validate": {
+      "complexity": 8,
+      "lineno": 300
+    },
+    "scripts/gate_vision_census.py::_assigned_names": {
+      "complexity": 3,
+      "lineno": 216
+    },
+    "scripts/gate_vision_census.py::_census_gap": {
+      "complexity": 4,
+      "lineno": 554
+    },
+    "scripts/gate_vision_census.py::_census_one": {
+      "complexity": 6,
+      "lineno": 510
+    },
+    "scripts/gate_vision_census.py::_covers": {
+      "complexity": 3,
+      "lineno": 389
+    },
+    "scripts/gate_vision_census.py::_dedupe": {
+      "complexity": 3,
+      "lineno": 319
+    },
+    "scripts/gate_vision_census.py::_excluded": {
+      "complexity": 1,
+      "lineno": 147
+    },
+    "scripts/gate_vision_census.py::_file_has_assertion": {
+      "complexity": 7,
+      "lineno": 175
+    },
+    "scripts/gate_vision_census.py::_find_step_block": {
+      "complexity": 8,
+      "lineno": 254
+    },
+    "scripts/gate_vision_census.py::_module_constants": {
+      "complexity": 5,
+      "lineno": 235
+    },
+    "scripts/gate_vision_census.py::_path_tokens": {
+      "complexity": 4,
+      "lineno": 307
+    },
+    "scripts/gate_vision_census.py::_print_gaps": {
+      "complexity": 4,
+      "lineno": 703
+    },
+    "scripts/gate_vision_census.py::_print_gate": {
+      "complexity": 4,
+      "lineno": 673
+    },
+    "scripts/gate_vision_census.py::_print_mirrors": {
+      "complexity": 4,
+      "lineno": 689
+    },
+    "scripts/gate_vision_census.py::_run_lines": {
+      "complexity": 7,
+      "lineno": 280
+    },
+    "scripts/gate_vision_census.py::_string_list": {
+      "complexity": 3,
+      "lineno": 225
+    },
+    "scripts/gate_vision_census.py::_validate_gaps": {
+      "complexity": 5,
+      "lineno": 475
+    },
+    "scripts/gate_vision_census.py::_validate_gate": {
+      "complexity": 7,
+      "lineno": 429
+    },
+    "scripts/gate_vision_census.py::_validate_mirrors": {
+      "complexity": 5,
+      "lineno": 459
+    },
+    "scripts/gate_vision_census.py::_workflow_step_paths": {
+      "complexity": 3,
+      "lineno": 330
+    },
+    "scripts/gate_vision_census.py::build_report": {
+      "complexity": 7,
+      "lineno": 631
+    },
+    "scripts/gate_vision_census.py::build_universe": {
+      "complexity": 6,
+      "lineno": 193
+    },
+    "scripts/gate_vision_census.py::census": {
+      "complexity": 4,
+      "lineno": 580
+    },
+    "scripts/gate_vision_census.py::compute_coverage": {
+      "complexity": 1,
+      "lineno": 399
+    },
+    "scripts/gate_vision_census.py::iter_python_files": {
+      "complexity": 7,
+      "lineno": 151
+    },
+    "scripts/gate_vision_census.py::load_registry": {
+      "complexity": 2,
+      "lineno": 417
+    },
+    "scripts/gate_vision_census.py::main": {
+      "complexity": 3,
+      "lineno": 744
+    },
+    "scripts/gate_vision_census.py::print_report": {
+      "complexity": 7,
+      "lineno": 717
+    },
+    "scripts/gate_vision_census.py::resolve_scope": {
+      "complexity": 10,
+      "lineno": 349
+    },
+    "scripts/gate_vision_census.py::validate_registry": {
+      "complexity": 4,
+      "lineno": 488
+    },
+    "scripts/gen_api_contract.py::_describe_constant": {
+      "complexity": 3,
+      "lineno": 114
+    },
+    "scripts/gen_api_contract.py::_describe_method": {
+      "complexity": 4,
+      "lineno": 89
+    },
+    "scripts/gen_api_contract.py::_format_annotation": {
+      "complexity": 3,
+      "lineno": 79
+    },
+    "scripts/gen_api_contract.py::_format_default": {
+      "complexity": 6,
+      "lineno": 60
+    },
+    "scripts/gen_api_contract.py::_public_names": {
+      "complexity": 1,
+      "lineno": 56
+    },
+    "scripts/gen_api_contract.py::diff_contracts": {
+      "complexity": 9,
+      "lineno": 193
+    },
+    "scripts/gen_api_contract.py::diff_structure": {
+      "complexity": 7,
+      "lineno": 228
+    },
+    "scripts/gen_api_contract.py::extract_contract": {
+      "complexity": 8,
+      "lineno": 127
+    },
+    "scripts/gen_api_contract.py::load_class_from_file": {
+      "complexity": 2,
+      "lineno": 182
+    },
+    "scripts/gen_api_contract.py::main": {
+      "complexity": 9,
+      "lineno": 255
+    },
+    "scripts/gen_complexity_baseline.py::_print_report": {
+      "complexity": 6,
+      "lineno": 306
+    },
+    "scripts/gen_complexity_baseline.py::_qualified_names": {
+      "complexity": 7,
+      "lineno": 160
+    },
+    "scripts/gen_complexity_baseline.py::_run_flake8": {
+      "complexity": 8,
+      "lineno": 116
+    },
+    "scripts/gen_complexity_baseline.py::collect": {
+      "complexity": 6,
+      "lineno": 200
+    },
+    "scripts/gen_complexity_baseline.py::diff": {
+      "complexity": 7,
+      "lineno": 253
+    },
+    "scripts/gen_complexity_baseline.py::load_baseline": {
+      "complexity": 1,
+      "lineno": 293
+    },
+    "scripts/gen_complexity_baseline.py::main": {
+      "complexity": 6,
+      "lineno": 324
+    },
+    "scripts/gen_complexity_baseline.py::write_baseline": {
+      "complexity": 1,
+      "lineno": 298
+    },
+    "scripts/gen_export_contracts.py::_collect_db_export": {
+      "complexity": 2,
+      "lineno": 624
+    },
+    "scripts/gen_export_contracts.py::_collect_path_export": {
+      "complexity": 2,
+      "lineno": 598
+    },
+    "scripts/gen_export_contracts.py::_compare_table_formats": {
+      "complexity": 7,
+      "lineno": 523
+    },
+    "scripts/gen_export_contracts.py::_contract_from_response": {
+      "complexity": 6,
+      "lineno": 576
+    },
+    "scripts/gen_export_contracts.py::_diff_name_list": {
+      "complexity": 6,
+      "lineno": 340
+    },
+    "scripts/gen_export_contracts.py::_print_report": {
+      "complexity": 5,
+      "lineno": 702
+    },
+    "scripts/gen_export_contracts.py::_seed_fixture": {
+      "complexity": 1,
+      "lineno": 560
+    },
+    "scripts/gen_export_contracts.py::build_request": {
+      "complexity": 2,
+      "lineno": 205
+    },
+    "scripts/gen_export_contracts.py::check_cross_format_consistency": {
+      "complexity": 4,
+      "lineno": 491
+    },
+    "scripts/gen_export_contracts.py::collect_contracts": {
+      "complexity": 5,
+      "lineno": 649
+    },
+    "scripts/gen_export_contracts.py::columns_of": {
+      "complexity": 8,
+      "lineno": 472
+    },
+    "scripts/gen_export_contracts.py::db_export_key": {
+      "complexity": 1,
+      "lineno": 195
+    },
+    "scripts/gen_export_contracts.py::diff_contracts": {
+      "complexity": 4,
+      "lineno": 445
+    },
+    "scripts/gen_export_contracts.py::diff_endpoint_contract": {
+      "complexity": 10,
+      "lineno": 388
+    },
+    "scripts/gen_export_contracts.py::discover_export_routes": {
+      "complexity": 6,
+      "lineno": 160
+    },
+    "scripts/gen_export_contracts.py::load_baseline": {
+      "complexity": 1,
+      "lineno": 690
+    },
+    "scripts/gen_export_contracts.py::main": {
+      "complexity": 5,
+      "lineno": 715
+    },
+    "scripts/gen_export_contracts.py::normalize_parquet_type": {
+      "complexity": 6,
+      "lineno": 255
+    },
+    "scripts/gen_export_contracts.py::parse_csv_contract": {
+      "complexity": 9,
+      "lineno": 216
+    },
+    "scripts/gen_export_contracts.py::parse_json_keys": {
+      "complexity": 7,
+      "lineno": 298
+    },
+    "scripts/gen_export_contracts.py::parse_ndjson_keys": {
+      "complexity": 8,
+      "lineno": 316
+    },
+    "scripts/gen_export_contracts.py::parse_parquet_contract": {
+      "complexity": 1,
+      "lineno": 280
+    },
+    "scripts/gen_export_contracts.py::table_of": {
+      "complexity": 3,
+      "lineno": 182
+    },
+    "scripts/gen_export_contracts.py::write_baseline": {
+      "complexity": 1,
+      "lineno": 695
+    },
+    "scripts/gen_http_contract.py::_collect_refs": {
+      "complexity": 6,
+      "lineno": 102
+    },
+    "scripts/gen_http_contract.py::_diff_models": {
+      "complexity": 9,
+      "lineno": 409
+    },
+    "scripts/gen_http_contract.py::_diff_param_pair": {
+      "complexity": 3,
+      "lineno": 305
+    },
+    "scripts/gen_http_contract.py::_diff_param_pair_compat": {
+      "complexity": 2,
+      "lineno": 323
+    },
+    "scripts/gen_http_contract.py::_diff_params": {
+      "complexity": 5,
+      "lineno": 286
+    },
+    "scripts/gen_http_contract.py::_diff_responses": {
+      "complexity": 6,
+      "lineno": 332
+    },
+    "scripts/gen_http_contract.py::_diff_route": {
+      "complexity": 8,
+      "lineno": 359
+    },
+    "scripts/gen_http_contract.py::_extract_models": {
+      "complexity": 3,
+      "lineno": 192
+    },
+    "scripts/gen_http_contract.py::_extract_params": {
+      "complexity": 4,
+      "lineno": 147
+    },
+    "scripts/gen_http_contract.py::_extract_response_schema": {
+      "complexity": 3,
+      "lineno": 177
+    },
+    "scripts/gen_http_contract.py::_is_admin_protected": {
+      "complexity": 4,
+      "lineno": 130
+    },
+    "scripts/gen_http_contract.py::_route_key": {
+      "complexity": 1,
+      "lineno": 282
+    },
+    "scripts/gen_http_contract.py::_route_lookup": {
+      "complexity": 4,
+      "lineno": 117
+    },
+    "scripts/gen_http_contract.py::_schema_summary": {
+      "complexity": 9,
+      "lineno": 70
+    },
+    "scripts/gen_http_contract.py::diff_contracts": {
+      "complexity": 4,
+      "lineno": 437
+    },
+    "scripts/gen_http_contract.py::extract_contract": {
+      "complexity": 6,
+      "lineno": 223
+    },
+    "scripts/gen_http_contract.py::main": {
+      "complexity": 8,
+      "lineno": 472
+    },
+    "scripts/gen_payload_shapes.py::_diff_node": {
+      "complexity": 10,
+      "lineno": 214
+    },
+    "scripts/gen_payload_shapes.py::_node": {
+      "complexity": 3,
+      "lineno": 121
+    },
+    "scripts/gen_payload_shapes.py::_print_report": {
+      "complexity": 5,
+      "lineno": 480
+    },
+    "scripts/gen_payload_shapes.py::_seed_fixture": {
+      "complexity": 1,
+      "lineno": 381
+    },
+    "scripts/gen_payload_shapes.py::_shape_array": {
+      "complexity": 3,
+      "lineno": 159
+    },
+    "scripts/gen_payload_shapes.py::_shape_object": {
+      "complexity": 2,
+      "lineno": 151
+    },
+    "scripts/gen_payload_shapes.py::_shape_scalar": {
+      "complexity": 6,
+      "lineno": 132
+    },
+    "scripts/gen_payload_shapes.py::collect_shapes": {
+      "complexity": 7,
+      "lineno": 391
+    },
+    "scripts/gen_payload_shapes.py::diff_coverage": {
+      "complexity": 9,
+      "lineno": 263
+    },
+    "scripts/gen_payload_shapes.py::diff_shapes": {
+      "complexity": 5,
+      "lineno": 352
+    },
+    "scripts/gen_payload_shapes.py::load_baseline": {
+      "complexity": 1,
+      "lineno": 468
+    },
+    "scripts/gen_payload_shapes.py::main": {
+      "complexity": 4,
+      "lineno": 493
+    },
+    "scripts/gen_payload_shapes.py::merge_shapes": {
+      "complexity": 7,
+      "lineno": 186
+    },
+    "scripts/gen_payload_shapes.py::shape_of": {
+      "complexity": 4,
+      "lineno": 170
+    },
+    "scripts/gen_payload_shapes.py::write_baseline": {
+      "complexity": 1,
+      "lineno": 473
+    },
+    "scripts/loose_assert_lint.py::_build_function_index": {
+      "complexity": 5,
+      "lineno": 344
+    },
+    "scripts/loose_assert_lint.py::_call_name": {
+      "complexity": 3,
+      "lineno": 215
+    },
+    "scripts/loose_assert_lint.py::_container_elements": {
+      "complexity": 2,
+      "lineno": 208
+    },
+    "scripts/loose_assert_lint.py::_dedupe_keys": {
+      "complexity": 3,
+      "lineno": 525
+    },
+    "scripts/loose_assert_lint.py::_dumps": {
+      "complexity": 3,
+      "lineno": 195
+    },
+    "scripts/loose_assert_lint.py::_find_conditional_asserts": {
+      "complexity": 6,
+      "lineno": 380
+    },
+    "scripts/loose_assert_lint.py::_find_loose_in_assert": {
+      "complexity": 4,
+      "lineno": 281
+    },
+    "scripts/loose_assert_lint.py::_find_loose_in_container": {
+      "complexity": 3,
+      "lineno": 244
+    },
+    "scripts/loose_assert_lint.py::_find_loose_in_unittest": {
+      "complexity": 3,
+      "lineno": 313
+    },
+    "scripts/loose_assert_lint.py::_find_loose_or_assert": {
+      "complexity": 2,
+      "lineno": 299
+    },
+    "scripts/loose_assert_lint.py::_find_loose_or_chain": {
+      "complexity": 9,
+      "lineno": 254
+    },
+    "scripts/loose_assert_lint.py::_find_loose_or_unittest": {
+      "complexity": 3,
+      "lineno": 328
+    },
+    "scripts/loose_assert_lint.py::_find_multi_status_guards": {
+      "complexity": 6,
+      "lineno": 402
+    },
+    "scripts/loose_assert_lint.py::_is_assert_like_call": {
+      "complexity": 1,
+      "lineno": 238
+    },
+    "scripts/loose_assert_lint.py::_is_known_assert_call": {
+      "complexity": 4,
+      "lineno": 225
+    },
+    "scripts/loose_assert_lint.py::_is_status_like_value": {
+      "complexity": 2,
+      "lineno": 187
+    },
+    "scripts/loose_assert_lint.py::_iter_asserts_without_nested_functions": {
+      "complexity": 5,
+      "lineno": 366
+    },
+    "scripts/loose_assert_lint.py::_normalize_source": {
+      "complexity": 1,
+      "lineno": 203
+    },
+    "scripts/loose_assert_lint.py::_qualify": {
+      "complexity": 5,
+      "lineno": 431
+    },
+    "scripts/loose_assert_lint.py::build_report": {
+      "complexity": 2,
+      "lineno": 732
+    },
+    "scripts/loose_assert_lint.py::census_dialects": {
+      "complexity": 8,
+      "lineno": 540
+    },
+    "scripts/loose_assert_lint.py::evaluate": {
+      "complexity": 6,
+      "lineno": 671
+    },
+    "scripts/loose_assert_lint.py::guard_source": {
+      "complexity": 1,
+      "lineno": 427
+    },
+    "scripts/loose_assert_lint.py::load_registry": {
+      "complexity": 2,
+      "lineno": 629
+    },
+    "scripts/loose_assert_lint.py::main": {
+      "complexity": 9,
+      "lineno": 755
+    },
+    "scripts/loose_assert_lint.py::registry_key": {
+      "complexity": 1,
+      "lineno": 639
+    },
+    "scripts/loose_assert_lint.py::scan_file": {
+      "complexity": 9,
+      "lineno": 445
+    },
+    "scripts/loose_assert_lint.py::scan_paths": {
+      "complexity": 9,
+      "lineno": 579
+    },
+    "scripts/loose_assert_lint.py::validate_registry": {
+      "complexity": 6,
+      "lineno": 644
+    },
+    "scripts/make_llm_charts.py::fetch_llm_timeseries": {
+      "complexity": 1,
+      "lineno": 27
+    },
+    "scripts/make_llm_charts.py::fetch_per_target_timeseries": {
+      "complexity": 2,
+      "lineno": 51
+    },
+    "scripts/make_llm_charts.py::plot_decision_panel": {
+      "complexity": 10,
+      "lineno": 71
+    },
+    "scripts/order_shuffle.py::pytest_collection_modifyitems": {
+      "complexity": 5,
+      "lineno": 65
+    },
+    "scripts/order_shuffle.py::pytest_report_header": {
+      "complexity": 2,
+      "lineno": 100
+    },
+    "scripts/run_month.py::main": {
+      "complexity": 6,
+      "lineno": 26
+    },
+    "scripts/run_pareto.py::main": {
+      "complexity": 6,
+      "lineno": 21
+    },
+    "scripts/seed_ci_fixture.py::_ensure_schema": {
+      "complexity": 1,
+      "lineno": 80
+    },
+    "scripts/seed_ci_fixture.py::_existing_sim_days": {
+      "complexity": 4,
+      "lineno": 65
+    },
+    "scripts/seed_ci_fixture.py::_seed_detail_rows": {
+      "complexity": 3,
+      "lineno": 124
+    },
+    "scripts/seed_ci_fixture.py::_seed_rows": {
+      "complexity": 2,
+      "lineno": 87
+    },
+    "scripts/seed_ci_fixture.py::main": {
+      "complexity": 1,
+      "lineno": 272
+    },
+    "scripts/seed_ci_fixture.py::seed": {
+      "complexity": 4,
+      "lineno": 237
+    },
+    "scripts/seed_ci_fixture.py::seed_detail_tables": {
+      "complexity": 3,
+      "lineno": 178
+    },
+    "scripts/split_persistence_router.py::MoveUnit.__init__": {
+      "complexity": 1,
+      "lineno": 366
+    },
+    "scripts/split_persistence_router.py::MoveUnit.name": {
+      "complexity": 1,
+      "lineno": 375
+    },
+    "scripts/split_persistence_router.py::MoveUnit.remove_range": {
+      "complexity": 2,
+      "lineno": 378
+    },
+    "scripts/split_persistence_router.py::MoveUnit.source_lines": {
+      "complexity": 1,
+      "lineno": 384
+    },
+    "scripts/split_persistence_router.py::apply_cleanups": {
+      "complexity": 3,
+      "lineno": 503
+    },
+    "scripts/split_persistence_router.py::attach_comments": {
+      "complexity": 4,
+      "lineno": 209
+    },
+    "scripts/split_persistence_router.py::block_end": {
+      "complexity": 1,
+      "lineno": 204
+    },
+    "scripts/split_persistence_router.py::block_start": {
+      "complexity": 2,
+      "lineno": 196
+    },
+    "scripts/split_persistence_router.py::body_nodes": {
+      "complexity": 2,
+      "lineno": 136
+    },
+    "scripts/split_persistence_router.py::build_module_source": {
+      "complexity": 2,
+      "lineno": 431
+    },
+    "scripts/split_persistence_router.py::build_router_source": {
+      "complexity": 5,
+      "lineno": 401
+    },
+    "scripts/split_persistence_router.py::closure": {
+      "complexity": 5,
+      "lineno": 176
+    },
+    "scripts/split_persistence_router.py::collect_units": {
+      "complexity": 2,
+      "lineno": 388
+    },
+    "scripts/split_persistence_router.py::find_insert_points": {
+      "complexity": 9,
+      "lineno": 513
+    },
+    "scripts/split_persistence_router.py::indentation_of": {
+      "complexity": 1,
+      "lineno": 239
+    },
+    "scripts/split_persistence_router.py::insertion_point": {
+      "complexity": 2,
+      "lineno": 226
+    },
+    "scripts/split_persistence_router.py::local_names": {
+      "complexity": 7,
+      "lineno": 148
+    },
+    "scripts/split_persistence_router.py::main": {
+      "complexity": 7,
+      "lineno": 543
+    },
+    "scripts/split_persistence_router.py::parse_args": {
+      "complexity": 1,
+      "lineno": 533
+    },
+    "scripts/split_persistence_router.py::read_lines": {
+      "complexity": 1,
+      "lineno": 98
+    },
+    "scripts/split_persistence_router.py::referenced_globals": {
+      "complexity": 4,
+      "lineno": 165
+    },
+    "scripts/split_persistence_router.py::rewrite_main": {
+      "complexity": 7,
+      "lineno": 440
+    },
+    "scripts/split_persistence_router.py::route_path": {
+      "complexity": 7,
+      "lineno": 102
+    },
+    "scripts/split_persistence_router.py::top_level_defs": {
+      "complexity": 6,
+      "lineno": 123
+    },
+    "scripts/split_persistence_router.py::write_text": {
+      "complexity": 1,
+      "lineno": 498
+    },
+    "scripts/test_order_gate.py::_is_singleton_attr": {
+      "complexity": 1,
+      "lineno": 97
+    },
+    "scripts/test_order_gate.py::_junit_outcomes": {
+      "complexity": 8,
+      "lineno": 180
+    },
+    "scripts/test_order_gate.py::_print_unstable": {
+      "complexity": 3,
+      "lineno": 311
+    },
+    "scripts/test_order_gate.py::_root_name": {
+      "complexity": 3,
+      "lineno": 101
+    },
+    "scripts/test_order_gate.py::_run_seeds": {
+      "complexity": 3,
+      "lineno": 280
+    },
+    "scripts/test_order_gate.py::_singleton_write_lines": {
+      "complexity": 7,
+      "lineno": 111
+    },
+    "scripts/test_order_gate.py::build_cohort": {
+      "complexity": 2,
+      "lineno": 160
+    },
+    "scripts/test_order_gate.py::compare_runs": {
+      "complexity": 6,
+      "lineno": 255
+    },
+    "scripts/test_order_gate.py::main": {
+      "complexity": 9,
+      "lineno": 325
+    },
+    "scripts/test_order_gate.py::run_with_seed": {
+      "complexity": 3,
+      "lineno": 206
+    },
+    "scripts/test_order_gate.py::scan_ambient_writers": {
+      "complexity": 7,
+      "lineno": 131
     },
     "synthetic/data_generator.py::SyntheticDataGenerator.__init__": {
       "complexity": 2,
@@ -2149,10 +2969,12 @@
     "optimization",
     "synthetic",
     "data",
-    "web/backend"
+    "web/backend",
+    "scripts",
+    "debug_script.py"
   ],
   "schema_version": 1,
-  "skipped_block_graphs": 17,
+  "skipped_block_graphs": 48,
   "threshold": 10,
-  "total_functions": 486
+  "total_functions": 691
 }

@@ -66,7 +66,7 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
@@ -98,6 +98,36 @@ def _is_singleton_attr(attr: str) -> bool:
     return attr in AMBIENT_SINGLETONS
 
 
+def _root_name(node: ast.AST) -> Optional[str]:
+    """赋值目标最外层的对象名(``backend_main.coordinator`` → ``backend_main``)。"""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        # backend_main.xxx.coordinator = ... (深一层)
+        return getattr(node, "attr", None)
+    return None
+
+
+def _singleton_write_lines(tree: ast.AST) -> List[str]:
+    """在一棵 AST 里找出所有「给 ambient 单例赋值」的语句。"""
+    found: List[str] = []
+    for node in ast.walk(tree):
+        # 形如  backend_main.coordinator = X
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        for tgt in targets:
+            if not isinstance(tgt, ast.Attribute):
+                continue
+            if not _is_singleton_attr(tgt.attr):
+                continue
+            # 根对象必须是已知的 backend_main / main 之一
+            if _root_name(tgt.value) not in _ASSIGN_TARGETS:
+                continue
+            found.append(f"L{node.lineno}: {ast.unparse(node)[:110]}")
+    return found
+
+
 def scan_ambient_writers() -> Dict[str, List[str]]:
     """找出所有给 ambient 单例赋值的测试文件。
 
@@ -120,29 +150,7 @@ def scan_ambient_writers() -> Dict[str, List[str]]:
         except (OSError, SyntaxError):
             continue
 
-        found: List[str] = []
-        for node in ast.walk(tree):
-            # 形如  backend_main.coordinator = X
-            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for tgt in targets:
-                if not isinstance(tgt, ast.Attribute):
-                    continue
-                if not _is_singleton_attr(tgt.attr):
-                    continue
-                # 根对象必须是已知的 backend_main / main 之一
-                root = tgt.value
-                root_name = None
-                if isinstance(root, ast.Name):
-                    root_name = root.id
-                elif isinstance(root, ast.Attribute):
-                    # backend_main.xxx.coordinator = ... (深一层)
-                    root_name = getattr(root, "attr", None)
-                if root_name not in _ASSIGN_TARGETS:
-                    continue
-                found.append(f"L{node.lineno}: {ast.unparse(node)[:110]}")
-
+        found = _singleton_write_lines(tree)
         if found:
             hits[fname] = found
 
@@ -269,6 +277,51 @@ def compare_runs(runs: Dict[int, Dict[str, str]]) -> Dict[str, List[str]]:
     return unstable
 
 
+def _run_seeds(cohort: List[str], seeds: List[int], timeout: int,
+               report: Dict[str, object]) -> Tuple[Dict[int, Dict[str, str]],
+                                                  Optional[str]]:
+    """跑完所有 seed 的扰动。
+
+    返回 (每次 seed 的 outcomes, 致命错误信息)。
+    致命错误 = **一个 testcase 都没收集到** —— 那说明这轮扰动什么都没验证,
+    静默绿灯 = 门禁作废(这正是 iter #83 之前的老毛病)。
+    """
+    runs: Dict[int, Dict[str, str]] = {}
+
+    for seed in seeds:
+        print(f"▶ 跑 seed={seed} ...", flush=True)
+        outcomes, summary = run_with_seed(cohort, seed, timeout)
+        runs[seed] = outcomes
+        n_cases = len([k for k in outcomes if not k.startswith("__")])
+        report["runs"][str(seed)] = {
+            "summary": summary,
+            "exit_code": outcomes.get("__exit_code__"),
+            "testcases": n_cases,
+        }
+        print(f"  → {summary}  ({n_cases} 个 testcase)")
+        if n_cases == 0:
+            print(f"❌ seed={seed} 收集到 0 个 testcase —— 本轮扰动无效, 门禁判红")
+            report["ok"] = False
+            report["fatal"] = f"seed={seed} collected 0 testcases"
+            return runs, f"seed={seed} collected 0 testcases"
+
+    return runs, None
+
+
+def _print_unstable(unstable: Dict[str, Any]) -> None:
+    """把「顺序敏感」的测试清单打出来 + 说清楚含义和修法。"""
+    print(f"❌ 发现 {len(unstable)} 个**顺序敏感**的测试 (结果随执行顺序翻转)")
+    print("=" * 74)
+    for cid, details in unstable.items():
+        print(f"  🔴 {cid}")
+        for d in details:
+            print(f"       {d}")
+    print()
+    print("  含义: 这些测试的结果依赖「谁先跑」—— 它们不是可靠的证据。")
+    print("  修法: 测试自己持有状态, 别共享 ambient 单例;")
+    print("        或用 fixture 在 setup/teardown 里显式换掉并还原。")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="测试顺序无关性门禁 (ADR-0017)")
     ap.add_argument("--seeds", default="101,202,303", help="逗号分隔的 seed 列表")
@@ -318,27 +371,11 @@ def main() -> int:
     print(f"扰动 seed: {seeds}")
     print()
 
-    runs: Dict[int, Dict[str, str]] = {}
-    for seed in seeds:
-        print(f"▶ 跑 seed={seed} ...", flush=True)
-        outcomes, summary = run_with_seed(cohort, seed, args.timeout)
-        runs[seed] = outcomes
-        n_cases = len([k for k in outcomes if not k.startswith("__")])
-        report["runs"][str(seed)] = {
-            "summary": summary,
-            "exit_code": outcomes.get("__exit_code__"),
-            "testcases": n_cases,
-        }
-        print(f"  → {summary}  ({n_cases} 个 testcase)")
-        # Fail-closed: 一个 testcase 都没收集到 = 这轮扰动**什么都没验证**,
-        # 必须当红处理。静默绿灯 = 门禁作废(这正是 iter #83 之前的老毛病)。
-        if n_cases == 0:
-            print(f"❌ seed={seed} 收集到 0 个 testcase —— 本轮扰动无效, 门禁判红")
-            report["ok"] = False
-            report["fatal"] = f"seed={seed} collected 0 testcases"
-            if args.json:
-                print(json.dumps(report, ensure_ascii=False, indent=2))
-            return 1
+    runs, fatal = _run_seeds(cohort, seeds, args.timeout, report)
+    if fatal is not None:
+        if args.json:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1
 
     unstable = compare_runs(runs)
     report["unstable"] = unstable
@@ -347,16 +384,7 @@ def main() -> int:
     print("=" * 74)
     if unstable:
         report["ok"] = False
-        print(f"❌ 发现 {len(unstable)} 个**顺序敏感**的测试 (结果随执行顺序翻转)")
-        print("=" * 74)
-        for cid, details in unstable.items():
-            print(f"  🔴 {cid}")
-            for d in details:
-                print(f"       {d}")
-        print()
-        print("  含义: 这些测试的结果依赖「谁先跑」—— 它们不是可靠的证据。")
-        print("  修法: 测试自己持有状态, 别共享 ambient 单例;")
-        print("        或用 fixture 在 setup/teardown 里显式换掉并还原。")
+        _print_unstable(unstable)
         if args.json:
             print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1

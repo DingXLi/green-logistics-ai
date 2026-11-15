@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "_why": "ADR-0020: 门禁的覆盖面 = 门禁的价值上限。这份登记册不写「我扫了哪些目录」—— 扫描范围从门禁自己的源码里读, 登记册和代码对不上时门禁自己会红。",
+  "gates": [
+    {
+      "id": "complexity-ratchet",
+      "title": "复杂度棘轮门禁",
+      "concern": "PRODUCTION_PY",
+      "scope_source": {
+        "kind": "module_const",
+        "path": "scripts/gen_complexity_baseline.py",
+        "names": ["SCAN_PATHS"]
+      },
+      "min_coverage_pct": 100.0
+    },
+    {
+      "id": "flake8-lint",
+      "title": "CI flake8 lint 目标",
+      "concern": "PRODUCTION_PY",
+      "scope_source": {
+        "kind": "workflow_paths",
+        "path": ".github/workflows/ci-cd.yml",
+        "step": "Lint with flake8"
+      },
+      "min_coverage_pct": 100.0
+    },
+    {
+      "id": "loose-assert",
+      "title": "松断言门禁",
+      "concern": "PY_WITH_ASSERTS",
+      "scope_source": {
+        "kind": "module_const",
+        "path": "scripts/loose_assert_lint.py",
+        "names": ["DEFAULT_SCAN_PATHS"]
+      },
+      "min_coverage_pct": 100.0
+    }
+  ],
+  "mirror_claims": [
+    {
+      "a": "complexity-ratchet",
+      "b": "flake8-lint",
+      "why": "ADR-0020: 复杂度棘轮门禁的源码注释写着「扫描范围: 与 CI lint job 的 flake8 目标完全一致」—— 这句话从来没被验证过。两处各写一遍目录名, 哪天只改一边, 注释就变成谎言, 而谎言不会让 CI 变红。"
+    }
+  ],
+  "known_gaps": [
+    {
+      "id": "mypy-type-check",
+      "title": "CI mypy 类型检查",
+      "concern": "PRODUCTION_PY",
+      "scope_source": {
+        "kind": "workflow_paths",
+        "path": ".github/workflows/ci-cd.yml",
+        "step": "Type-check with mypy"
+      },
+      "why": "mypy 的关注面不是「所有生产代码」, 而是「已经有类型标注的代码」—— scripts/ 目前基本是无类型脚本, 强行纳入会把 mypy 变成永远红的噪音机, 大家就会去关掉它。登记在案 = 缺口不会变大也不会被忘掉; 等 scripts/ 补上类型标注, 再把它升格为正式门禁。"
+    }
+  ]
+}
